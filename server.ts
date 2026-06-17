@@ -8,9 +8,16 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
+import { v2 as cloudinary } from "cloudinary";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
@@ -22,18 +29,10 @@ app.use(express.urlencoded({ limit: "20mb", extended: true }));
 // Set up data directory and persistence path
 const DATA_DIR = path.join(process.cwd(), "data");
 const PRODUCTS_FILE = path.join(DATA_DIR, "products_v3.json"); // Save to a fresh version to reset default list cleanly
-const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
-
-// Ensure directories exist
+// Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
-// Serve uploaded files statically under /api/uploads
-app.use("/api/uploads", express.static(UPLOADS_DIR));
 
 // Default catalog data starts empty
 const DEFAULT_PRODUCTS: any[] = [];
@@ -91,7 +90,7 @@ app.get("/api/products", (req, res) => {
   res.json(products);
 });
 
-// POST: Upload custom product images via Base64 stream
+// POST: Upload custom product images via Base64 stream to Cloudinary
 app.post("/api/products/upload-image", (req, res) => {
   try {
     const { image, filename } = req.body;
@@ -99,40 +98,21 @@ app.post("/api/products/upload-image", (req, res) => {
       return res.status(400).json({ error: "Missing image data" });
     }
 
-    // Capture standard data URIs (e.g. data:image/png;base64,iVBOR...)
-    const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      return res.status(400).json({ error: "Invalid base64 image data payload" });
-    }
-
-    const type = matches[1];
-    const base64Data = matches[2];
-    const buffer = Buffer.from(base64Data, "base64");
-
-    // Extract type extension safely
-    let ext = "png";
-    if (type.includes("jpeg") || type.includes("jpg")) {
-      ext = "jpg";
-    } else if (type.includes("gif")) {
-      ext = "gif";
-    } else if (type.includes("webp")) {
-      ext = "webp";
-    } else if (type.includes("svg")) {
-      ext = "svg";
-    }
-
-    // Sanitize user files names to prevent injections
-    const sanitizedBase = (filename || "product")
+    const publicId = (filename || "product")
       .replace(/[^a-zA-Z0-9]/g, "_")
       .toLowerCase()
-      .substring(0, 30);
-    const uniqueFilename = `${sanitizedBase}_${Date.now()}_${Math.floor(Math.random() * 10000)}.${ext}`;
-    const targetPath = path.join(UPLOADS_DIR, uniqueFilename);
+      .substring(0, 30) + `_${Date.now()}`;
 
-    fs.writeFileSync(targetPath, buffer);
-
-    res.json({
-      imageUrl: `/api/uploads/${uniqueFilename}`
+    cloudinary.uploader.upload(image, {
+      public_id: publicId,
+      folder: "product-catalog",
+      resource_type: "image",
+    }, (err, result) => {
+      if (err || !result) {
+        console.error("Cloudinary upload error:", err);
+        return res.status(500).json({ error: "Failed to upload image to cloud storage", details: err?.message });
+      }
+      res.json({ imageUrl: result.secure_url });
     });
   } catch (err: any) {
     console.error("Express photo upload parsing error:", err);
