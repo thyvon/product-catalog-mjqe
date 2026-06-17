@@ -40,7 +40,11 @@ export default function App() {
   const [maxAvailablePrice, setMaxAvailablePrice] = useState<number>(500);
 
   // Dark mode
-  const [darkMode, setDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
+  const [darkMode, setDarkMode] = useState(() => {
+    const isDark = document.documentElement.classList.contains("dark");
+    if (!isDark) document.documentElement.classList.remove("dark");
+    return isDark;
+  });
   const toggleDarkMode = () => {
     const next = !darkMode;
     setDarkMode(next);
