@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { 
-  Plus, Search, ShieldCheck, ShieldAlert, Filter, RefreshCw, 
+  Plus, Search, Filter, RefreshCw, 
   AlertCircle, ShoppingBag, ArrowDownAZ, FileSpreadsheet, Download, Grid, List,
   ChevronLeft, ChevronRight
 } from "lucide-react";
@@ -255,25 +255,6 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col bg-slate-50/50">
-      {/* Dynamic Authorization Bar Indicator */}
-      <div id="portal-banner" className={`w-full py-2 px-4 text-center text-xs font-semibold flex items-center justify-center gap-2 transition-all shrink-0 ${
-        isAdmin 
-          ? "bg-slate-900 text-white" 
-          : "bg-slate-100 text-slate-600 border-b border-slate-200"
-      }`}>
-        {isAdmin ? (
-          <>
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Admin Mode</span>
-          </>
-        ) : (
-          <>
-            <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
-            <span>Viewer Mode</span>
-          </>
-        )}
-      </div>
-
       <div className="w-full px-2.5 sm:px-4 lg:px-6 mt-3 flex flex-col flex-1 min-h-0">
         {/* Statistics and Toolbar Actions (Refresh & Export CSV positioned above the search toolbar) */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 px-1 shrink-0">

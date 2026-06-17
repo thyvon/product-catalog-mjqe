@@ -69,17 +69,28 @@ export default function ProductListView({
                 >
                   {/* Container Image Column */}
                   <td className="px-6 py-4">
-                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border border-slate-100 shadow-sm shrink-0">
-                      <img
-                        src={imageUrl}
-                        alt={product.name}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover object-center hover:scale-110 transition-transform duration-300"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.src = LIST_PLACEHOLDER;
-                        }}
-                      />
+                    <div className="group relative w-16 h-16 shrink-0">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border border-slate-100 shadow-sm">
+                        <img
+                          src={imageUrl}
+                          alt={product.name}
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-300"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = LIST_PLACEHOLDER;
+                          }}
+                        />
+                      </div>
+                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <div className="w-48 h-48 rounded-2xl overflow-hidden shadow-2xl border border-white/20 ring-1 ring-slate-900/10 bg-white">
+                          <img
+                            src={imageUrl}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </td>
 
