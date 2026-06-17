@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { CloseCircle, StarsMinimalistic, Refresh, CloudUpload, Gallery } from "solar-icons";
+import {
+  XCircle as CloseCircle,
+  Sparkles as StarsMinimalistic,
+  RefreshCw as Refresh,
+  CloudUpload,
+  Images as Gallery,
+} from "lucide-react";
 import { Product, ProductInput } from "../types";
 import AlertModal from "./AlertModal";
 import { motion, AnimatePresence } from "motion/react";

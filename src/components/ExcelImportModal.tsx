@@ -1,5 +1,15 @@
 import React, { useState, useRef } from "react";
-import { CloseCircle, FileText, Download, DangerCircle, CheckCircle, CloudUpload, Eye, Refresh, Layers } from "solar-icons";
+import {
+  XCircle as CloseCircle,
+  FileText,
+  Download,
+  AlertCircle as DangerCircle,
+  CheckCircle,
+  CloudUpload,
+  Eye,
+  RefreshCw as Refresh,
+  Layers,
+} from "lucide-react";
 import * as XLSX from "xlsx";
 import { motion, AnimatePresence } from "motion/react";
 

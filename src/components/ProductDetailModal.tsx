@@ -1,5 +1,15 @@
 import React from "react";
-import { CloseCircle, Calendar, Layers, FileText, CheckCircle, Bookmark, Box, InfoCircle, Dollar } from "solar-icons";
+import {
+  XCircle as CloseCircle,
+  Calendar,
+  Layers,
+  FileText,
+  CheckCircle,
+  Bookmark,
+  Package as Box,
+  Info as InfoCircle,
+  DollarSign as Dollar,
+} from "lucide-react";
 import { Product } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 

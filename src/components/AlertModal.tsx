@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
-import { CloseCircle, DangerCircle } from "solar-icons";
+import { XCircle as CloseCircle, AlertCircle as DangerCircle } from "lucide-react";
 
 interface AlertModalProps {
   isOpen: boolean;

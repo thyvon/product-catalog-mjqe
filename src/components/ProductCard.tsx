@@ -1,5 +1,14 @@
 import React from "react";
-import { Eye, PenNewSquare, TrashBinMinimalistic, Layers, Archive, CheckCircle, DangerTriangle, QuestionCircle } from "solar-icons";
+import {
+  Eye,
+  SquarePen as PenNewSquare,
+  Trash2 as TrashBinMinimalistic,
+  Layers,
+  Archive,
+  CheckCircle,
+  TriangleAlert as DangerTriangle,
+  CircleQuestionMark as QuestionCircle,
+} from "lucide-react";
 import { Product } from "../types";
 import { motion } from "motion/react";
 

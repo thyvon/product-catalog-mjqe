@@ -1,5 +1,12 @@
 import React from "react";
-import { Layers, CheckCircle, ShieldWarning, CloseCircle, Refresh, Chart } from "solar-icons";
+import {
+  Layers,
+  CheckCircle,
+  ShieldAlert as ShieldWarning,
+  XCircle as CloseCircle,
+  RefreshCw as Refresh,
+  ChartColumn as Chart,
+} from "lucide-react";
 import { CatalogStats } from "../types";
 import { motion } from "motion/react";
 

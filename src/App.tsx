@@ -4,7 +4,23 @@
  */
 
 import React, { useState, useEffect, useMemo } from "react";
-import { AddCircle, Magnifer, Filter, Refresh, DangerCircle, Bag, SortByAlphabet, FileText, Download, Widget, List, AltArrowLeft, AltArrowRight, Sun, Moon } from "solar-icons";
+import {
+  PlusCircle as AddCircle,
+  Search as Magnifer,
+  Filter,
+  RefreshCw as Refresh,
+  AlertCircle as DangerCircle,
+  ShoppingBag as Bag,
+  ArrowDownAZ as SortByAlphabet,
+  FileText,
+  Download,
+  LayoutGrid as Widget,
+  List,
+  ChevronLeft as AltArrowLeft,
+  ChevronRight as AltArrowRight,
+  Sun,
+  Moon,
+} from "lucide-react";
 import { Product, ProductInput } from "./types";
 import ProductGalleryView from "./components/ProductGalleryView";
 import ProductListView from "./components/ProductListView";
