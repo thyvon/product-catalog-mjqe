@@ -236,12 +236,13 @@ export default function App() {
   }, [products]);
 
   // Pagination
-  const [pageSize, setPageSize] = useState(12);
+  const [pageSize, setPageSize] = useState<number>(12);
   const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(sortedProducts.length / pageSize));
+  const size = pageSize === 0 ? sortedProducts.length : pageSize;
+  const totalPages = Math.max(1, Math.ceil(sortedProducts.length / size));
   const paginatedProducts = sortedProducts.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
+    (currentPage - 1) * size,
+    currentPage * size
   );
 
   // Reset to page 1 when filters or page size change
@@ -495,6 +496,7 @@ export default function App() {
                   <option value={20}>20</option>
                   <option value={50}>50</option>
                   <option value={100}>100</option>
+                  <option value={0}>All</option>
                 </select>
                 {selectedCategory && (
                   <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-750 border border-indigo-100 py-0.5 px-3 rounded-full uppercase tracking-wider">
