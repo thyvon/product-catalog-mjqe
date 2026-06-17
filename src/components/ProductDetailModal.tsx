@@ -1,10 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React from "react";
-import { X, Calendar, Layers, FileText, CheckCircle2, Bookmark, Package, Info, DollarSign } from "lucide-react";
+import { CloseCircle, Calendar, Layers, FileText, CheckCircle, Bookmark, Box, InfoCircle, Dollar } from "solar-icons";
 import { Product } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -87,7 +82,7 @@ export default function ProductDetailModal({
               onClick={onClose}
               className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-200 rounded-full transition-colors cursor-pointer"
             >
-              <X className="w-5 h-5" />
+              <CloseCircle className="w-5 h-5" />
             </button>
           </div>
 
@@ -105,7 +100,7 @@ export default function ProductDetailModal({
               </div>
             ) : (
               <div className="md:col-span-5 w-full aspect-square rounded-2xl bg-slate-50 dark:bg-gray-800 border border-slate-150 dark:border-gray-700 flex flex-col items-center justify-center text-slate-300 dark:text-gray-500 p-4 shrink-0">
-                <Package className="w-12 h-12 stroke-[1.5]" />
+                <Box className="w-12 h-12 stroke-[1.5]" />
                 <span className="text-[10px] font-bold font-mono uppercase tracking-wider mt-2">No Image Provided</span>
               </div>
             )}

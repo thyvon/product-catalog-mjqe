@@ -1,10 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React from "react";
-import { Eye, Edit3, Trash2, Layers, CheckCircle2, AlertTriangle, Archive, Scale, Copy, Check } from "lucide-react";
+import { Eye, PenNewSquare, TrashBinMinimalistic, Layers, CheckCircle, DangerTriangle, Archive, Copy } from "solar-icons";
 import { Product } from "../types";
 import { motion } from "motion/react";
 
@@ -74,11 +69,11 @@ export default function ProductGalleryView({
               <div className="absolute top-2.5 right-2.5 flex items-start z-10 pointer-events-none">
                 {product.status === "Active" ? (
                   <span className="px-1.5 py-0.5 text-[8px] font-extrabold bg-emerald-500 text-white rounded-md tracking-wide uppercase shadow-md flex items-center gap-1">
-                    <CheckCircle2 className="w-2.5 h-2.5" /> Active
+                    <CheckCircle className="w-2.5 h-2.5" /> Active
                   </span>
                 ) : product.status === "Inactive" ? (
                   <span className="px-1.5 py-0.5 text-[8px] font-extrabold bg-amber-500 text-white rounded-md tracking-wide uppercase shadow-md flex items-center gap-1">
-                    <AlertTriangle className="w-2.5 h-2.5" /> Inactive
+                    <DangerTriangle className="w-2.5 h-2.5" /> Inactive
                   </span>
                 ) : (
                   <span className="px-1.5 py-0.5 text-[8px] font-extrabold bg-rose-500 text-white rounded-md tracking-wide uppercase shadow-md flex items-center gap-1">
@@ -99,7 +94,7 @@ export default function ProductGalleryView({
                     title="Modify Specification"
                     className="p-1 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-md transition-all cursor-pointer flex items-center justify-center"
                   >
-                    <Edit3 className="w-3.5 h-3.5" />
+                    <PenNewSquare className="w-3.5 h-3.5" />
                   </button>
                   <button
                     type="button"
@@ -110,7 +105,7 @@ export default function ProductGalleryView({
                     title="Delete SKU"
                     className="p-1 hover:bg-rose-55 hover:bg-rose-50 dark:hover:bg-rose-900/50 text-slate-705 text-slate-700 dark:text-gray-300 hover:text-rose-650 dark:hover:text-rose-400 rounded-md transition-all cursor-pointer flex items-center justify-center"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <TrashBinMinimalistic className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
@@ -136,7 +131,7 @@ export default function ProductGalleryView({
                       className="p-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-md transition-all cursor-pointer inline-flex items-center justify-center shrink-0 z-10"
                     >
                       {copiedCode === product.productCode ? (
-                        <Check className="w-3 h-3 text-emerald-400" />
+                        <CheckCircle className="w-3 h-3 text-emerald-400" />
                       ) : (
                         <Copy className="w-3 h-3" />
                       )}

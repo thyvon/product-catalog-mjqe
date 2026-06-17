@@ -1,10 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useRef } from "react";
-import { X, FileSpreadsheet, Download, AlertCircle, CheckCircle2, UploadCloud, Eye, RefreshCw, Layers } from "lucide-react";
+import { CloseCircle, FileText, Download, DangerCircle, CheckCircle, CloudUpload, Eye, Refresh, Layers } from "solar-icons";
 import * as XLSX from "xlsx";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -275,7 +270,7 @@ export default function ExcelImportModal({
           <div className="p-5 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center bg-slate-50/50 dark:bg-gray-800/50">
             <div>
               <h2 className="text-sm font-bold text-slate-800 dark:text-gray-100 flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 Import Catalog from Excel or CSV
               </h2>
               <p className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">
@@ -287,7 +282,7 @@ export default function ExcelImportModal({
               onClick={onClose}
               className="p-1.5 hover:bg-slate-200 dark:hover:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-200 rounded-full transition-colors cursor-pointer"
             >
-              <X className="w-5 h-5" />
+              <CloseCircle className="w-5 h-5" />
             </button>
           </div>
 
@@ -315,7 +310,7 @@ export default function ExcelImportModal({
             {/* Error notifications */}
             {errorMsg && (
               <div className="p-4 bg-rose-50 dark:bg-rose-900/30 border border-rose-100 dark:border-rose-800 rounded-xl flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <DangerCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{errorMsg}</span>
               </div>
             )}
@@ -323,7 +318,7 @@ export default function ExcelImportModal({
             {/* Success notifications */}
             {successCount !== null && (
               <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-150/30 dark:border-emerald-800 rounded-xl text-center space-y-2">
-                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto" />
                 <h4 className="text-xs font-bold text-slate-800 dark:text-gray-100">Batch Ingestion Successful!</h4>
                 <p className="text-[11px] text-emerald-650 dark:text-emerald-400 font-mono">
                   Succesfully ingested {successCount} products into database v2 catalog! Reloading grid...
@@ -348,7 +343,7 @@ export default function ExcelImportModal({
                   className="hidden"
                 />
                 <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-gray-800 text-slate-500 flex items-center justify-center mx-auto group-hover:text-indigo-600 transition-colors">
-                  <UploadCloud className="w-6 h-6 text-slate-400 dark:text-gray-500" />
+                  <CloudUpload className="w-6 h-6 text-slate-400 dark:text-gray-500" />
                 </div>
                 <div>
                   <p className="text-xs font-bold text-slate-700 dark:text-gray-300">
@@ -451,12 +446,12 @@ export default function ExcelImportModal({
             >
               {loading ? (
                 <>
-                  <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />
+                  <Refresh className="w-4 h-4 animate-spin text-slate-400" />
                   Finalizing upload ingestion...
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-4 h-4" />
+                  <CheckCircle className="w-4 h-4" />
                   Finalize and Upload {parsedRows.length} items
                 </>
               )}

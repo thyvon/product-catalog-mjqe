@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
-import { X, AlertCircle } from "lucide-react";
+import { CloseCircle, DangerCircle } from "solar-icons";
 
 interface AlertModalProps {
   isOpen: boolean;
@@ -27,7 +27,7 @@ export default function AlertModal({ isOpen, message, onClose }: AlertModalProps
           >
             <div className="flex items-start gap-3">
               <div className="p-2 bg-rose-100 dark:bg-rose-900/50 rounded-full shrink-0">
-                <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+                <DangerCircle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-bold text-slate-800 dark:text-gray-100 mb-1">Notice</h3>
@@ -37,7 +37,7 @@ export default function AlertModal({ isOpen, message, onClose }: AlertModalProps
                 onClick={onClose}
                 className="p-1 hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 rounded-full cursor-pointer transition-colors shrink-0"
               >
-                <X className="w-4 h-4" />
+                <CloseCircle className="w-4 h-4" />
               </button>
             </div>
             <div className="mt-4 flex justify-end">

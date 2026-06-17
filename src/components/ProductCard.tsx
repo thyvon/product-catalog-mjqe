@@ -1,10 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React from "react";
-import { Eye, Edit3, Trash2, Tag, Layers, Archive, CheckCircle2, AlertTriangle, HelpCircle } from "lucide-react";
+import { Eye, PenNewSquare, TrashBinMinimalistic, Layers, Archive, CheckCircle, DangerTriangle, QuestionCircle } from "solar-icons";
 import { Product } from "../types";
 import { motion } from "motion/react";
 
@@ -68,11 +63,11 @@ export default function ProductCard({
           {/* Status badge and icon indicators */}
           {product.status === "Active" ? (
             <span className="px-2.5 py-0.5 text-[9px] font-bold bg-emerald-500/90 text-white rounded-md tracking-wider uppercase font-mono shadow-sm flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3 shrink-0" /> Active
+              <CheckCircle className="w-3 h-3 shrink-0" /> Active
             </span>
           ) : product.status === "Inactive" ? (
             <span className="px-2.5 py-0.5 text-[9px] font-bold bg-amber-500/90 text-white rounded-md tracking-wider uppercase font-mono shadow-sm flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3 shrink-0" /> Inactive
+              <DangerTriangle className="w-3 h-3 shrink-0" /> Inactive
             </span>
           ) : (
             <span className="px-2.5 py-0.5 text-[9px] font-bold bg-rose-500/90 text-white rounded-md tracking-wider uppercase font-mono shadow-sm flex items-center gap-1">
@@ -153,7 +148,7 @@ export default function ProductCard({
                   title="Modify Entry"
                   className="p-1.5 hover:bg-indigo-50 text-slate-400 hover:text-indigo-650 rounded-lg transition-colors cursor-pointer"
                 >
-                  <Edit3 className="w-3.5 h-3.5" />
+                  <PenNewSquare className="w-3.5 h-3.5" />
                 </button>
                 <button
                   id={`btn-delete-${product.id}`}
@@ -161,7 +156,7 @@ export default function ProductCard({
                   title="Remove from Catalog"
                   className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <TrashBinMinimalistic className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}

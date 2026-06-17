@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
-import { X, AlertTriangle } from "lucide-react";
+import { CloseCircle, DangerTriangle } from "solar-icons";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -39,7 +39,7 @@ export default function ConfirmModal({
           >
             <div className="flex items-start gap-3">
               <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-full shrink-0">
-                <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                <DangerTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-bold text-slate-800 dark:text-gray-100 mb-1">{title}</h3>
@@ -49,7 +49,7 @@ export default function ConfirmModal({
                 onClick={onCancel}
                 className="p-1 hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 rounded-full cursor-pointer transition-colors shrink-0"
               >
-                <X className="w-4 h-4" />
+                <CloseCircle className="w-4 h-4" />
               </button>
             </div>
             <div className="mt-4 flex justify-end gap-2">

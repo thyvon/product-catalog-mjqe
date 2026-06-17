@@ -1,10 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React, { useState, useEffect, useMemo } from "react";
-import { X, Sparkles, Loader2, UploadCloud, Image } from "lucide-react";
+import { CloseCircle, StarsMinimalistic, Refresh, CloudUpload, Gallery } from "solar-icons";
 import { Product, ProductInput } from "../types";
 import AlertModal from "./AlertModal";
 import { motion, AnimatePresence } from "motion/react";
@@ -289,7 +284,7 @@ export default function ProductFormModal({
               onClick={onClose}
               className="p-1.5 hover:bg-slate-200 dark:hover:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-200 rounded-full cursor-pointer transition-colors"
             >
-              <X className="w-5 h-5" />
+              <CloseCircle className="w-5 h-5" />
             </button>
           </div>
 
@@ -428,7 +423,7 @@ export default function ProductFormModal({
                     </div>
                   ) : (
                     <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 flex items-center justify-center shrink-0">
-                      <Image className="w-6 h-6 text-slate-300 dark:text-gray-600" />
+                      <Gallery className="w-6 h-6 text-slate-300 dark:text-gray-600" />
                     </div>
                   )}
                   <div
@@ -450,10 +445,10 @@ export default function ProductFormModal({
                       className="hidden"
                     />
                     {isUploading ? (
-                      <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                      <Refresh className="w-5 h-5 animate-spin text-indigo-500" />
                     ) : (
                       <>
-                        <UploadCloud className="w-5 h-5 text-slate-400 dark:text-gray-500 mb-1" />
+                        <CloudUpload className="w-5 h-5 text-slate-400 dark:text-gray-500 mb-1" />
                         <span className="text-[11px] text-slate-500 dark:text-gray-400 font-medium">Click or drag to upload</span>
                       </>
                     )}

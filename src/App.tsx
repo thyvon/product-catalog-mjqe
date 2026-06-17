@@ -4,11 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  Plus, Search, Filter, RefreshCw, 
-  AlertCircle, ShoppingBag, ArrowDownAZ, FileSpreadsheet, Download, Grid, List,
-  ChevronLeft, ChevronRight, Moon, Sun
-} from "lucide-react";
+import { AddCircle, Magnifer, Filter, Refresh, DangerCircle, Bag, SortByAlphabet, FileText, Download, Widget, List, AltArrowLeft, AltArrowRight, Sun, Moon } from "solar-icons";
 import { Product, ProductInput } from "./types";
 import ProductGalleryView from "./components/ProductGalleryView";
 import ProductListView from "./components/ProductListView";
@@ -279,7 +275,7 @@ export default function App() {
           {/* Catalog Title */}
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-indigo-650 text-white rounded-lg shadow-xs">
-              <ShoppingBag className="w-3.5 h-3.5" />
+              <Bag className="w-3.5 h-3.5" />
             </div>
             <h1 className="text-sm sm:text-base font-black text-slate-900 dark:text-gray-100 font-sans tracking-tight">
               PRODUCT CATALOG for PROD CEN WH - ឃ្លាំងលទ្ធកម្មសាខាកណ្ដាល
@@ -302,7 +298,7 @@ export default function App() {
               title="Reload catalog"
               className="p-2.5 bg-white dark:bg-gray-800 hover:bg-slate-50 dark:hover:bg-gray-700 text-slate-500 dark:text-gray-400 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm cursor-pointer transition-all flex items-center justify-center h-9"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+              <Refresh className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
 
             <button
@@ -330,7 +326,7 @@ export default function App() {
                   onClick={() => setIsImportOpen(true)}
                   className="h-9 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer transition-all dark:bg-emerald-700 dark:hover:bg-emerald-800"
                 >
-                  <FileSpreadsheet className="w-4 h-4" /> Import Excel/CSV
+                  <FileText className="w-4 h-4" /> Import Excel/CSV
                 </button>
 
                 <button
@@ -341,14 +337,14 @@ export default function App() {
                   }}
                   className="h-9 px-3.5 py-2 bg-slate-900 hover:bg-indigo-650 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer transition-all dark:bg-indigo-700 dark:hover:bg-indigo-800"
                 >
-                  <Plus className="w-4 h-4" /> Register SKU
+                  <AddCircle className="w-4 h-4" /> Register SKU
                 </button>
               </>
             )}
           </div>
         </div>
 
-        {/* Query and Layout Grid Control Bar */}
+        {/* Query and Layout Widget Control Bar */}
         <div id="catalog-controls-panel" className={`bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-2xl p-4 mb-5 shadow-sm space-y-3 ${
           showFilters ? "block" : "hidden lg:block"
         }`}>
@@ -356,7 +352,7 @@ export default function App() {
             {/* Search Input bar and Category dropdown filter */}
             <div className="flex flex-col sm:flex-row items-stretch gap-3 flex-1">
               <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <Magnifer className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <input
                   id="search-filter-input"
                   type="text"
@@ -428,7 +424,7 @@ export default function App() {
                       : "text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300"
                   }`}
                 >
-                  <Grid className="w-4 h-4" />
+                  <Widget className="w-4 h-4" />
                 </button>
                 <button
                   id="toggle-view-list"
@@ -465,7 +461,7 @@ export default function App() {
           </div>
         ) : error ? (
           <div id="catalog-error-stage" className="bg-rose-50 border border-rose-100 rounded-3xl p-8 text-center max-w-lg mx-auto mt-12 space-y-4">
-            <AlertCircle className="w-10 h-10 text-rose-500 mx-auto animate-bounce" />
+            <DangerCircle className="w-10 h-10 text-rose-500 mx-auto animate-bounce" />
             <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-rose-800">Connection Interrupted</h3>
             <p className="text-xs text-rose-600 leading-relaxed font-medium">
               {error}
@@ -480,7 +476,7 @@ export default function App() {
           </div>
         ) : sortedProducts.length === 0 ? (
           <div id="catalog-empty-stage" className="text-center py-20 bg-white border border-slate-100 rounded-3xl max-w-xl mx-auto mt-8 p-8 space-y-4 shadow-sm">
-            <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto" />
+            <Bag className="w-12 h-12 text-slate-300 mx-auto" />
             <div>
               <h3 className="text-sm font-bold text-slate-850">No Matching Speeds Found</h3>
               <p className="text-xs text-slate-400 mt-2 max-w-md mx-auto leading-relaxed">
@@ -519,7 +515,7 @@ export default function App() {
           <div>
             <div className="flex justify-between items-center mb-4 px-1">
               <span className="text-[10px] font-mono text-slate-400 dark:text-gray-500 uppercase tracking-widest font-bold flex items-center gap-1">
-                <ArrowDownAZ className="w-3.5 h-3.5 text-indigo-500" /> Showing {paginatedProducts.length} of {products.length} registered specs
+                <SortByAlphabet className="w-3.5 h-3.5 text-indigo-500" /> Showing {paginatedProducts.length} of {products.length} registered specs
               </span>
               <div className="flex items-center gap-3">
                 <span className="text-[10px] font-mono text-slate-400 dark:text-gray-500 font-bold uppercase tracking-widest">Rows:</span>
@@ -579,7 +575,7 @@ export default function App() {
                   disabled={currentPage === 1}
                   className="p-2 border border-slate-200 dark:border-gray-700 rounded-xl hover:bg-slate-50 dark:hover:bg-gray-800 text-slate-600 dark:text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
                 >
-                  <ChevronLeft className="w-4 h-4" />
+                  <AltArrowLeft className="w-4 h-4" />
                 </button>
                 {(() => {
                   const pages: (number | "...")[] = [];
@@ -617,7 +613,7 @@ export default function App() {
                   disabled={currentPage === totalPages}
                   className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
                 >
-                  <ChevronRight className="w-4 h-4" />
+                  <AltArrowRight className="w-4 h-4" />
                 </button>
               </div>
             )}

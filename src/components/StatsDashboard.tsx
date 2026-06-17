@@ -1,10 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import React from "react";
-import { Layers, CheckCircle2, ShieldAlert, XCircle, RefreshCw, BarChart3 } from "lucide-react";
+import { Layers, CheckCircle, ShieldWarning, CloseCircle, Refresh, Chart } from "solar-icons";
 import { CatalogStats } from "../types";
 import { motion } from "motion/react";
 
@@ -87,7 +82,7 @@ export default function StatsDashboard({
             </span>
           </div>
           <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-900/50 text-emerald-650 dark:text-emerald-400 flex items-center justify-center animate-pulse">
-            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+            <CheckCircle className="w-5 h-5 text-emerald-500" />
           </div>
         </motion.div>
 
@@ -111,7 +106,7 @@ export default function StatsDashboard({
             </span>
           </div>
           <div className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-            <ShieldAlert className="w-5 h-5" />
+            <ShieldWarning className="w-5 h-5" />
           </div>
         </motion.div>
 
@@ -135,7 +130,7 @@ export default function StatsDashboard({
             </span>
           </div>
           <div className="w-11 h-11 rounded-xl bg-rose-50 dark:bg-rose-900/50 text-rose-500 dark:text-rose-400 flex items-center justify-center">
-            <XCircle className="w-5 h-5" />
+            <CloseCircle className="w-5 h-5" />
           </div>
         </motion.div>
       </div>
@@ -151,7 +146,7 @@ export default function StatsDashboard({
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <h3 className="text-sm font-bold text-slate-800 dark:text-gray-100 flex items-center gap-1.5 font-sans">
-              <BarChart3 className="w-4 h-4 text-slate-500 dark:text-gray-400" />
+              <Chart className="w-4 h-4 text-slate-500 dark:text-gray-400" />
               Category Breakdown
             </h3>
             <p className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">
