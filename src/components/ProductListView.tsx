@@ -26,6 +26,7 @@ export default function ProductListView({
   onDelete,
 }: ProductListViewProps) {
   const [copiedCode, setCopiedCode] = React.useState<string | null>(null);
+  const [preview, setPreview] = React.useState<{ src: string; x: number; y: number } | null>(null);
 
   const handleCopy = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -69,27 +70,25 @@ export default function ProductListView({
                 >
                   {/* Container Image Column */}
                   <td className="px-6 py-4">
-                    <div className="group w-16 h-16 shrink-0">
+                    <div
+                      className="w-16 h-16 shrink-0"
+                      onMouseEnter={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setPreview({ src: imageUrl, x: rect.right + 12, y: rect.top });
+                      }}
+                      onMouseLeave={() => setPreview(null)}
+                    >
                       <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border border-slate-100 shadow-sm">
                         <img
                           src={imageUrl}
                           alt={product.name}
                           referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-300"
+                          className="w-full h-full object-cover object-center transition-transform duration-300"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.src = LIST_PLACEHOLDER;
                           }}
                         />
-                      </div>
-                      <div className="fixed top-4 right-4 z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <div className="w-60 h-60 rounded-2xl overflow-hidden shadow-2xl border border-white/20 ring-1 ring-slate-900/10 bg-white">
-                          <img
-                            src={imageUrl}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
                       </div>
                     </div>
                   </td>
@@ -204,6 +203,21 @@ export default function ProductListView({
           </tbody>
         </table>
       </div>
+
+      {preview && (
+        <div
+          className="fixed z-50 pointer-events-none"
+          style={{ left: preview.x, top: preview.y }}
+        >
+          <div className="w-60 h-60 rounded-2xl overflow-hidden shadow-2xl border border-white/20 ring-1 ring-slate-900/10 bg-white">
+            <img
+              src={preview.src}
+              alt="Preview"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
