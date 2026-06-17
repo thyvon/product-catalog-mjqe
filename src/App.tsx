@@ -14,6 +14,8 @@ import ProductListView from "./components/ProductListView";
 import ProductDetailModal from "./components/ProductDetailModal";
 import ProductFormModal from "./components/ProductFormModal";
 import ExcelImportModal from "./components/ExcelImportModal";
+import AlertModal from "./components/AlertModal";
+import ConfirmModal from "./components/ConfirmModal";
 import { motion, AnimatePresence } from "motion/react";
 
 const STANDARD_CATEGORIES = [
@@ -53,6 +55,21 @@ export default function App() {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const [isImportOpen, setIsImportOpen] = useState(false);
+
+  // Custom alert/confirm state
+  const [alertMessage, setAlertMessage] = useState("");
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [confirmState, setConfirmState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+
+  const showAlert = (message: string) => {
+    setAlertMessage(message);
+    setIsAlertOpen(true);
+  };
 
   // Load backend catalog standard listings
   const fetchCatalog = async () => {
@@ -116,7 +133,7 @@ export default function App() {
       setEditingProduct(null);
       await fetchCatalog();
     } catch (err: any) {
-      alert(`Error submitting product details config: ${err.message}`);
+      showAlert(`Error submitting product details config: ${err.message}`);
     }
   };
 
@@ -125,12 +142,13 @@ export default function App() {
     const target = products.find((p) => p.id === productId);
     if (!target) return;
 
-    const confirmed = window.confirm(
-      `Are you sure you want to permanently delete SKU "${target.productCode}" (${target.name}) from catalog database?`
-    );
-    if (!confirmed) return;
-
-    try {
+    setConfirmState({
+      isOpen: true,
+      title: "Confirm Deletion",
+      message: `Are you sure you want to permanently delete SKU "${target.productCode}" (${target.name}) from catalog database?`,
+      onConfirm: async () => {
+        setConfirmState((prev) => ({ ...prev, isOpen: false }));
+        try {
       const response = await fetch(`/api/products/${productId}`, {
         method: "DELETE",
       });
@@ -140,9 +158,11 @@ export default function App() {
       }
 
       await fetchCatalog();
-    } catch (err: any) {
-      alert(`Error removing SKU from database: ${err.message}`);
-    }
+        } catch (err: any) {
+          showAlert(`Error removing SKU from database: ${err.message}`);
+        }
+      },
+    });
   };
 
   // Trigger export format CSV helper
@@ -546,6 +566,22 @@ export default function App() {
           setIsImportOpen(false);
           await fetchCatalog();
         }}
+      />
+
+      {/* 4. Alert Modal */}
+      <AlertModal
+        isOpen={isAlertOpen}
+        message={alertMessage}
+        onClose={() => setIsAlertOpen(false)}
+      />
+
+      {/* 5. Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        title={confirmState.title}
+        message={confirmState.message}
+        onConfirm={confirmState.onConfirm}
+        onCancel={() => setConfirmState((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

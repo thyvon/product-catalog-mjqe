@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Sparkles, Loader2, Check, DollarSign, Layers, Hash, BookOpen, UploadCloud, Image } from "lucide-react";
 import { Product, ProductInput } from "../types";
+import AlertModal from "./AlertModal";
 import { motion, AnimatePresence } from "motion/react";
 
 interface ProductFormModalProps {
@@ -52,6 +53,10 @@ export default function ProductFormModal({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+
+  // Alert state
+  const [alertMessage, setAlertMessage] = useState("");
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
 
   // Core handler to process image files from drag/drop or clicks
   const processImageFile = async (file: File) => {
@@ -211,7 +216,8 @@ export default function ProductFormModal({
     e.preventDefault();
 
     if (!productCode || !name || !uom || !category) {
-      alert("Please fill in Product Code, Name, UoM and Category.");
+      setAlertMessage("Please fill in Product Code, Name, UoM and Category.");
+      setIsAlertOpen(true);
       return;
     }
 
@@ -535,6 +541,12 @@ export default function ProductFormModal({
             </div>
 
           </form>
+
+          <AlertModal
+            isOpen={isAlertOpen}
+            message={alertMessage}
+            onClose={() => setIsAlertOpen(false)}
+          />
         </motion.div>
       </div>
     </AnimatePresence>
