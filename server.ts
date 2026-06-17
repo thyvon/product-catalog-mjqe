@@ -101,6 +101,13 @@ async function getProductById(id: string): Promise<any | null> {
   return result.rows[0] || null;
 }
 
+async function getProductByCode(code: string): Promise<any | null> {
+  const p = getPool();
+  if (!p || !dbReady) return null;
+  const result = await p.query('SELECT * FROM products WHERE "productCode" = $1', [code]);
+  return result.rows[0] || null;
+}
+
 function assertDb() {
   if (!getPool() || !dbReady) throw new Error("Database is not available.");
 }
@@ -317,7 +324,14 @@ app.post("/api/products/import", async (req, res) => {
       return res.status(400).json({ error: "Expected an array of imported products." });
     }
 
-    const newImportedItems: any[] = [];
+    // Build a map of existing products by productCode
+    const allProducts = await getAllProducts();
+    const existingByCode = new Map<string, any>();
+    for (const p of allProducts) {
+      existingByCode.set(p.productCode, p);
+    }
+
+    const itemsToUpsert: any[] = [];
 
     incoming.forEach((item: any) => {
       let codeStr = item.productCode || item["Product Code"] || item["code"] || item["Code"];
@@ -340,11 +354,13 @@ app.post("/api/products/import", async (req, res) => {
       let itemStock = item.stock || item["Stock"] || item["Qty"] || item["Quantity"];
 
       if (codeStr && nameStr) {
-        const defaultImage = BLANK_PLACEHOLDER;
+        const normalizedCode = String(codeStr).toUpperCase().trim();
+        const existing = existingByCode.get(normalizedCode);
+        const now = new Date().toISOString();
 
-        newImportedItems.push({
-          id: `prod-import-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
-          productCode: String(codeStr).toUpperCase().trim(),
+        itemsToUpsert.push({
+          id: existing ? existing.id : `prod-import-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+          productCode: normalizedCode,
           name: String(nameStr).trim(),
           description: String(descStr || nameStr).trim(),
           uom: String(uomStr).trim(),
@@ -353,19 +369,19 @@ app.post("/api/products/import", async (req, res) => {
           status: norStatus,
           price: itemPrice !== undefined ? Math.max(0, parseFloat(itemPrice)) : null,
           stock: itemStock !== undefined ? Math.max(0, parseInt(itemStock, 10)) : null,
-          imageUrl: String(imgStr || defaultImage).trim(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          imageUrl: String(imgStr || BLANK_PLACEHOLDER).trim(),
+          createdAt: existing ? existing.createdAt : now,
+          updatedAt: now,
         });
       }
     });
 
-    if (newImportedItems.length === 0) {
+    if (itemsToUpsert.length === 0) {
       return res.status(400).json({ error: "No records with at least a valid 'Product Code' and 'Product Name' were detected." });
     }
 
-    await insertImportBatch(newImportedItems);
-    res.json({ success: true, count: newImportedItems.length });
+    await insertImportBatch(itemsToUpsert);
+    res.json({ success: true, count: itemsToUpsert.length });
   } catch (err: any) {
     console.error("Error importing products:", err);
     res.status(500).json({ error: "Failed to import products." });

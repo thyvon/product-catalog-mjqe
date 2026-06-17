@@ -69,7 +69,7 @@ export default function ProductListView({
                 >
                   {/* Container Image Column */}
                   <td className="px-6 py-4">
-                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-slate-100 border border-slate-100 shadow-sm shrink-0">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border border-slate-100 shadow-sm shrink-0">
                       <img
                         src={imageUrl}
                         alt={product.name}

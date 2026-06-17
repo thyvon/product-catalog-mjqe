@@ -283,7 +283,7 @@ export default function App() {
               <ShoppingBag className="w-3.5 h-3.5" />
             </div>
             <h1 className="text-sm sm:text-base font-black text-slate-900 font-sans tracking-tight">
-              Product Catalog
+              PRODUCT CATALOG for PROD CEN WH - ឃ្លាំងលទ្ធកម្មសាខាកណ្ដាល
             </h1>
           </div>
 
