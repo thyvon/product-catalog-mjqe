@@ -266,7 +266,7 @@ export default function App() {
   const discontinuedCount = products.filter((p) => p.status === "Discontinued").length;
 
   return (
-    <div className="h-screen flex flex-col bg-slate-50/50">
+    <div className="h-screen flex flex-col bg-slate-50/50 dark:bg-gray-950">
       <div className="w-full px-2.5 sm:px-4 lg:px-6 mt-3 flex flex-col flex-1 min-h-0">
         {/* Statistics and Toolbar Actions (Refresh & Export CSV positioned above the search toolbar) */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 px-1 shrink-0">
@@ -294,7 +294,7 @@ export default function App() {
               id="reload-catalog-btn"
               onClick={fetchCatalog}
               title="Reload catalog"
-              className="p-2.5 bg-white hover:bg-slate-50 text-slate-500 rounded-xl border border-slate-200 shadow-sm cursor-pointer transition-all flex items-center justify-center h-9"
+              className="p-2.5 bg-white dark:bg-gray-800 hover:bg-slate-50 dark:hover:bg-gray-700 text-slate-500 dark:text-gray-400 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm cursor-pointer transition-all flex items-center justify-center h-9"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
@@ -312,7 +312,7 @@ export default function App() {
               id="btn-export-csv"
               onClick={triggerExportCSV}
               disabled={products.length === 0}
-              className="h-9 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-655 border border-slate-200 rounded-xl font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer transition-all"
+              className="h-9 px-3.5 py-2 bg-white dark:bg-gray-800 hover:bg-slate-50 dark:hover:bg-gray-700 text-slate-655 dark:text-gray-300 border border-slate-200 dark:border-gray-700 rounded-xl font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer transition-all"
             >
               <Download className="w-4 h-4" /> Export CSV
             </button>
@@ -322,7 +322,7 @@ export default function App() {
                 <button
                   id="btn-import-excel"
                   onClick={() => setIsImportOpen(true)}
-                  className="h-9 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer transition-all"
+                  className="h-9 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer transition-all dark:bg-emerald-700 dark:hover:bg-emerald-800"
                 >
                   <FileSpreadsheet className="w-4 h-4" /> Import Excel/CSV
                 </button>
@@ -333,7 +333,7 @@ export default function App() {
                     setEditingProduct(null);
                     setIsFormOpen(true);
                   }}
-                  className="h-9 px-3.5 py-2 bg-slate-900 hover:bg-indigo-650 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer transition-all"
+                  className="h-9 px-3.5 py-2 bg-slate-900 hover:bg-indigo-650 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer transition-all dark:bg-indigo-700 dark:hover:bg-indigo-800"
                 >
                   <Plus className="w-4 h-4" /> Register SKU
                 </button>
@@ -343,7 +343,7 @@ export default function App() {
         </div>
 
         {/* Query and Layout Grid Control Bar */}
-        <div id="catalog-controls-panel" className={`bg-white border border-slate-100 rounded-2xl p-4 mb-5 shadow-sm space-y-3 ${
+        <div id="catalog-controls-panel" className={`bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-2xl p-4 mb-5 shadow-sm space-y-3 ${
           showFilters ? "block" : "hidden lg:block"
         }`}>
           <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
@@ -357,7 +357,7 @@ export default function App() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search products by SKU Code or name specifications..."
-                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-2xl text-xs bg-slate-50/20 hover:bg-slate-50/45 focus:bg-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-slate-805"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-gray-700 rounded-2xl text-xs bg-slate-50/20 dark:bg-gray-800/50 hover:bg-slate-50/45 dark:hover:bg-gray-800 focus:bg-white dark:focus:bg-gray-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-slate-805 dark:text-gray-200"
                 />
               </div>
               <div className="sm:w-56 shrink-0">
@@ -365,7 +365,7 @@ export default function App() {
                   id="category-filter-select"
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full h-full px-3 py-2 border border-slate-200 rounded-2xl text-xs font-bold text-slate-500 focus:border-indigo-500 focus:outline-none bg-slate-50/40 hover:bg-slate-50 cursor-pointer min-h-[36px]"
+                  className="w-full h-full px-3 py-2 border border-slate-200 dark:border-gray-700 rounded-2xl text-xs font-bold text-slate-500 dark:text-gray-400 focus:border-indigo-500 focus:outline-none bg-slate-50/40 dark:bg-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800 cursor-pointer min-h-[36px]"
                 >
                   <option value="">All Categories ({products.length})</option>
                   {categories.map((cat) => {
@@ -388,7 +388,7 @@ export default function App() {
                   id="status-filter-select"
                   value={statusFilter}
                   onChange={(e: any) => setStatusFilter(e.target.value)}
-                  className="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 focus:border-indigo-500 focus:outline-none bg-slate-50/40 hover:bg-slate-50 cursor-pointer"
+                  className="px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold text-slate-500 dark:text-gray-400 focus:border-indigo-500 focus:outline-none bg-slate-50/40 dark:bg-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800 cursor-pointer"
                 >
                   <option value="all">All Lifecycles</option>
                   <option value="active">Active Only</option>
@@ -403,7 +403,7 @@ export default function App() {
                   id="sorting-select"
                   value={sortBy}
                   onChange={(e: any) => setSortBy(e.target.value)}
-                  className="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 focus:border-indigo-500 focus:outline-none bg-slate-50/40 hover:bg-slate-50 cursor-pointer"
+                  className="px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold text-slate-500 dark:text-gray-400 focus:border-indigo-500 focus:outline-none bg-slate-50/40 dark:bg-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800 cursor-pointer"
                 >
                   <option value="name">Sort: Product Name (A-Z)</option>
                   <option value="code">Sort: Product Code</option>
@@ -411,15 +411,15 @@ export default function App() {
               </div>
 
               {/* View Layout Double Switch Toggle */}
-              <div className="flex items-center border border-slate-200 rounded-xl p-1 bg-slate-50/60 ml-1.5">
+              <div className="flex items-center border border-slate-200 dark:border-gray-700 rounded-xl p-1 bg-slate-50/60 dark:bg-gray-800/60 ml-1.5">
                 <button
                   id="toggle-view-gallery"
                   onClick={() => setViewMode("gallery")}
                   title="Gallery view layout"
                   className={`p-1.5 rounded-lg transition-all cursor-pointer ${
                     viewMode === "gallery" 
-                      ? "bg-white text-slate-900 shadow-sm" 
-                      : "text-slate-400 hover:text-slate-600"
+                      ? "bg-white dark:bg-gray-700 text-slate-900 dark:text-gray-100 shadow-sm" 
+                      : "text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300"
                   }`}
                 >
                   <Grid className="w-4 h-4" />
@@ -512,15 +512,15 @@ export default function App() {
         ) : (
           <div>
             <div className="flex justify-between items-center mb-4 px-1">
-              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1">
+              <span className="text-[10px] font-mono text-slate-400 dark:text-gray-500 uppercase tracking-widest font-bold flex items-center gap-1">
                 <ArrowDownAZ className="w-3.5 h-3.5 text-indigo-500" /> Showing {paginatedProducts.length} of {products.length} registered specs
               </span>
               <div className="flex items-center gap-3">
-                <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-widest">Rows:</span>
+                <span className="text-[10px] font-mono text-slate-400 dark:text-gray-500 font-bold uppercase tracking-widest">Rows:</span>
                 <select
                   value={pageSize}
                   onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="px-2 py-1 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 bg-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  className="px-2 py-1 border border-slate-200 dark:border-gray-700 rounded-lg text-xs font-bold text-slate-600 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:border-indigo-500 cursor-pointer"
                 >
                   <option value={10}>10</option>
                   <option value={20}>20</option>
@@ -529,7 +529,7 @@ export default function App() {
                   <option value={0}>All</option>
                 </select>
                 {selectedCategory && (
-                  <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-750 border border-indigo-100 py-0.5 px-3 rounded-full uppercase tracking-wider">
+                  <span className="text-[10px] font-mono font-bold bg-indigo-50 dark:bg-indigo-900/50 text-indigo-750 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800 py-0.5 px-3 rounded-full uppercase tracking-wider">
                     {selectedCategory}
                   </span>
                 )}
@@ -571,7 +571,7 @@ export default function App() {
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                  className="p-2 border border-slate-200 dark:border-gray-700 rounded-xl hover:bg-slate-50 dark:hover:bg-gray-800 text-slate-600 dark:text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -597,8 +597,8 @@ export default function App() {
                         onClick={() => setCurrentPage(page)}
                         className={`min-w-[36px] h-9 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           page === currentPage
-                            ? "bg-slate-900 text-white shadow-sm"
-                            : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                            ? "bg-slate-900 dark:bg-indigo-700 text-white shadow-sm"
+                            : "border border-slate-200 dark:border-gray-700 text-slate-600 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-800"
                         }`}
                       >
                         {page}

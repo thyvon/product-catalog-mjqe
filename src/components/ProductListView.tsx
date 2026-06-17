@@ -37,11 +37,11 @@ export default function ProductListView({
   };
 
   return (
-    <div id="product-list-container" className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
+    <div id="product-list-container" className="bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-3xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
-            <tr className="bg-slate-50/70 border-b border-slate-100/80 text-slate-400 font-mono tracking-wider font-bold uppercase">
+            <tr className="bg-slate-50/70 dark:bg-gray-800/70 border-b border-slate-100/80 dark:border-gray-700 text-slate-400 dark:text-gray-500 font-mono tracking-wider font-bold uppercase">
               <th className="px-6 py-4.5 w-16">Preview</th>
               <th className="px-6 py-4.5 w-48 whitespace-nowrap">Product Code</th>
               <th className="px-6 py-4.5">Product Name</th>
@@ -62,10 +62,10 @@ export default function ProductListView({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className={`hover:bg-slate-100/50 transition-colors duration-150 align-middle ${
-                    product.status === "Inactive" ? "bg-amber-50/10" : "even:bg-slate-50/40"
+                   className={`hover:bg-slate-100/50 dark:hover:bg-gray-800/50 transition-colors duration-150 align-middle ${
+                    product.status === "Inactive" ? "bg-amber-50/10" : "even:bg-slate-50/40 dark:even:bg-gray-800/30"
                   } ${
-                    product.status === "Discontinued" ? "bg-rose-50/10" : ""
+                    product.status === "Discontinued" ? "bg-rose-50/10 dark:bg-rose-900/20" : ""
                   }`}
                 >
                   {/* Container Image Column */}
@@ -96,7 +96,7 @@ export default function ProductListView({
                   {/* Identification Monospace tags */}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1.5">
-                      <span className="px-2.5 py-0.5 bg-slate-900 text-white rounded-lg font-black font-mono tracking-wider text-[11px] inline-block whitespace-nowrap shadow-sm">
+                      <span className="px-2.5 py-0.5 bg-slate-900 dark:bg-indigo-700 text-white rounded-lg font-black font-mono tracking-wider text-[11px] inline-block whitespace-nowrap shadow-sm">
                         {product.productCode}
                       </span>
                       <button
@@ -119,7 +119,7 @@ export default function ProductListView({
                     <div className="space-y-1">
                       <h4
                         onClick={() => onView(product)}
-                        className="text-[13px] font-extrabold text-slate-800 hover:text-indigo-650 transition-colors tracking-tight font-sans cursor-pointer whitespace-normal break-words"
+                        className="text-[13px] font-extrabold text-slate-800 dark:text-gray-100 hover:text-indigo-650 dark:hover:text-indigo-400 transition-colors tracking-tight font-sans cursor-pointer whitespace-normal break-words"
                         title="Click to view details"
                       >
                         {product.name}
@@ -129,7 +129,7 @@ export default function ProductListView({
 
                   {/* UoM column next to product name */}
                   <td className="px-6 py-4">
-                    <span className="px-2.5 py-0.5 bg-indigo-50/60 text-indigo-750 font-bold font-mono rounded-lg border border-indigo-100/50 text-[10px] uppercase inline-block">
+                    <span className="px-2.5 py-0.5 bg-indigo-50/60 dark:bg-indigo-900/40 text-indigo-750 dark:text-indigo-300 font-bold font-mono rounded-lg border border-indigo-100/50 dark:border-indigo-800 text-[10px] uppercase inline-block">
                       {product.uom || "Pcs"}
                     </span>
                   </td>
@@ -137,10 +137,10 @@ export default function ProductListView({
                   {/* Structural Groups column */}
                   <td className="px-6 py-4">
                     <div className="space-y-1">
-                      <span className="font-bold text-slate-700 block">
+                      <span className="font-bold text-slate-700 dark:text-gray-300 block">
                         {product.category}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-mono block">
+                      <span className="text-[10px] text-slate-400 dark:text-gray-500 font-mono block">
                         {product.subCategory || "General"}
                       </span>
                     </div>

@@ -50,10 +50,10 @@ export default function ProductGalleryView({
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.35 }}
             onClick={() => onView(product)}
-            className={`group bg-white rounded-2xl overflow-hidden border border-slate-100/80 hover:shadow-[0_12px_24px_-8px_rgba(0,0,0,0.06)] hover:border-slate-200/90 transition-all duration-305 flex flex-col h-full cursor-pointer relative ${
+            className={`group bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-slate-100/80 dark:border-gray-800 hover:shadow-[0_12px_24px_-8px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_12px_24px_-8px_rgba(0,0,0,0.3)] hover:border-slate-200/90 dark:hover:border-gray-700 transition-all duration-305 flex flex-col h-full cursor-pointer relative ${
               product.status === "Inactive" ? "opacity-90 border-dashed border-amber-200" : ""
             } ${
-              product.status === "Discontinued" ? "bg-rose-50/10 border-rose-100/60" : ""
+              product.status === "Discontinued" ? "bg-rose-50/10 dark:bg-rose-900/20 border-rose-100/60 dark:border-rose-900" : ""
             }`}
           >
             {/* Visual Header Image Container */}
@@ -154,7 +154,7 @@ export default function ProductGalleryView({
               <div className="space-y-0.5">
                 <h3
                   id={`product-title-${product.id}`}
-                  className="text-xs font-extrabold text-slate-800 transition-colors font-sans leading-snug line-clamp-2"
+                  className="text-xs font-extrabold text-slate-800 dark:text-gray-100 transition-colors font-sans leading-snug line-clamp-2"
                 >
                   {product.name}
                 </h3>
