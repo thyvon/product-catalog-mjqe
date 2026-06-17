@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   Plus, Search, ShieldCheck, ShieldAlert, Filter, RefreshCw, 
-  AlertCircle, ShoppingBag, ArrowDownAZ, FileSpreadsheet, Download, Grid, List 
+  AlertCircle, ShoppingBag, ArrowDownAZ, FileSpreadsheet, Download, Grid, List,
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 import { Product, ProductInput } from "./types";
 import ProductGalleryView from "./components/ProductGalleryView";
@@ -18,15 +19,6 @@ import AlertModal from "./components/AlertModal";
 import ConfirmModal from "./components/ConfirmModal";
 import { motion, AnimatePresence } from "motion/react";
 
-const STANDARD_CATEGORIES = [
-  "Electronics",
-  "Home & Lifestyle",
-  "Wearables",
-  "Outdoor & Travel",
-  "Office Tools",
-  "Furniture"
-];
-
 export default function App() {
   // Core catalog state
   const [products, setProducts] = useState<Product[]>([]);
@@ -34,7 +26,7 @@ export default function App() {
   const [error, setError] = useState("");
 
   // Mode & Layout states
-  const [isAdmin, setIsAdmin] = useState(true); // Default to unlocked admin mode
+  const isAdmin = new URLSearchParams(window.location.search).get("admin") === "true";
   const [viewMode, setViewMode] = useState<"gallery" | "list">("gallery");
 
   // Client filtering & sorting state
@@ -232,6 +224,31 @@ export default function App() {
     }
   });
 
+  // Unique categories and UoMs derived from actual products
+  const categories = useMemo(() => {
+    const cats = new Set(products.map((p) => p.category));
+    return Array.from(cats).sort();
+  }, [products]);
+
+  const productUoms = useMemo(() => {
+    const uoms = new Set(products.map((p) => p.uom).filter(Boolean));
+    return Array.from(uoms).sort();
+  }, [products]);
+
+  // Pagination
+  const PAGE_SIZE = 12;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(sortedProducts.length / PAGE_SIZE));
+  const paginatedProducts = sortedProducts.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, statusFilter, sortBy]);
+
   // Calculate quick stats inline to replace heavy cards dashboards
   const activeCount = products.filter((p) => p.status === "Active").length;
   const discontinuedCount = products.filter((p) => p.status === "Discontinued").length;
@@ -247,25 +264,14 @@ export default function App() {
         {isAdmin ? (
           <>
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Administrator View Enabled — Spreadsheet Excel Imports, SKU Creation, and specs editing are unlocked</span>
+            <span>Admin Mode</span>
           </>
         ) : (
           <>
             <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
-            <span>Viewer Perspective — Read-only catalog preview active</span>
+            <span>Viewer Mode</span>
           </>
         )}
-        <button
-          id="toggle-portal-mode"
-          onClick={() => setIsAdmin(!isAdmin)}
-          className={`ml-3 px-3 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all duration-200 border cursor-pointer ${
-            isAdmin
-              ? "bg-white text-slate-900 border-white hover:bg-slate-100"
-              : "bg-slate-900 text-white border-slate-900 hover:bg-slate-800"
-          }`}
-        >
-          {isAdmin ? "Switch to Viewer" : "Switch to Admin"}
-        </button>
       </div>
 
       <div className="w-full px-2.5 sm:px-4 lg:px-6 mt-4">
@@ -350,7 +356,7 @@ export default function App() {
                   className="w-full h-full px-3 py-2 border border-slate-200 rounded-2xl text-xs font-bold text-slate-500 focus:border-indigo-500 focus:outline-none bg-slate-50/40 hover:bg-slate-50 cursor-pointer min-h-[36px]"
                 >
                   <option value="">All Categories ({products.length})</option>
-                  {STANDARD_CATEGORIES.map((cat) => {
+                  {categories.map((cat) => {
                     const count = products.filter((p) => p.category === cat).length;
                     return (
                       <option key={cat} value={cat}>
@@ -494,7 +500,7 @@ export default function App() {
           <div>
             <div className="flex justify-between items-center mb-4 px-1">
               <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1">
-                <ArrowDownAZ className="w-3.5 h-3.5 text-indigo-500" /> Showing {sortedProducts.length} of {products.length} registered specs
+                <ArrowDownAZ className="w-3.5 h-3.5 text-indigo-500" /> Showing {paginatedProducts.length} of {products.length} registered specs
               </span>
               {selectedCategory && (
                 <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-750 border border-indigo-100 py-0.5 px-3 rounded-full uppercase tracking-wider">
@@ -514,7 +520,7 @@ export default function App() {
               >
                 {viewMode === "gallery" ? (
                   <ProductGalleryView
-                    products={sortedProducts}
+                    products={paginatedProducts}
                     isAdmin={isAdmin}
                     onView={handleOpenDetailModal}
                     onEdit={handleOpenEditModal}
@@ -522,7 +528,7 @@ export default function App() {
                   />
                 ) : (
                   <ProductListView
-                    products={sortedProducts}
+                    products={paginatedProducts}
                     isAdmin={isAdmin}
                     onView={handleOpenDetailModal}
                     onEdit={handleOpenEditModal}
@@ -531,6 +537,39 @@ export default function App() {
                 )}
               </motion.div>
             </AnimatePresence>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-6">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`min-w-[36px] h-9 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      page === currentPage
+                        ? "bg-slate-900 text-white shadow-sm"
+                        : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -554,6 +593,8 @@ export default function App() {
         }}
         onSubmit={handleAddEditProduct}
         editingProduct={editingProduct}
+        allCategories={categories}
+        allUoms={productUoms}
       />
 
       {/* 3. Excel Upload parsing Modal */}

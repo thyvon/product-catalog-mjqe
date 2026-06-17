@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
-import { X, Sparkles, Loader2, Check, DollarSign, Layers, Hash, BookOpen, UploadCloud, Image } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { X, Sparkles, Loader2, UploadCloud, Image } from "lucide-react";
 import { Product, ProductInput } from "../types";
 import AlertModal from "./AlertModal";
 import { motion, AnimatePresence } from "motion/react";
@@ -14,9 +14,11 @@ interface ProductFormModalProps {
   onClose: () => void;
   onSubmit: (productData: ProductInput | Product) => void;
   editingProduct: Product | null;
+  allCategories?: string[];
+  allUoms?: string[];
 }
 
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   "Electronics",
   "Home & Lifestyle",
   "Wearables",
@@ -27,20 +29,31 @@ const CATEGORIES = [
   "Industrial Supplies"
 ];
 
-const UOM_OPTIONS = ["Pcs", "Box", "Set", "Kg", "Pack", "Doz", "Roll", "Bag"];
+const DEFAULT_UOMS = ["Pcs", "Box", "Set", "Kg", "Pack", "Doz", "Roll", "Bag"];
 
 export default function ProductFormModal({
   isOpen,
   onClose,
   onSubmit,
   editingProduct,
+  allCategories = [],
+  allUoms = [],
 }: ProductFormModalProps) {
+  const mergedCategories = useMemo(() => {
+    const set = new Set([...DEFAULT_CATEGORIES, ...allCategories]);
+    return Array.from(set);
+  }, [allCategories]);
+
+  const mergedUoms = useMemo(() => {
+    const set = new Set([...DEFAULT_UOMS, ...allUoms]);
+    return Array.from(set);
+  }, [allUoms]);
   // Core state fields
   const [productCode, setProductCode] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [uom, setUom] = useState(UOM_OPTIONS[0]);
-  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [uom, setUom] = useState(DEFAULT_UOMS[0]);
+  const [category, setCategory] = useState(DEFAULT_CATEGORIES[0]);
   const [subCategory, setSubCategory] = useState("");
   const [status, setStatus] = useState<"Active" | "Inactive" | "Discontinued">("Active");
   
@@ -146,8 +159,8 @@ export default function ProductFormModal({
       setProductCode(editingProduct.productCode);
       setName(editingProduct.name);
       setDescription(editingProduct.description);
-      setUom(editingProduct.uom || UOM_OPTIONS[0]);
-      setCategory(editingProduct.category || CATEGORIES[0]);
+      setUom(editingProduct.uom || DEFAULT_UOMS[0]);
+      setCategory(editingProduct.category || DEFAULT_CATEGORIES[0]);
       setSubCategory(editingProduct.subCategory || "");
       setStatus(editingProduct.status || "Active");
       setPrice(editingProduct.price !== undefined ? String(editingProduct.price) : "");
@@ -159,8 +172,8 @@ export default function ProductFormModal({
       setProductCode(`PROD-${Math.floor(100 + Math.random() * 900)}-${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}`);
       setName("");
       setDescription("");
-      setUom(UOM_OPTIONS[0]);
-      setCategory(CATEGORIES[0]);
+      setUom(DEFAULT_UOMS[0]);
+      setCategory(DEFAULT_CATEGORIES[0]);
       setSubCategory("");
       setStatus("Active");
       setPrice("");
@@ -267,15 +280,10 @@ export default function ProductFormModal({
           className="relative bg-white w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl border border-slate-100 flex flex-col z-10 max-h-[92vh]"
         >
           {/* Header */}
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/40">
-            <div>
-              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 font-sans">
-                {editingProduct ? "Revise Catalog Specifications" : "Register New Catalog Product"}
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Configure core product identifiers and image references. All updates sync instantly to the server.
-              </p>
-            </div>
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+            <h2 className="text-sm font-bold text-slate-800 font-sans">
+              {editingProduct ? "Edit Product" : "New Product"}
+            </h2>
             <button
               id="btn-close-form"
               onClick={onClose}
@@ -291,8 +299,8 @@ export default function ProductFormModal({
               
               {/* 1. Product Code */}
               <div>
-                <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                  <Hash className="w-3.5 h-3.5 text-indigo-505" /> Product Code <span className="text-rose-500">*</span>
+                <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                  Product Code <span className="text-rose-500">*</span>
                 </label>
                 <input
                   id="input-productCode"
@@ -340,8 +348,8 @@ export default function ProductFormModal({
 
               {/* 4. Category selection */}
               <div>
-                <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1">
-                  <Layers className="w-3.5 h-3.5" /> Category <span className="text-rose-500">*</span>
+                <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                  Category <span className="text-rose-500">*</span>
                 </label>
                 <select
                   id="input-category"
@@ -349,7 +357,7 @@ export default function ProductFormModal({
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-slate-850 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
                 >
-                  {CATEGORIES.map((cat) => (
+                  {mergedCategories.map((cat) => (
                     <option key={cat} value={cat}>
                       {cat}
                     </option>
@@ -379,144 +387,93 @@ export default function ProductFormModal({
                 </label>
                 <select
                   id="input-uom"
-                  value={uom}
+                  value={mergedUoms.includes(uom) ? uom : "other"}
                   onChange={(e) => setUom(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-slate-805 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
                 >
-                  {UOM_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
+                  {mergedUoms.map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
                   ))}
-                  {!UOM_OPTIONS.includes(uom) && <option value={uom}>{uom}</option>}
+                  <option value="other">Other...</option>
                 </select>
+                {!mergedUoms.includes(uom) && (
+                  <input
+                    type="text"
+                    value={uom}
+                    onChange={(e) => setUom(e.target.value)}
+                    placeholder="Type custom UoM..."
+                    className="w-full mt-2 px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                  />
+                )}
               </div>
 
-              {/* Optional Custom UOM free-text input */}
-              <div>
-                <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                  Custom UoM (Optional override)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Set, Bag, Bundle"
-                  onChange={(e) => {
-                    if (e.target.value.trim()) {
-                      setUom(e.target.value.trim());
-                    }
-                  }}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
-                />
-              </div>
-
-              {/* Product Image Manager (Upload via Drag & Drop or Paste URL) */}
-              <div className="sm:col-span-2 space-y-4">
-                <div className="flex justify-between items-center bg-slate-50 border border-slate-100 rounded-xl p-3">
-                  <div>
-                    <label className="block text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest">
-                      Image Aspect Ratio Rule
-                    </label>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      The catalog uses a strict <strong className="text-slate-700">1:1 Square Aspect Ratio</strong> for all product listings.
-                    </p>
-                  </div>
-                  <span className="text-[10px] bg-slate-900 text-white font-mono font-bold tracking-wider uppercase px-2 py-0.5 rounded-md">
-                    Square (1:1)
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* Image Preview Thumbnail with Chessboard Transparecy Grid Pattern */}
-                  <div 
-                    className="flex flex-col items-center justify-center border border-slate-200 rounded-2xl relative overflow-hidden group aspect-square w-full max-w-[140px] mx-auto bg-slate-50"
-                    style={{ 
-                      backgroundImage: "radial-gradient(#e2e8f0 25%, transparent 25%), radial-gradient(#e2e8f0 25%, transparent 25%)",
-                      backgroundPosition: "0 0, 4px 4px",
-                      backgroundSize: "8px 8px"
-                    }}
-                  >
-                    {imageUrl ? (
-                      <>
-                        <img
-                          src={imageUrl}
-                          alt="Product Preview"
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover transition-all duration-300 hover:brightness-95 active:scale-95"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setImageUrl("")}
-                          className="absolute right-1.5 top-1.5 bg-slate-900/80 hover:bg-rose-600 text-white p-1 rounded-full text-[10px] uppercase font-mono font-bold tracking-wider opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-sm z-10"
-                        >
-                          Clear
-                        </button>
-                      </>
-                    ) : (
-                      <div className="text-center p-3 bg-white/80 backdrop-blur-xs rounded-xl border border-slate-100/50 m-2">
-                        <Image className="w-6 h-6 text-slate-400 mx-auto mb-1" />
-                        <span className="text-[9px] text-slate-400 font-mono font-bold block leading-tight">No Image</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Drag and Drop File Upload Area */}
-                  <div className="sm:col-span-2">
-                    <div
-                      onDragOver={handleDragOver}
-                      onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                      className={`h-full min-h-[140px] p-4 border-2 border-dashed rounded-2xl flex flex-col justify-center items-center text-center cursor-pointer transition-all ${
-                        isDragging
-                          ? "border-indigo-500 bg-indigo-50/30 text-indigo-650"
-                          : "border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/30"
-                      }`}
-                      onClick={() => document.getElementById("product-image-file-input")?.click()}
-                    >
-                      <input
-                        id="product-image-file-input"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        className="hidden"
+              {/* Product Image */}
+              <div className="sm:col-span-2 space-y-3">
+                <div className="flex items-center gap-4">
+                  {imageUrl ? (
+                    <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shrink-0 group">
+                      <img
+                        src={imageUrl}
+                        alt="Preview"
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full object-cover"
                       />
-                      {isUploading ? (
-                        <div className="flex flex-col items-center gap-1.5 text-indigo-600">
-                          <Loader2 className="w-5 h-5 animate-spin text-indigo-650" />
-                          <span className="text-xs font-bold font-mono uppercase tracking-wider animate-pulse">
-                            Uploading file...
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center gap-1">
-                          <UploadCloud className="w-6 h-6 text-slate-400 animate-bounce" />
-                          <p className="text-xs font-bold text-slate-700">Drag & Drop Image or Click to Browse</p>
-                          <p className="text-[10px] text-slate-400">Supports PNG, JPG, JPEG, WEBP, SVG (Max 10MB)</p>
-                        </div>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setImageUrl("")}
+                        className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white text-[10px] font-bold"
+                      >
+                        Remove
+                      </button>
                     </div>
+                  ) : (
+                    <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center shrink-0">
+                      <Image className="w-6 h-6 text-slate-300" />
+                    </div>
+                  )}
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={`flex-1 p-3 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all min-h-[80px] ${
+                      isDragging
+                        ? "border-indigo-500 bg-indigo-50/30"
+                        : "border-slate-200 hover:border-slate-300 bg-white"
+                    }`}
+                    onClick={() => document.getElementById("product-image-file-input")?.click()}
+                  >
+                    <input
+                      id="product-image-file-input"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                    {isUploading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+                    ) : (
+                      <>
+                        <UploadCloud className="w-5 h-5 text-slate-400 mb-1" />
+                        <span className="text-[11px] text-slate-500 font-medium">Click or drag to upload</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 {uploadError && (
-                  <div className="p-3 bg-rose-50 border border-rose-100/50 rounded-xl text-[11px] text-rose-650 font-mono">
+                  <div className="p-2.5 bg-rose-50 border border-rose-100 rounded-xl text-[11px] text-rose-600">
                     {uploadError}
                   </div>
                 )}
 
-                {/* Direct Manual URL Input Fallback */}
-                <div className="pt-1">
-                  <label className="block text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1.5">
-                    Or specify external direct URL manually:
-                  </label>
-                  <input
-                    id="input-imageUrl"
-                    type="url"
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    placeholder="e.g. https://images.unsplash.com/photo-1505740420928-5e560c06d30e"
-                    className="w-full px-3.5 py-1.5 border border-slate-200 rounded-xl focus:border-indigo-500 text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 fill-none"
-                  />
-                </div>
+                <input
+                  id="input-imageUrl"
+                  type="url"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="Or paste an image URL..."
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                />
               </div>
 
             </div>

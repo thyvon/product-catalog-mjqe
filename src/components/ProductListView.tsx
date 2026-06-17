@@ -16,21 +16,7 @@ interface ProductListViewProps {
   onDelete: (productId: string) => void;
 }
 
-// Fallback high-quality images based on category
-const getFallbackImage = (category: string) => {
-  switch (category) {
-    case "Electronics":
-      return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
-    case "Home & Lifestyle":
-      return "https://images.unsplash.com/photo-1507512140264-ac60c121b4ae?w=800&auto=format&fit=crop&q=80";
-    case "Outdoor & Travel":
-      return "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&auto=format&fit=crop&q=80";
-    case "Office Tools":
-      return "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=800&auto=format&fit=crop&q=80";
-    default:
-      return "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80";
-  }
-};
+const LIST_PLACEHOLDER = "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect fill="#f1f5f9" width="400" height="400"/><text x="50%" y="50%" fill="#94a3b8" font-family="monospace" font-size="14" font-weight="bold" text-anchor="middle" dominant-baseline="middle">NO IMAGE</text></svg>`);
 
 export default function ProductListView({
   products,
@@ -66,7 +52,7 @@ export default function ProductListView({
           </thead>
           <tbody className="divide-y divide-slate-50">
             {products.map((product) => {
-              const imageUrl = product.imageUrl || getFallbackImage(product.category);
+              const imageUrl = product.imageUrl || LIST_PLACEHOLDER;
 
               return (
                 <motion.tr
@@ -75,10 +61,10 @@ export default function ProductListView({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className={`hover:bg-slate-50/40 bg-white transition-colors duration-150 align-middle ${
-                    product.status === "Inactive" ? "bg-amber-50/5" : ""
+                  className={`hover:bg-slate-100/50 transition-colors duration-150 align-middle ${
+                    product.status === "Inactive" ? "bg-amber-50/10" : "even:bg-slate-50/40"
                   } ${
-                    product.status === "Discontinued" ? "bg-rose-50/5" : ""
+                    product.status === "Discontinued" ? "bg-rose-50/10" : ""
                   }`}
                 >
                   {/* Container Image Column */}
@@ -91,7 +77,7 @@ export default function ProductListView({
                         className="w-full h-full object-cover object-center hover:scale-110 transition-transform duration-300"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
-                          target.src = getFallbackImage(product.category);
+                          target.src = LIST_PLACEHOLDER;
                         }}
                       />
                     </div>

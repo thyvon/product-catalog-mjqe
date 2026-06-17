@@ -15,52 +15,100 @@ cloudinary.config({
 });
 
 const app = express();
+
+const BLANK_PLACEHOLDER = "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect fill="#f1f5f9" width="400" height="400"/><text x="50%" y="45%" fill="#94a3b8" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">NO IMAGE</text><text x="50%" y="55%" fill="#94a3b8" font-family="monospace" font-size="11" text-anchor="middle" dominant-baseline="middle">Click to upload</text></svg>`);
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ limit: "20mb", extended: true }));
 
 // PostgreSQL connection pool
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes("localhost")
-    ? false
-    : { rejectUnauthorized: false },
-});
+let pool: pg.Pool | null = null;
+
+function getPool(): pg.Pool | null {
+  if (!pool) {
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl) {
+      console.warn("DATABASE_URL not set. Product data will not persist across restarts.");
+      return null;
+    }
+    pool = new pg.Pool({
+      connectionString: dbUrl,
+      ssl: dbUrl.includes("localhost")
+        ? false
+        : { rejectUnauthorized: false },
+    });
+  }
+  return pool;
+}
+
+async function checkDbConnection(): Promise<boolean> {
+  const p = getPool();
+  if (!p) return false;
+  try {
+    await p.query("SELECT 1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+let dbReady = false;
 
 async function initDb() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS products (
-      id TEXT PRIMARY KEY,
-      "productCode" TEXT NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT DEFAULT '',
-      uom TEXT NOT NULL,
-      category TEXT NOT NULL,
-      "subCategory" TEXT DEFAULT '',
-      status TEXT DEFAULT 'Active',
-      price DOUBLE PRECISION,
-      stock INTEGER,
-      "imageUrl" TEXT DEFAULT '',
-      "createdAt" TEXT NOT NULL,
-      "updatedAt" TEXT NOT NULL
-    );
-  `);
-  console.log("Database table 'products' is ready.");
+  const p = getPool();
+  if (!p) {
+    console.warn("Skipping database initialization — DATABASE_URL not configured.");
+    return;
+  }
+  try {
+    await p.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id TEXT PRIMARY KEY,
+        "productCode" TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        uom TEXT NOT NULL,
+        category TEXT NOT NULL,
+        "subCategory" TEXT DEFAULT '',
+        status TEXT DEFAULT 'Active',
+        price DOUBLE PRECISION,
+        stock INTEGER,
+        "imageUrl" TEXT DEFAULT '',
+        "createdAt" TEXT NOT NULL,
+        "updatedAt" TEXT NOT NULL
+      );
+    `);
+    dbReady = true;
+    console.log("Database table 'products' is ready.");
+  } catch (err) {
+    console.error("Failed to initialize database:", err);
+    console.warn("Server will start without database persistence.");
+  }
 }
 
 async function getAllProducts(): Promise<any[]> {
-  const result = await pool.query("SELECT * FROM products ORDER BY name ASC");
+  const p = getPool();
+  if (!p || !dbReady) return [];
+  const result = await p.query("SELECT * FROM products ORDER BY name ASC");
   return result.rows;
 }
 
 async function getProductById(id: string): Promise<any | null> {
-  const result = await pool.query("SELECT * FROM products WHERE id = $1", [id]);
+  const p = getPool();
+  if (!p || !dbReady) return null;
+  const result = await p.query("SELECT * FROM products WHERE id = $1", [id]);
   return result.rows[0] || null;
 }
 
+function assertDb() {
+  if (!getPool() || !dbReady) throw new Error("Database is not available.");
+}
+
 async function upsertProduct(product: any): Promise<void> {
-  await pool.query(
+  assertDb();
+  const p = getPool()!;
+  await p.query(
     `INSERT INTO products (id, "productCode", name, description, uom, category, "subCategory", status, price, stock, "imageUrl", "createdAt", "updatedAt")
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      ON CONFLICT (id) DO UPDATE SET
@@ -94,7 +142,9 @@ async function upsertProduct(product: any): Promise<void> {
 }
 
 async function deleteProduct(id: string): Promise<boolean> {
-  const result = await pool.query("DELETE FROM products WHERE id = $1", [id]);
+  assertDb();
+  const p = getPool()!;
+  const result = await p.query("DELETE FROM products WHERE id = $1", [id]);
   return (result.rowCount ?? 0) > 0;
 }
 
@@ -214,6 +264,15 @@ app.get("/api/products/stats", async (req, res) => {
   }
 });
 
+// GET: Health check
+app.get("/api/health", async (req, res) => {
+  const dbAlive = dbReady && (await checkDbConnection());
+  res.json({
+    status: dbAlive ? "ok" : "degraded",
+    database: dbAlive ? "connected" : "unavailable",
+  });
+});
+
 // POST: Add new product
 app.post("/api/products", async (req, res) => {
   try {
@@ -223,16 +282,7 @@ app.post("/api/products", async (req, res) => {
       return res.status(400).json({ error: "Missing required catalog fields. Name, Product Code, UoM, and Category are mandatory." });
     }
 
-    let defaultImage = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80";
-    if (input.category === "Electronics") {
-      defaultImage = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
-    } else if (input.category === "Home & Lifestyle") {
-      defaultImage = "https://images.unsplash.com/photo-1507512140264-ac60c121b4ae?w=800&auto=format&fit=crop&q=80";
-    } else if (input.category === "Outdoor & Travel") {
-      defaultImage = "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&auto=format&fit=crop&q=80";
-    } else if (input.category === "Office Tools") {
-      defaultImage = "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=800&auto=format&fit=crop&q=80";
-    }
+    const defaultImage = BLANK_PLACEHOLDER;
 
     const newProduct = {
       id: `prod-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -290,14 +340,7 @@ app.post("/api/products/import", async (req, res) => {
       let itemStock = item.stock || item["Stock"] || item["Qty"] || item["Quantity"];
 
       if (codeStr && nameStr) {
-        let defaultImage = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80";
-        if (String(catStr) === "Electronics") {
-          defaultImage = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
-        } else if (String(catStr) === "Home & Lifestyle") {
-          defaultImage = "https://images.unsplash.com/photo-1507512140264-ac60c121b4ae?w=800&auto=format&fit=crop&q=80";
-        } else if (String(catStr) === "Outdoor & Travel") {
-          defaultImage = "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&auto=format&fit=crop&q=80";
-        }
+        const defaultImage = BLANK_PLACEHOLDER;
 
         newImportedItems.push({
           id: `prod-import-${Date.now()}-${Math.floor(Math.random() * 100000)}`,

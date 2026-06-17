@@ -16,21 +16,7 @@ interface ProductGalleryViewProps {
   onDelete: (productId: string) => void;
 }
 
-// Fallback high-quality images based on category
-const getFallbackImage = (category: string) => {
-  switch (category) {
-    case "Electronics":
-      return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
-    case "Home & Lifestyle":
-      return "https://images.unsplash.com/photo-1507512140264-ac60c121b4ae?w=800&auto=format&fit=crop&q=80";
-    case "Outdoor & Travel":
-      return "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&auto=format&fit=crop&q=80";
-    case "Office Tools":
-      return "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=800&auto=format&fit=crop&q=80";
-    default:
-      return "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80";
-  }
-};
+const BLANK_PLACEHOLDER = "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect fill="#f1f5f9" width="400" height="400"/><text x="50%" y="50%" fill="#94a3b8" font-family="monospace" font-size="14" font-weight="bold" text-anchor="middle" dominant-baseline="middle">NO IMAGE</text></svg>`);
 
 export default function ProductGalleryView({
   products,
@@ -50,9 +36,9 @@ export default function ProductGalleryView({
   };
 
   return (
-    <div id="product-gallery-grid" className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 sm:gap-4">
+    <div id="product-gallery-grid" className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4 sm:gap-5">
       {products.map((product) => {
-        const imageUrl = product.imageUrl || getFallbackImage(product.category); 
+        const imageUrl = product.imageUrl || BLANK_PLACEHOLDER; 
         
         return (
           <motion.div
@@ -79,18 +65,13 @@ export default function ProductGalleryView({
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
                 onError={(e) => {
-                  // Fallback if URL is broken
                   const target = e.target as HTMLImageElement;
-                  target.src = getFallbackImage(product.category);
+                  target.src = BLANK_PLACEHOLDER;
                 }}
               />
 
-              {/* Status and Category Overlay Badges */}
-              <div className="absolute top-2.5 inset-x-2.5 flex justify-between items-start z-10 pointer-events-none">
-                <span className="px-2 py-0.5 text-[8px] font-bold bg-slate-900/85 backdrop-blur-md text-white rounded-md tracking-wider uppercase border border-white/10 shadow-sm pointer-events-auto">
-                  {product.category}
-                </span>
-
+              {/* Status Badge */}
+              <div className="absolute top-2.5 right-2.5 flex items-start z-10 pointer-events-none">
                 {product.status === "Active" ? (
                   <span className="px-1.5 py-0.5 text-[8px] font-extrabold bg-emerald-500 text-white rounded-md tracking-wide uppercase shadow-md flex items-center gap-1">
                     <CheckCircle2 className="w-2.5 h-2.5" /> Active
@@ -171,11 +152,6 @@ export default function ProductGalleryView({
             {/* Product description content info */}
             <div className="p-3 flex-1 flex flex-col justify-between">
               <div className="space-y-0.5">
-                <div className="flex items-center gap-1 text-[8px] text-slate-400 font-mono font-bold uppercase tracking-widest">
-                  <Layers className="w-2.5 h-2.5 text-indigo-500" />
-                  <span>{product.subCategory || "General"}</span>
-                </div>
-
                 <h3
                   id={`product-title-${product.id}`}
                   className="text-xs font-extrabold text-slate-800 transition-colors font-sans leading-snug line-clamp-2"
