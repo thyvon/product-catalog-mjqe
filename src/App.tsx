@@ -7,7 +7,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { 
   Plus, Search, Filter, RefreshCw, 
   AlertCircle, ShoppingBag, ArrowDownAZ, FileSpreadsheet, Download, Grid, List,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Moon, Sun
 } from "lucide-react";
 import { Product, ProductInput } from "./types";
 import ProductGalleryView from "./components/ProductGalleryView";
@@ -38,6 +38,14 @@ export default function App() {
   // Price range dynamically calculated
   const [priceBudget, setPriceBudget] = useState<number>(500);
   const [maxAvailablePrice, setMaxAvailablePrice] = useState<number>(500);
+
+  // Dark mode
+  const [darkMode, setDarkMode] = useState(() => document.documentElement.classList.contains("dark"));
+  const toggleDarkMode = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    document.documentElement.classList.toggle("dark", next);
+  };
 
   // Mobile filter toggle
   const [showFilters, setShowFilters] = useState(false);
@@ -289,6 +297,15 @@ export default function App() {
               className="p-2.5 bg-white hover:bg-slate-50 text-slate-500 rounded-xl border border-slate-200 shadow-sm cursor-pointer transition-all flex items-center justify-center h-9"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+
+            <button
+              id="btn-dark-mode"
+              onClick={toggleDarkMode}
+              title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+              className="p-2.5 bg-white hover:bg-slate-50 text-slate-500 rounded-xl border border-slate-200 shadow-sm cursor-pointer transition-all flex items-center justify-center h-9"
+            >
+              {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
             <button
