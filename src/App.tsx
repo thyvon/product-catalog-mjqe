@@ -254,9 +254,9 @@ export default function App() {
   const discontinuedCount = products.filter((p) => p.status === "Discontinued").length;
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-20">
+    <div className="h-screen flex flex-col bg-slate-50/50">
       {/* Dynamic Authorization Bar Indicator */}
-      <div id="portal-banner" className={`w-full py-2.5 px-4 text-center text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+      <div id="portal-banner" className={`w-full py-2 px-4 text-center text-xs font-semibold flex items-center justify-center gap-2 transition-all shrink-0 ${
         isAdmin 
           ? "bg-slate-900 text-white" 
           : "bg-slate-100 text-slate-600 border-b border-slate-200"
@@ -274,9 +274,9 @@ export default function App() {
         )}
       </div>
 
-      <div className="w-full px-2.5 sm:px-4 lg:px-6 mt-4">
+      <div className="w-full px-2.5 sm:px-4 lg:px-6 mt-3 flex flex-col flex-1 min-h-0">
         {/* Statistics and Toolbar Actions (Refresh & Export CSV positioned above the search toolbar) */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 px-1">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 px-1 shrink-0">
           {/* Catalog Title */}
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-indigo-650 text-white rounded-lg shadow-xs">
@@ -429,7 +429,8 @@ export default function App() {
           </div>
         </div>
 
-        {/* Display Main Catalog contents */}
+        {/* Scrollable product area */}
+        <div className="flex-1 min-h-0 overflow-y-auto pb-4 space-y-4">
         {loading ? (
           <div id="catalog-loading-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => (
@@ -590,6 +591,7 @@ export default function App() {
             )}
           </div>
         )}
+      </div>
       </div>
 
       {/* 1. Detail Sheet Specifications Modal */}
