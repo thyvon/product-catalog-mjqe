@@ -41,14 +41,16 @@ export default function App() {
 
   // Dark mode
   const [darkMode, setDarkMode] = useState(() => {
-    const isDark = document.documentElement.classList.contains("dark");
-    if (!isDark) document.documentElement.classList.remove("dark");
+    const stored = localStorage.getItem("darkMode");
+    const isDark = stored === "true";
+    document.documentElement.classList.toggle("dark", isDark);
     return isDark;
   });
   const toggleDarkMode = () => {
     const next = !darkMode;
     setDarkMode(next);
     document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("darkMode", String(next));
   };
 
   // Mobile filter toggle
