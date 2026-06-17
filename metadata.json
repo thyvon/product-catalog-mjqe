@@ -1,0 +1,6 @@
+{
+  "name": "Product Catalog Manager",
+  "description": "A modern product catalog manager with real-time analytics, robust item searching, dynamic status updates, and an intelligent AI product copywriter tool.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

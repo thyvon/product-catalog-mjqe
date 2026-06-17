@@ -1,0 +1,552 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect } from "react";
+import { 
+  Plus, Search, ShieldCheck, ShieldAlert, Filter, RefreshCw, 
+  AlertCircle, ShoppingBag, ArrowDownAZ, FileSpreadsheet, Download, Grid, List 
+} from "lucide-react";
+import { Product, ProductInput } from "./types";
+import ProductGalleryView from "./components/ProductGalleryView";
+import ProductListView from "./components/ProductListView";
+import ProductDetailModal from "./components/ProductDetailModal";
+import ProductFormModal from "./components/ProductFormModal";
+import ExcelImportModal from "./components/ExcelImportModal";
+import { motion, AnimatePresence } from "motion/react";
+
+const STANDARD_CATEGORIES = [
+  "Electronics",
+  "Home & Lifestyle",
+  "Wearables",
+  "Outdoor & Travel",
+  "Office Tools",
+  "Furniture"
+];
+
+export default function App() {
+  // Core catalog state
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Mode & Layout states
+  const [isAdmin, setIsAdmin] = useState(true); // Default to unlocked admin mode
+  const [viewMode, setViewMode] = useState<"gallery" | "list">("gallery");
+
+  // Client filtering & sorting state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "discontinued">("all");
+  const [sortBy, setSortBy] = useState<"name" | "code" | "price-asc" | "price-desc">("name");
+
+  // Price range dynamically calculated
+  const [priceBudget, setPriceBudget] = useState<number>(500);
+  const [maxAvailablePrice, setMaxAvailablePrice] = useState<number>(500);
+
+  // Modals controllers
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const [isImportOpen, setIsImportOpen] = useState(false);
+
+  // Load backend catalog standard listings
+  const fetchCatalog = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const prodRes = await fetch("/api/products");
+      if (!prodRes.ok) throw new Error("Could not load products catalog from database server APIs.");
+      const prodData = await prodRes.json();
+      setProducts(prodData);
+
+      // Compute ceiling price boundary dynamically if data available
+      const validPrices = prodData.filter((p: Product) => p.price !== undefined).map((p: Product) => p.price);
+      if (validPrices.length > 0) {
+        const maxP = Math.ceil(Math.max(...validPrices));
+        setMaxAvailablePrice(maxP);
+        setPriceBudget((prev) => (prev === 500 || prev === 200 ? maxP : prev));
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Failed to establish real-time link with catalog databases.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCatalog();
+  }, []);
+
+  // Modal spec triggers
+  const handleOpenDetailModal = (product: Product) => {
+    setSelectedProduct(product);
+    setIsDetailOpen(true);
+  };
+
+  const handleOpenEditModal = (product: Product) => {
+    setEditingProduct(product);
+    setIsFormOpen(true);
+  };
+
+  // Post / Put product specs save
+  const handleAddEditProduct = async (productData: ProductInput | Product) => {
+    try {
+      const isEdit = "id" in productData;
+      const url = isEdit ? `/api/products/${(productData as Product).id}` : "/api/products";
+      const method = isEdit ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productData),
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json();
+        throw new Error(errJson.error || "Failed to persist catalog product changes.");
+      }
+
+      setIsFormOpen(false);
+      setEditingProduct(null);
+      await fetchCatalog();
+    } catch (err: any) {
+      alert(`Error submitting product details config: ${err.message}`);
+    }
+  };
+
+  // Delete product handling
+  const handleDeleteProduct = async (productId: string) => {
+    const target = products.find((p) => p.id === productId);
+    if (!target) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete SKU "${target.productCode}" (${target.name}) from catalog database?`
+    );
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to execute delete commands on the server.");
+      }
+
+      await fetchCatalog();
+    } catch (err: any) {
+      alert(`Error removing SKU from database: ${err.message}`);
+    }
+  };
+
+  // Trigger export format CSV helper
+  const triggerExportCSV = () => {
+    if (products.length === 0) return;
+
+    const headers = ["Product Code", "Product Name", "Description", "UoM", "Category", "Sub Category", "Status", "Price", "Stock", "Image URL"];
+    const rows = products.map((p) => [
+      p.productCode,
+      p.name,
+      p.description.replace(/"/g, '""'), 
+      p.uom,
+      p.category,
+      p.subCategory,
+      p.status,
+      p.price !== undefined ? String(p.price) : "",
+      p.stock !== undefined ? String(p.stock) : "",
+      p.imageUrl || ""
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(","), ...rows.map(e => e.map(val => `"${val}"`).join(","))].join("\n");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Premium_Catalog_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Filters application
+  const filteredProducts = products.filter((p) => {
+    // 1. Search filter Query
+    const query = searchQuery.toLowerCase().trim();
+    const matchesSearch = query === "" ||
+      p.name.toLowerCase().includes(query) ||
+      p.productCode.toLowerCase().includes(query) ||
+      p.category.toLowerCase().includes(query) ||
+      (p.subCategory && p.subCategory.toLowerCase().includes(query));
+
+    // 2. Category selection pill
+    const matchesCategory = selectedCategory === "" || p.category === selectedCategory;
+
+    // 3. Status lifecycle matches
+    let matchesStatus = true;
+    if (statusFilter === "active") {
+      matchesStatus = p.status === "Active";
+    } else if (statusFilter === "inactive") {
+      matchesStatus = p.status === "Inactive";
+    } else if (statusFilter === "discontinued") {
+      matchesStatus = p.status === "Discontinued";
+    }
+
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
+  // Sorting application
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    switch (sortBy) {
+      case "code":
+        return a.productCode.localeCompare(b.productCode);
+      case "name":
+      default:
+        return a.name.localeCompare(b.name);
+    }
+  });
+
+  // Calculate quick stats inline to replace heavy cards dashboards
+  const activeCount = products.filter((p) => p.status === "Active").length;
+  const discontinuedCount = products.filter((p) => p.status === "Discontinued").length;
+
+  return (
+    <div className="min-h-screen bg-slate-50/50 pb-20">
+      {/* Dynamic Authorization Bar Indicator */}
+      <div id="portal-banner" className={`w-full py-2.5 px-4 text-center text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+        isAdmin 
+          ? "bg-slate-900 text-white" 
+          : "bg-slate-100 text-slate-600 border-b border-slate-200"
+      }`}>
+        {isAdmin ? (
+          <>
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Administrator View Enabled — Spreadsheet Excel Imports, SKU Creation, and specs editing are unlocked</span>
+          </>
+        ) : (
+          <>
+            <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>Viewer Perspective — Read-only catalog preview active</span>
+          </>
+        )}
+        <button
+          id="toggle-portal-mode"
+          onClick={() => setIsAdmin(!isAdmin)}
+          className={`ml-3 px-3 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all duration-200 border cursor-pointer ${
+            isAdmin
+              ? "bg-white text-slate-900 border-white hover:bg-slate-100"
+              : "bg-slate-900 text-white border-slate-900 hover:bg-slate-800"
+          }`}
+        >
+          {isAdmin ? "Switch to Viewer" : "Switch to Admin"}
+        </button>
+      </div>
+
+      <div className="w-full px-2.5 sm:px-4 lg:px-6 mt-4">
+        {/* Statistics and Toolbar Actions (Refresh & Export CSV positioned above the search toolbar) */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 px-1">
+          {/* Catalog Title */}
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-indigo-650 text-white rounded-lg shadow-xs">
+              <ShoppingBag className="w-3.5 h-3.5" />
+            </div>
+            <h1 className="text-sm sm:text-base font-black text-slate-900 font-sans tracking-tight">
+              Product Catalog
+            </h1>
+          </div>
+
+          {/* Quick Toolbar Actions */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              id="reload-catalog-btn"
+              onClick={fetchCatalog}
+              title="Reload catalog"
+              className="p-2.5 bg-white hover:bg-slate-50 text-slate-500 rounded-xl border border-slate-200 shadow-sm cursor-pointer transition-all flex items-center justify-center h-9"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            </button>
+
+            <button
+              id="btn-export-csv"
+              onClick={triggerExportCSV}
+              disabled={products.length === 0}
+              className="h-9 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-655 border border-slate-200 rounded-xl font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer transition-all"
+            >
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
+
+            {isAdmin && (
+              <>
+                <button
+                  id="btn-import-excel"
+                  onClick={() => setIsImportOpen(true)}
+                  className="h-9 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer transition-all"
+                >
+                  <FileSpreadsheet className="w-4 h-4" /> Import Excel/CSV
+                </button>
+
+                <button
+                  id="btn-insert-new"
+                  onClick={() => {
+                    setEditingProduct(null);
+                    setIsFormOpen(true);
+                  }}
+                  className="h-9 px-3.5 py-2 bg-slate-900 hover:bg-indigo-650 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer transition-all"
+                >
+                  <Plus className="w-4 h-4" /> Register SKU
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Query and Layout Grid Control Bar */}
+        <div id="catalog-controls-panel" className="bg-white border border-slate-100 rounded-2xl p-4 mb-5 shadow-sm space-y-3">
+          <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+            {/* Search Input bar and Category dropdown filter */}
+            <div className="flex flex-col sm:flex-row items-stretch gap-3 flex-1">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <input
+                  id="search-filter-input"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search products by SKU Code or name specifications..."
+                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-2xl text-xs bg-slate-50/20 hover:bg-slate-50/45 focus:bg-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-slate-805"
+                />
+              </div>
+              <div className="sm:w-56 shrink-0">
+                <select
+                  id="category-filter-select"
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full h-full px-3 py-2 border border-slate-200 rounded-2xl text-xs font-bold text-slate-500 focus:border-indigo-500 focus:outline-none bg-slate-50/40 hover:bg-slate-50 cursor-pointer min-h-[36px]"
+                >
+                  <option value="">All Categories ({products.length})</option>
+                  {STANDARD_CATEGORIES.map((cat) => {
+                    const count = products.filter((p) => p.category === cat).length;
+                    return (
+                      <option key={cat} value={cat}>
+                        {cat} ({count})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            {/* Selection filters & Layout toggle */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Status filtering selection dropdown */}
+              <div>
+                <select
+                  id="status-filter-select"
+                  value={statusFilter}
+                  onChange={(e: any) => setStatusFilter(e.target.value)}
+                  className="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 focus:border-indigo-500 focus:outline-none bg-slate-50/40 hover:bg-slate-50 cursor-pointer"
+                >
+                  <option value="all">All Lifecycles</option>
+                  <option value="active">Active Only</option>
+                  <option value="inactive">Inactive Staged</option>
+                  <option value="discontinued">Discontinued SKU</option>
+                </select>
+              </div>
+
+              {/* Sorting criteria select */}
+              <div>
+                <select
+                  id="sorting-select"
+                  value={sortBy}
+                  onChange={(e: any) => setSortBy(e.target.value)}
+                  className="px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 focus:border-indigo-500 focus:outline-none bg-slate-50/40 hover:bg-slate-50 cursor-pointer"
+                >
+                  <option value="name">Sort: Product Name (A-Z)</option>
+                  <option value="code">Sort: Product Code</option>
+                </select>
+              </div>
+
+              {/* View Layout Double Switch Toggle */}
+              <div className="flex items-center border border-slate-200 rounded-xl p-1 bg-slate-50/60 ml-1.5">
+                <button
+                  id="toggle-view-gallery"
+                  onClick={() => setViewMode("gallery")}
+                  title="Gallery view layout"
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    viewMode === "gallery" 
+                      ? "bg-white text-slate-900 shadow-sm" 
+                      : "text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  <Grid className="w-4 h-4" />
+                </button>
+                <button
+                  id="toggle-view-list"
+                  onClick={() => setViewMode("list")}
+                  title="Detailed list view layout"
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    viewMode === "list" 
+                      ? "bg-white text-slate-900 shadow-sm" 
+                      : "text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Display Main Catalog contents */}
+        {loading ? (
+          <div id="catalog-loading-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="animate-pulse border border-slate-100 bg-white rounded-3xl h-[360px] p-6 flex flex-col justify-between">
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="bg-slate-200 h-40 rounded-2xl w-full"></div>
+                  <div className="h-4 bg-slate-200 rounded w-1/3"></div>
+                  <div className="h-6 bg-slate-200 rounded w-2/3"></div>
+                  <div className="h-4 bg-slate-200 rounded w-full"></div>
+                </div>
+                <div className="h-8 bg-slate-200 rounded w-1/3 mt-6"></div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div id="catalog-error-stage" className="bg-rose-50 border border-rose-100 rounded-3xl p-8 text-center max-w-lg mx-auto mt-12 space-y-4">
+            <AlertCircle className="w-10 h-10 text-rose-500 mx-auto animate-bounce" />
+            <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-rose-800">Connection Interrupted</h3>
+            <p className="text-xs text-rose-600 leading-relaxed font-medium">
+              {error}
+            </p>
+            <button
+              id="retry-connection-btn"
+              onClick={fetchCatalog}
+              className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer shadow-sm transition-all"
+            >
+              Verify Connections
+            </button>
+          </div>
+        ) : sortedProducts.length === 0 ? (
+          <div id="catalog-empty-stage" className="text-center py-20 bg-white border border-slate-100 rounded-3xl max-w-xl mx-auto mt-8 p-8 space-y-4 shadow-sm">
+            <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-850">No Matching Speeds Found</h3>
+              <p className="text-xs text-slate-400 mt-2 max-w-md mx-auto leading-relaxed">
+                We couldn't locate any product SKU matching your filters or search terms inside this category. Modify parameters or import spreadsheets.
+              </p>
+            </div>
+            <div className="flex justify-center gap-2 pt-2">
+              <button
+                id="clear-all-filters-btn"
+                onClick={() => {
+                  setSearchQuery("");
+                  setSelectedCategory("");
+                  setStatusFilter("all");
+                  setPriceBudget(maxAvailablePrice);
+                }}
+                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-500 font-bold text-xs rounded-xl cursor-pointer transition-colors"
+              >
+                Reset Search Filters
+              </button>
+
+              {isAdmin && (
+                <button
+                  id="insert-empty-catalog-btn"
+                  onClick={() => {
+                    setEditingProduct(null);
+                    setIsFormOpen(true);
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow-sm transition-all"
+                >
+                  Register Single SKU
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="flex justify-between items-center mb-4 px-1">
+              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1">
+                <ArrowDownAZ className="w-3.5 h-3.5 text-indigo-500" /> Showing {sortedProducts.length} of {products.length} registered specs
+              </span>
+              {selectedCategory && (
+                <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-750 border border-indigo-100 py-0.5 px-3 rounded-full uppercase tracking-wider">
+                  Filter: {selectedCategory}
+                </span>
+              )}
+            </div>
+
+            {/* Toggle visual Gallery grid vs List table */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={viewMode}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.25 }}
+              >
+                {viewMode === "gallery" ? (
+                  <ProductGalleryView
+                    products={sortedProducts}
+                    isAdmin={isAdmin}
+                    onView={handleOpenDetailModal}
+                    onEdit={handleOpenEditModal}
+                    onDelete={handleDeleteProduct}
+                  />
+                ) : (
+                  <ProductListView
+                    products={sortedProducts}
+                    isAdmin={isAdmin}
+                    onView={handleOpenDetailModal}
+                    onEdit={handleOpenEditModal}
+                    onDelete={handleDeleteProduct}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
+
+      {/* 1. Detail Sheet Specifications Modal */}
+      <ProductDetailModal
+        product={selectedProduct}
+        isOpen={isDetailOpen}
+        onClose={() => {
+          setIsDetailOpen(false);
+          setSelectedProduct(null);
+        }}
+      />
+
+      {/* 2. Create and edit specifications drawer modal */}
+      <ProductFormModal
+        isOpen={isFormOpen}
+        onClose={() => {
+          setIsFormOpen(false);
+          setEditingProduct(null);
+        }}
+        onSubmit={handleAddEditProduct}
+        editingProduct={editingProduct}
+      />
+
+      {/* 3. Excel Upload parsing Modal */}
+      <ExcelImportModal
+        isOpen={isImportOpen}
+        onClose={() => {
+          setIsImportOpen(false);
+        }}
+        onImportComplete={async () => {
+          setIsImportOpen(false);
+          await fetchCatalog();
+        }}
+      />
+    </div>
+  );
+}
