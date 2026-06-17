@@ -279,7 +279,7 @@ export default function App() {
             <div className="p-1.5 bg-indigo-650 text-white rounded-lg shadow-xs">
               <ShoppingBag className="w-3.5 h-3.5" />
             </div>
-            <h1 className="text-sm sm:text-base font-black text-slate-900 font-sans tracking-tight">
+            <h1 className="text-sm sm:text-base font-black text-slate-900 dark:text-gray-100 font-sans tracking-tight">
               PRODUCT CATALOG for PROD CEN WH - ឃ្លាំងលទ្ធកម្មសាខាកណ្ដាល
             </h1>
           </div>
@@ -289,7 +289,7 @@ export default function App() {
             <button
               id="toggle-filters-btn"
               onClick={() => setShowFilters(!showFilters)}
-              className="lg:hidden p-2.5 bg-white hover:bg-slate-50 text-slate-500 rounded-xl border border-slate-200 shadow-sm cursor-pointer transition-all flex items-center justify-center h-9"
+              className="lg:hidden p-2.5 bg-white dark:bg-gray-800 hover:bg-slate-50 dark:hover:bg-gray-700 text-slate-500 dark:text-gray-400 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm cursor-pointer transition-all flex items-center justify-center h-9"
               title="Toggle filters"
             >
               <Filter className="w-4 h-4" />
@@ -307,7 +307,7 @@ export default function App() {
               id="btn-dark-mode"
               onClick={toggleDarkMode}
               title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-              className="p-2.5 bg-white hover:bg-slate-50 text-slate-500 rounded-xl border border-slate-200 shadow-sm cursor-pointer transition-all flex items-center justify-center h-9"
+              className="p-2.5 bg-white dark:bg-gray-800 hover:bg-slate-50 dark:hover:bg-gray-700 text-slate-500 dark:text-gray-400 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm cursor-pointer transition-all flex items-center justify-center h-9"
             >
               {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
@@ -432,10 +432,10 @@ export default function App() {
                   id="toggle-view-list"
                   onClick={() => setViewMode("list")}
                   title="Detailed list view layout"
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                   className={`p-1.5 rounded-lg transition-all cursor-pointer ${
                     viewMode === "list" 
-                      ? "bg-white text-slate-900 shadow-sm" 
-                      : "text-slate-400 hover:text-slate-600"
+                      ? "bg-white dark:bg-gray-700 text-slate-900 dark:text-gray-100 shadow-sm" 
+                      : "text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300"
                   }`}
                 >
                   <List className="w-4 h-4" />

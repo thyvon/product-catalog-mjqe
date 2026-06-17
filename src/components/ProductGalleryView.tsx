@@ -89,7 +89,7 @@ export default function ProductGalleryView({
 
               {/* Float action elements overlay for admins on card hover */}
               {isAdmin && (
-                <div className="absolute top-10 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20 bg-white/95 backdrop-blur-md p-1 rounded-lg shadow-sm border border-slate-100">
+                <div className="absolute top-10 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md p-1 rounded-lg shadow-sm border border-slate-100 dark:border-gray-700">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -97,7 +97,7 @@ export default function ProductGalleryView({
                       onEdit(product);
                     }}
                     title="Modify Specification"
-                    className="p-1 hover:bg-slate-100 text-slate-700 hover:text-indigo-600 rounded-md transition-all cursor-pointer flex items-center justify-center"
+                    className="p-1 hover:bg-slate-100 dark:hover:bg-gray-700 text-slate-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-md transition-all cursor-pointer flex items-center justify-center"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
@@ -108,7 +108,7 @@ export default function ProductGalleryView({
                       onDelete(product.id);
                     }}
                     title="Delete SKU"
-                    className="p-1 hover:bg-rose-55 hover:bg-rose-50 text-slate-705 text-slate-700 hover:text-rose-650 rounded-md transition-all cursor-pointer flex items-center justify-center"
+                    className="p-1 hover:bg-rose-55 hover:bg-rose-50 dark:hover:bg-rose-900/50 text-slate-705 text-slate-700 dark:text-gray-300 hover:text-rose-650 dark:hover:text-rose-400 rounded-md transition-all cursor-pointer flex items-center justify-center"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -143,7 +143,7 @@ export default function ProductGalleryView({
                     </button>
                   </div>
                 </div>
-                <div className="px-1.5 py-0.5 bg-white/95 backdrop-blur-md text-slate-900 rounded-md font-black text-[8px] font-mono shadow-sm border border-white/20">
+                <div className="px-1.5 py-0.5 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md text-slate-900 dark:text-gray-100 rounded-md font-black text-[8px] font-mono shadow-sm border border-white/20">
                   UoM: {product.uom || "Pcs"}
                 </div>
               </div>

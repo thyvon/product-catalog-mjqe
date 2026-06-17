@@ -269,23 +269,23 @@ export default function ExcelImportModal({
           initial={{ opacity: 0, scale: 0.96, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 12 }}
-          className="relative bg-white w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl border border-slate-100 flex flex-col z-10 max-h-[88vh]"
+          className="relative bg-white dark:bg-gray-900 w-full max-w-3xl rounded-3xl overflow-hidden shadow-2xl border border-slate-100 dark:border-gray-800 flex flex-col z-10 max-h-[88vh]"
         >
           {/* Header Panel */}
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div className="p-5 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center bg-slate-50/50 dark:bg-gray-800/50">
             <div>
-              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
+              <h2 className="text-sm font-bold text-slate-800 dark:text-gray-100 flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 Import Catalog from Excel or CSV
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">
                 Bulk register, update, and manage products from `.xlsx`, `.xls` or `.csv` files
               </p>
             </div>
             <button
               id="close-import-btn"
               onClick={onClose}
-              className="p-1.5 hover:bg-slate-200 text-slate-400 hover:text-slate-700 rounded-full transition-colors cursor-pointer"
+              className="p-1.5 hover:bg-slate-200 dark:hover:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-200 rounded-full transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -293,20 +293,20 @@ export default function ExcelImportModal({
 
           <div className="p-6 md:p-8 overflow-y-auto space-y-6 flex-1">
             {/* Guide & Template download */}
-            <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-800 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="space-y-1">
-                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block">
+                <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest block">
                   Column Specification Standard
                 </span>
-                <p className="text-xs text-slate-500 leading-relaxed max-w-lg">
-                  Ensure headers contain: <strong className="text-slate-700">Product Code</strong>, <strong className="text-slate-700">Product Name</strong>, <strong className="text-slate-700">UoM</strong>, <strong className="text-slate-700">Category</strong>, <strong className="text-slate-700">Sub Category</strong>, and <strong className="text-slate-700">Status</strong>.
+                <p className="text-xs text-slate-500 dark:text-gray-400 leading-relaxed max-w-lg">
+                  Ensure headers contain: <strong className="text-slate-700 dark:text-gray-200">Product Code</strong>, <strong className="text-slate-700 dark:text-gray-200">Product Name</strong>, <strong className="text-slate-700 dark:text-gray-200">UoM</strong>, <strong className="text-slate-700 dark:text-gray-200">Category</strong>, <strong className="text-slate-700 dark:text-gray-200">Sub Category</strong>, and <strong className="text-slate-700 dark:text-gray-200">Status</strong>.
                 </p>
               </div>
 
               <button
                 id="btn-download-excel-template"
                 onClick={downloadExcelTemplate}
-                className="px-3 py-1.5 bg-white hover:bg-indigo-50 hover:text-indigo-750 text-[11px] font-bold text-indigo-600 rounded-xl border border-indigo-150/40 shadow-sm flex items-center gap-1 cursor-pointer shrink-0 transition-all"
+                className="px-3 py-1.5 bg-white dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-750 dark:hover:text-indigo-300 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-150/40 dark:border-indigo-800/40 shadow-sm flex items-center gap-1 cursor-pointer shrink-0 transition-all"
               >
                 <Download className="w-3.5 h-3.5" /> Download Template (.xlsx)
               </button>
@@ -314,7 +314,7 @@ export default function ExcelImportModal({
 
             {/* Error notifications */}
             {errorMsg && (
-              <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-2.5 text-xs text-rose-700 leading-relaxed">
+              <div className="p-4 bg-rose-50 dark:bg-rose-900/30 border border-rose-100 dark:border-rose-800 rounded-xl flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{errorMsg}</span>
               </div>
@@ -322,10 +322,10 @@ export default function ExcelImportModal({
 
             {/* Success notifications */}
             {successCount !== null && (
-              <div className="p-4 bg-emerald-50 border border-emerald-150/30 rounded-xl text-center space-y-2">
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-150/30 dark:border-emerald-800 rounded-xl text-center space-y-2">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
-                <h4 className="text-xs font-bold text-slate-800">Batch Ingestion Successful!</h4>
-                <p className="text-[11px] text-emerald-650 font-mono">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-gray-100">Batch Ingestion Successful!</h4>
+                <p className="text-[11px] text-emerald-650 dark:text-emerald-400 font-mono">
                   Succesfully ingested {successCount} products into database v2 catalog! Reloading grid...
                 </p>
               </div>
@@ -338,7 +338,7 @@ export default function ExcelImportModal({
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-slate-200 hover:border-indigo-500 bg-slate-50/20 hover:bg-indigo-50/5 p-10 rounded-2xl text-center space-y-3 cursor-pointer transition-all"
+                className="border-2 border-dashed border-slate-200 dark:border-gray-700 hover:border-indigo-500 bg-slate-50/20 dark:bg-gray-800/20 hover:bg-indigo-50/5 dark:hover:bg-indigo-900/10 p-10 rounded-2xl text-center space-y-3 cursor-pointer transition-all"
               >
                 <input
                   type="file"
@@ -347,14 +347,14 @@ export default function ExcelImportModal({
                   accept=".xlsx,.xls,.csv"
                   className="hidden"
                 />
-                <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mx-auto group-hover:text-indigo-600 transition-colors">
-                  <UploadCloud className="w-6 h-6 text-slate-400" />
+                <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-gray-800 text-slate-500 flex items-center justify-center mx-auto group-hover:text-indigo-600 transition-colors">
+                  <UploadCloud className="w-6 h-6 text-slate-400 dark:text-gray-500" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-700">
-                    Drag and drop your spreadsheet here, or <span className="text-indigo-600 underline">browse</span>
+                  <p className="text-xs font-bold text-slate-700 dark:text-gray-300">
+                    Drag and drop your spreadsheet here, or <span className="text-indigo-600 dark:text-indigo-400 underline">browse</span>
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-1 font-mono">
+                  <p className="text-[10px] text-slate-400 dark:text-gray-500 mt-1 font-mono">
                     Supports Microsoft Excel (.xlsx, .xls) and raw Comma Separated (.csv) files
                   </p>
                 </div>
@@ -365,22 +365,22 @@ export default function ExcelImportModal({
             {parsedRows.length > 0 && (
               <div className="space-y-3">
                 <div className="flex justify-between items-center px-1">
-                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest flex items-center gap-1">
                     <Eye className="w-3.5 h-3.5" /> Staging Spreadsheet Preview ({parsedRows.length} valid rows detected)
                   </span>
                   <button
                     id="btn-remove-file"
                     onClick={clearStagedFile}
-                    className="text-xs text-rose-600 hover:text-rose-800 font-bold transition-all cursor-pointer"
+                    className="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 font-bold transition-all cursor-pointer"
                   >
                     Clear Spreadsheet
                   </button>
                 </div>
 
                 {/* Staging grid table preview */}
-                <div className="border border-slate-100 rounded-xl overflow-hidden bg-slate-50/30 max-h-[220px] overflow-y-auto">
+                <div className="border border-slate-100 dark:border-gray-800 rounded-xl overflow-hidden bg-slate-50/30 dark:bg-gray-800/30 max-h-[220px] overflow-y-auto">
                   <table className="w-full text-left text-[11px] border-collapse">
-                    <thead className="bg-slate-50 text-slate-400 font-mono tracking-wider font-bold uppercase sticky top-0">
+                    <thead className="bg-slate-50 dark:bg-gray-800 text-slate-400 dark:text-gray-500 font-mono tracking-wider font-bold uppercase sticky top-0">
                       <tr>
                         <th className="px-3.5 py-2 w-1/5">Code</th>
                         <th className="px-3.5 py-2 w-1/3">Name/Title</th>
@@ -389,28 +389,28 @@ export default function ExcelImportModal({
                         <th className="px-3 py-2">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 font-sans">
+                    <tbody className="divide-y divide-slate-100 dark:divide-gray-800 font-sans">
                       {parsedRows.slice(0, 15).map((row, index) => (
-                        <tr key={index} className="hover:bg-slate-50/50 bg-white transition-colors">
-                          <td className="px-3.5 py-1.5 font-bold font-mono text-slate-700 uppercase tracking-wide">
+                        <tr key={index} className="hover:bg-slate-50/50 dark:hover:bg-gray-800/50 bg-white dark:bg-gray-900 transition-colors">
+                          <td className="px-3.5 py-1.5 font-bold font-mono text-slate-700 dark:text-gray-200 uppercase tracking-wide">
                             {row.productCode}
                           </td>
-                          <td className="px-3.5 py-1.5 text-slate-800 line-clamp-1 truncate mt-0.5 font-medium">
+                          <td className="px-3.5 py-1.5 text-slate-800 dark:text-gray-100 line-clamp-1 truncate mt-0.5 font-medium">
                             {row.name}
                           </td>
-                          <td className="px-3 py-1.5 text-indigo-750 font-bold font-mono">
+                          <td className="px-3 py-1.5 text-indigo-750 dark:text-indigo-400 font-bold font-mono">
                             {row.uom}
                           </td>
-                          <td className="px-3 py-1.5 text-slate-500 font-medium">
+                          <td className="px-3 py-1.5 text-slate-500 dark:text-gray-400 font-medium">
                             {row.category}
                           </td>
                           <td className="px-3 py-1.5">
                             <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
                               row.status === "Active" 
-                                ? "bg-emerald-50 text-emerald-700" 
+                                ? "bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400" 
                                 : row.status === "Inactive"
-                                  ? "bg-amber-50 text-amber-700"
-                                  : "bg-rose-50 text-rose-700"
+                                  ? "bg-amber-50 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400"
+                                  : "bg-rose-50 dark:bg-rose-900/40 text-rose-700 dark:text-rose-400"
                             }`}>
                               {row.status}
                             </span>
@@ -420,7 +420,7 @@ export default function ExcelImportModal({
                     </tbody>
                   </table>
                   {parsedRows.length > 15 && (
-                    <div className="text-[10px] text-center text-slate-400 py-2.5 font-mono border-t border-slate-100 bg-slate-50/20">
+                    <div className="text-[10px] text-center text-slate-400 dark:text-gray-500 py-2.5 font-mono border-t border-slate-100 dark:border-gray-800 bg-slate-50/20 dark:bg-gray-800/20">
                       ...and {parsedRows.length - 15} additional rows ready in staging buffer
                     </div>
                   )}
@@ -430,12 +430,12 @@ export default function ExcelImportModal({
           </div>
 
           {/* Dialog Action buttons */}
-          <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/30">
+          <div className="p-4 border-t border-slate-100 dark:border-gray-800 flex justify-end gap-3 bg-slate-50/30 dark:bg-gray-800/30">
             <button
               id="import-cancel-btn"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl font-bold text-xs cursor-pointer transition-colors"
+              className="px-4 py-2 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-600 dark:text-gray-400 rounded-xl font-bold text-xs cursor-pointer transition-colors"
             >
               Cancel
             </button>
@@ -445,7 +445,7 @@ export default function ExcelImportModal({
               disabled={loading || parsedRows.length === 0}
               className={`px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer ${
                 loading || parsedRows.length === 0
-                  ? "bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+                  ? "bg-slate-100 dark:bg-gray-800 text-slate-400 dark:text-gray-500 cursor-not-allowed shadow-none"
                   : "bg-indigo-600 hover:bg-indigo-700 text-white"
               }`}
             >

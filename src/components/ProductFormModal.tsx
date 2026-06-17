@@ -277,17 +277,17 @@ export default function ProductFormModal({
           initial={{ opacity: 0, scale: 0.96, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 15 }}
-          className="relative bg-white w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl border border-slate-100 flex flex-col z-10 max-h-[92vh]"
+          className="relative bg-white dark:bg-gray-900 w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl border border-slate-100 dark:border-gray-800 flex flex-col z-10 max-h-[92vh]"
         >
           {/* Header */}
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center">
-            <h2 className="text-sm font-bold text-slate-800 font-sans">
+          <div className="p-5 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center">
+            <h2 className="text-sm font-bold text-slate-800 dark:text-gray-100 font-sans">
               {editingProduct ? "Edit Product" : "New Product"}
             </h2>
             <button
               id="btn-close-form"
               onClick={onClose}
-              className="p-1.5 hover:bg-slate-200 text-slate-400 hover:text-slate-700 rounded-full cursor-pointer transition-colors"
+              className="p-1.5 hover:bg-slate-200 dark:hover:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-200 rounded-full cursor-pointer transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -299,7 +299,7 @@ export default function ProductFormModal({
               
               {/* 1. Product Code */}
               <div>
-                <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
                   Product Code <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -309,20 +309,20 @@ export default function ProductFormModal({
                   value={productCode}
                   onChange={(e) => setProductCode(e.target.value)}
                   placeholder="e.g. STO-SSD-291"
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-slate-805 font-mono text-xs uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                  className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-805 dark:text-gray-200 font-mono text-xs uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
                 />
               </div>
 
               {/* 2. Status Select option */}
               <div>
-                <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
                   Item Status <span className="text-rose-500">*</span>
                 </label>
                 <select
                   id="input-status"
                   value={status}
                   onChange={(e: any) => setStatus(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-slate-800 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                  className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-800 dark:text-gray-200 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
                 >
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
@@ -332,7 +332,7 @@ export default function ProductFormModal({
 
               {/* 3. Product Title/Name */}
               <div className="sm:col-span-2">
-                <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
                   Product Title / Name <span className="text-rose-500">*</span>
                 </label>
                 <input
@@ -342,20 +342,20 @@ export default function ProductFormModal({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Quantum Sonic High Fidelity Speaker"
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                  className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-800 dark:text-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
                 />
               </div>
 
               {/* 4. Category selection */}
               <div>
-                <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
                   Category <span className="text-rose-500">*</span>
                 </label>
                 <select
                   id="input-category"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-slate-850 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                  className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-850 dark:text-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
                 >
                   {mergedCategories.map((cat) => (
                     <option key={cat} value={cat}>
@@ -367,7 +367,7 @@ export default function ProductFormModal({
 
               {/* 5. Subcategory */}
               <div>
-                <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
                   Sub Category
                 </label>
                 <input
@@ -376,20 +376,20 @@ export default function ProductFormModal({
                   value={subCategory}
                   onChange={(e) => setSubCategory(e.target.value)}
                   placeholder="e.g. Audio Tech"
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                  className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-800 dark:text-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
                 />
               </div>
 
               {/* 6. UOM Options */}
               <div>
-                <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
                   Unit of Measure (UoM) <span className="text-rose-500">*</span>
                 </label>
                 <select
                   id="input-uom"
                   value={mergedUoms.includes(uom) ? uom : "other"}
                   onChange={(e) => setUom(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                  className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-xs dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
                 >
                   {mergedUoms.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
@@ -402,7 +402,7 @@ export default function ProductFormModal({
                     value={uom}
                     onChange={(e) => setUom(e.target.value)}
                     placeholder="Type custom UoM..."
-                    className="w-full mt-2 px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                    className="w-full mt-2 px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-xs dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
                   />
                 )}
               </div>
@@ -411,7 +411,7 @@ export default function ProductFormModal({
               <div className="sm:col-span-2 space-y-3">
                 <div className="flex items-center gap-4">
                   {imageUrl ? (
-                    <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 shrink-0 group">
+                    <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 dark:border-gray-700 shrink-0 group">
                       <img
                         src={imageUrl}
                         alt="Preview"
@@ -427,8 +427,8 @@ export default function ProductFormModal({
                       </button>
                     </div>
                   ) : (
-                    <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center shrink-0">
-                      <Image className="w-6 h-6 text-slate-300" />
+                    <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 flex items-center justify-center shrink-0">
+                      <Image className="w-6 h-6 text-slate-300 dark:text-gray-600" />
                     </div>
                   )}
                   <div
@@ -437,8 +437,8 @@ export default function ProductFormModal({
                     onDrop={handleDrop}
                     className={`flex-1 p-3 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all min-h-[80px] ${
                       isDragging
-                        ? "border-indigo-500 bg-indigo-50/30"
-                        : "border-slate-200 hover:border-slate-300 bg-white"
+                        ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/30"
+                        : "border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800"
                     }`}
                     onClick={() => document.getElementById("product-image-file-input")?.click()}
                   >
@@ -453,15 +453,15 @@ export default function ProductFormModal({
                       <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
                     ) : (
                       <>
-                        <UploadCloud className="w-5 h-5 text-slate-400 mb-1" />
-                        <span className="text-[11px] text-slate-500 font-medium">Click or drag to upload</span>
+                        <UploadCloud className="w-5 h-5 text-slate-400 dark:text-gray-500 mb-1" />
+                        <span className="text-[11px] text-slate-500 dark:text-gray-400 font-medium">Click or drag to upload</span>
                       </>
                     )}
                   </div>
                 </div>
 
                 {uploadError && (
-                  <div className="p-2.5 bg-rose-50 border border-rose-100 rounded-xl text-[11px] text-rose-600">
+                  <div className="p-2.5 bg-rose-50 dark:bg-rose-900/30 border border-rose-100 dark:border-rose-800 rounded-xl text-[11px] text-rose-600 dark:text-rose-400">
                     {uploadError}
                   </div>
                 )}
@@ -472,26 +472,26 @@ export default function ProductFormModal({
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
                   placeholder="Or paste an image URL..."
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl focus:border-indigo-500 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50"
+                  className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-xs dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
                 />
               </div>
 
             </div>
 
             {/* Actions Footer row */}
-            <div className="border-t border-slate-100 pt-5 flex justify-end gap-2.5">
+            <div className="border-t border-slate-100 dark:border-gray-800 pt-5 flex justify-end gap-2.5">
               <button
                 id="btn-cancel-form"
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 font-bold text-xs rounded-xl cursor-pointer"
+                className="px-4 py-2 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-800 text-slate-600 dark:text-gray-400 font-bold text-xs rounded-xl cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 id="btn-submit-form"
                 type="submit"
-                className="px-5 py-2 bg-slate-900 hover:bg-indigo-650 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer"
+                className="px-5 py-2 bg-slate-900 dark:bg-indigo-700 hover:bg-indigo-650 dark:hover:bg-indigo-800 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer"
               >
                 {editingProduct ? "Save Specifications" : "Register Product"}
               </button>

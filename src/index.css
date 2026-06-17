@@ -38,18 +38,3 @@ body {
   scrollbar-width: none !important;
 }
 
-body {
-  font-family: var(--font-sans);
-  background-color: #fafbfc;
-}
-
-/* Hide scrollbar helper */
-.no-scrollbar::-webkit-scrollbar {
-  display: none !important;
-}
-.no-scrollbar {
-  -ms-overflow-style: none !important; /* IE and Edge */
-  scrollbar-width: none !important; /* Firefox */
-}
-
-

@@ -23,19 +23,19 @@ export default function AlertModal({ isOpen, message, onClose }: AlertModalProps
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            className="relative bg-white w-full max-w-sm rounded-2xl shadow-2xl border border-slate-100 z-10 p-6"
+            className="relative bg-white dark:bg-gray-900 w-full max-w-sm rounded-2xl shadow-2xl border border-slate-100 dark:border-gray-800 z-10 p-6"
           >
             <div className="flex items-start gap-3">
-              <div className="p-2 bg-rose-100 rounded-full shrink-0">
-                <AlertCircle className="w-5 h-5 text-rose-600" />
+              <div className="p-2 bg-rose-100 dark:bg-rose-900/50 rounded-full shrink-0">
+                <AlertCircle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-slate-800 mb-1">Notice</h3>
-                <p className="text-xs text-slate-600 leading-relaxed">{message}</p>
+                <h3 className="text-sm font-bold text-slate-800 dark:text-gray-100 mb-1">Notice</h3>
+                <p className="text-xs text-slate-600 dark:text-gray-400 leading-relaxed">{message}</p>
               </div>
               <button
                 onClick={onClose}
-                className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer transition-colors shrink-0"
+                className="p-1 hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300 rounded-full cursor-pointer transition-colors shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -43,7 +43,7 @@ export default function AlertModal({ isOpen, message, onClose }: AlertModalProps
             <div className="mt-4 flex justify-end">
               <button
                 onClick={onClose}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer transition-all"
+                className="px-4 py-2 bg-slate-900 dark:bg-indigo-700 hover:bg-slate-800 dark:hover:bg-indigo-800 text-white font-bold text-xs rounded-xl cursor-pointer transition-all"
               >
                 OK
               </button>
