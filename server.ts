@@ -1,14 +1,9 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { v2 as cloudinary } from "cloudinary";
+import pg from "pg";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -22,42 +17,90 @@ cloudinary.config({
 const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
-// Enable JSON bodies with higher limits for Excel batch loads
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ limit: "20mb", extended: true }));
 
-// Set up data directory and persistence path
-const DATA_DIR = path.join(process.cwd(), "data");
-const PRODUCTS_FILE = path.join(DATA_DIR, "products_v3.json"); // Save to a fresh version to reset default list cleanly
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+// PostgreSQL connection pool
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes("localhost")
+    ? false
+    : { rejectUnauthorized: false },
+});
+
+async function initDb() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      "productCode" TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      uom TEXT NOT NULL,
+      category TEXT NOT NULL,
+      "subCategory" TEXT DEFAULT '',
+      status TEXT DEFAULT 'Active',
+      price DOUBLE PRECISION,
+      stock INTEGER,
+      "imageUrl" TEXT DEFAULT '',
+      "createdAt" TEXT NOT NULL,
+      "updatedAt" TEXT NOT NULL
+    );
+  `);
+  console.log("Database table 'products' is ready.");
 }
 
-// Default catalog data starts empty
-const DEFAULT_PRODUCTS: any[] = [];
-
-// Helper to read products
-function readProductsFromFile() {
-  try {
-    if (fs.existsSync(PRODUCTS_FILE)) {
-      const raw = fs.readFileSync(PRODUCTS_FILE, "utf-8");
-      return JSON.parse(raw);
-    }
-  } catch (error) {
-    console.error("Error reading products file, fallback to default seed data:", error);
-  }
-  // Store default if file empty or nonexistent
-  writeProductsToFile(DEFAULT_PRODUCTS);
-  return DEFAULT_PRODUCTS;
+async function getAllProducts(): Promise<any[]> {
+  const result = await pool.query("SELECT * FROM products ORDER BY name ASC");
+  return result.rows;
 }
 
-// Helper to write products
-function writeProductsToFile(products: any[]) {
-  try {
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), "utf-8");
-  } catch (error) {
-    console.error("Error writing products database file:", error);
+async function getProductById(id: string): Promise<any | null> {
+  const result = await pool.query("SELECT * FROM products WHERE id = $1", [id]);
+  return result.rows[0] || null;
+}
+
+async function upsertProduct(product: any): Promise<void> {
+  await pool.query(
+    `INSERT INTO products (id, "productCode", name, description, uom, category, "subCategory", status, price, stock, "imageUrl", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     ON CONFLICT (id) DO UPDATE SET
+       "productCode" = EXCLUDED."productCode",
+       name = EXCLUDED.name,
+       description = EXCLUDED.description,
+       uom = EXCLUDED.uom,
+       category = EXCLUDED.category,
+       "subCategory" = EXCLUDED."subCategory",
+       status = EXCLUDED.status,
+       price = EXCLUDED.price,
+       stock = EXCLUDED.stock,
+       "imageUrl" = EXCLUDED."imageUrl",
+       "updatedAt" = EXCLUDED."updatedAt"`,
+    [
+      product.id,
+      product.productCode,
+      product.name,
+      product.description || "",
+      product.uom,
+      product.category,
+      product.subCategory || "",
+      product.status || "Active",
+      product.price ?? null,
+      product.stock ?? null,
+      product.imageUrl || "",
+      product.createdAt,
+      product.updatedAt,
+    ]
+  );
+}
+
+async function deleteProduct(id: string): Promise<boolean> {
+  const result = await pool.query("DELETE FROM products WHERE id = $1", [id]);
+  return (result.rowCount ?? 0) > 0;
+}
+
+async function insertImportBatch(products: any[]): Promise<void> {
+  for (const p of products) {
+    await upsertProduct(p);
   }
 }
 
@@ -85,9 +128,14 @@ function getGeminiAI() {
 // --- API Endpoints ---
 
 // GET: Retrieve all products
-app.get("/api/products", (req, res) => {
-  const products = readProductsFromFile();
-  res.json(products);
+app.get("/api/products", async (req, res) => {
+  try {
+    const products = await getAllProducts();
+    res.json(products);
+  } catch (err: any) {
+    console.error("Error fetching products:", err);
+    res.status(500).json({ error: "Failed to fetch products." });
+  }
 });
 
 // POST: Upload custom product images via Base64 stream to Cloudinary
@@ -120,230 +168,220 @@ app.post("/api/products/upload-image", (req, res) => {
   }
 });
 
-// GET: Calculate stats in simple format helper
-app.get("/api/products/stats", (req, res) => {
-  const products = readProductsFromFile();
-  
-  const totalProducts = products.length;
-  let activeCount = 0;
-  let inactiveCount = 0;
-  let discontinuedCount = 0;
+// GET: Calculate stats
+app.get("/api/products/stats", async (req, res) => {
+  try {
+    const products = await getAllProducts();
+    const totalProducts = products.length;
+    let activeCount = 0;
+    let inactiveCount = 0;
+    let discontinuedCount = 0;
 
-  const categoriesMap: { [cat: string]: { count: number; activeCount: number } } = {};
+    const categoriesMap: { [cat: string]: { count: number; activeCount: number } } = {};
 
-  products.forEach((p: any) => {
-    const status = String(p.status || "Active");
-    if (status === "Active") activeCount++;
-    else if (status === "Inactive") inactiveCount++;
-    else if (status === "Discontinued") discontinuedCount++;
+    products.forEach((p: any) => {
+      const status = String(p.status || "Active");
+      if (status === "Active") activeCount++;
+      else if (status === "Inactive") inactiveCount++;
+      else if (status === "Discontinued") discontinuedCount++;
 
-    const cat = p.category || "Uncategorized";
-    if (!categoriesMap[cat]) {
-      categoriesMap[cat] = { count: 0, activeCount: 0 };
-    }
-    categoriesMap[cat].count++;
-    if (status === "Active") {
-      categoriesMap[cat].activeCount++;
-    }
-  });
+      const cat = p.category || "Uncategorized";
+      if (!categoriesMap[cat]) {
+        categoriesMap[cat] = { count: 0, activeCount: 0 };
+      }
+      categoriesMap[cat].count++;
+      if (status === "Active") {
+        categoriesMap[cat].activeCount++;
+      }
+    });
 
-  const categoryStats = Object.keys(categoriesMap).map((cat) => ({
-    category: cat,
-    count: categoriesMap[cat].count,
-    activeCount: categoriesMap[cat].activeCount
-  }));
+    const categoryStats = Object.keys(categoriesMap).map((cat) => ({
+      category: cat,
+      count: categoriesMap[cat].count,
+      activeCount: categoriesMap[cat].activeCount
+    }));
 
-  res.json({
-    totalProducts,
-    activeCount,
-    inactiveCount,
-    discontinuedCount,
-    categoryStats,
-  });
+    res.json({
+      totalProducts,
+      activeCount,
+      inactiveCount,
+      discontinuedCount,
+      categoryStats,
+    });
+  } catch (err: any) {
+    console.error("Error fetching stats:", err);
+    res.status(500).json({ error: "Failed to fetch stats." });
+  }
 });
 
 // POST: Add new product
-app.post("/api/products", (req, res) => {
-  const products = readProductsFromFile();
-  const input = req.body;
+app.post("/api/products", async (req, res) => {
+  try {
+    const input = req.body;
 
-  if (!input.name || !input.productCode || !input.uom || !input.category) {
-    return res.status(400).json({ error: "Missing required catalog fields. Name, Product Code, UoM, and Category are mandatory." });
+    if (!input.name || !input.productCode || !input.uom || !input.category) {
+      return res.status(400).json({ error: "Missing required catalog fields. Name, Product Code, UoM, and Category are mandatory." });
+    }
+
+    let defaultImage = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80";
+    if (input.category === "Electronics") {
+      defaultImage = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
+    } else if (input.category === "Home & Lifestyle") {
+      defaultImage = "https://images.unsplash.com/photo-1507512140264-ac60c121b4ae?w=800&auto=format&fit=crop&q=80";
+    } else if (input.category === "Outdoor & Travel") {
+      defaultImage = "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&auto=format&fit=crop&q=80";
+    } else if (input.category === "Office Tools") {
+      defaultImage = "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=800&auto=format&fit=crop&q=80";
+    }
+
+    const newProduct = {
+      id: `prod-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      productCode: String(input.productCode).toUpperCase().trim(),
+      name: String(input.name).trim(),
+      description: String(input.description || "").trim(),
+      uom: String(input.uom).trim(),
+      category: String(input.category).trim(),
+      subCategory: String(input.subCategory || "General").trim(),
+      status: ["Active", "Inactive", "Discontinued"].includes(input.status) ? input.status : "Active",
+      price: input.price !== undefined ? Math.max(0, parseFloat(input.price)) : null,
+      stock: input.stock !== undefined ? Math.max(0, parseInt(input.stock, 10)) : null,
+      imageUrl: String(input.imageUrl || defaultImage).trim(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    await upsertProduct(newProduct);
+    res.status(201).json(newProduct);
+  } catch (err: any) {
+    console.error("Error creating product:", err);
+    res.status(500).json({ error: "Failed to create product." });
   }
-
-  // Provide high-quality category default image if custom one isn't specified
-  let defaultImage = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80"; // standard default watch
-  if (input.category === "Electronics") {
-    defaultImage = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
-  } else if (input.category === "Home & Lifestyle") {
-    defaultImage = "https://images.unsplash.com/photo-1507512140264-ac60c121b4ae?w=800&auto=format&fit=crop&q=80";
-  } else if (input.category === "Outdoor & Travel") {
-    defaultImage = "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&auto=format&fit=crop&q=80";
-  } else if (input.category === "Office Tools") {
-    defaultImage = "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=800&auto=format&fit=crop&q=80";
-  }
-
-  const newProduct = {
-    id: `prod-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    productCode: String(input.productCode).toUpperCase().trim(),
-    name: String(input.name).trim(),
-    description: String(input.description || "").trim(),
-    uom: String(input.uom).trim(),
-    category: String(input.category).trim(),
-    subCategory: String(input.subCategory || "General").trim(),
-    status: ["Active", "Inactive", "Discontinued"].includes(input.status) ? input.status : "Active",
-    price: input.price !== undefined ? Math.max(0, parseFloat(input.price)) : undefined,
-    stock: input.stock !== undefined ? Math.max(0, parseInt(input.stock, 10)) : undefined,
-    imageUrl: String(input.imageUrl || defaultImage).trim(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  products.push(newProduct);
-  writeProductsToFile(products);
-
-  res.status(201).json(newProduct);
 });
 
 // POST: Batch Import multiple parsed products (from Excel / CSV parser)
-app.post("/api/products/import", (req, res) => {
-  const products = readProductsFromFile();
-  const incoming = req.body;
+app.post("/api/products/import", async (req, res) => {
+  try {
+    const incoming = req.body;
 
-  if (!Array.isArray(incoming)) {
-    return res.status(400).json({ error: "Expected an array of imported products." });
-  }
-
-  let importedCount = 0;
-  const newImportedItems: any[] = [];
-
-  incoming.forEach((item: any) => {
-    let codeStr = item.productCode || item["Product Code"] || item["code"] || item["Code"];
-    let nameStr = item.name || item["Product Name"] || item["Name"] || item["Product Name/Description"] || item["Description"];
-    let descStr = item.description || item["Description"] || item["Product Name/Description"] || "";
-    let uomStr = item.uom || item["UoM"] || item["unit"] || item["Unit"] || "Pcs";
-    let catStr = item.category || item["Category"] || "General";
-    let subCatStr = item.subCategory || item["Sub Category"] || item["SubCategory"] || "";
-    let imgStr = item.imageUrl || item["Image"] || item["imageUrl"] || item["Photo"] || "";
-    
-    // Status normalization
-    let rawStatus = item.status || item["Status"] || "Active";
-    let norStatus = "Active";
-    if (String(rawStatus).toLowerCase().includes("inactive") || String(rawStatus).toLowerCase() === "i") {
-      norStatus = "Inactive";
-    } else if (String(rawStatus).toLowerCase().includes("discon") || String(rawStatus).toLowerCase() === "d") {
-      norStatus = "Discontinued";
+    if (!Array.isArray(incoming)) {
+      return res.status(400).json({ error: "Expected an array of imported products." });
     }
 
-    let itemPrice = item.price || item["Price"] || item["Rate"];
-    let itemStock = item.stock || item["Stock"] || item["Qty"] || item["Quantity"];
+    const newImportedItems: any[] = [];
 
-    if (codeStr && nameStr) {
-      let defaultImage = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80";
-      if (String(catStr) === "Electronics") {
-        defaultImage = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
-      } else if (String(catStr) === "Home & Lifestyle") {
-        defaultImage = "https://images.unsplash.com/photo-1507512140264-ac60c121b4ae?w=800&auto=format&fit=crop&q=80";
-      } else if (String(catStr) === "Outdoor & Travel") {
-        defaultImage = "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&auto=format&fit=crop&q=80";
+    incoming.forEach((item: any) => {
+      let codeStr = item.productCode || item["Product Code"] || item["code"] || item["Code"];
+      let nameStr = item.name || item["Product Name"] || item["Name"] || item["Product Name/Description"] || item["Description"];
+      let descStr = item.description || item["Description"] || item["Product Name/Description"] || "";
+      let uomStr = item.uom || item["UoM"] || item["unit"] || item["Unit"] || "Pcs";
+      let catStr = item.category || item["Category"] || "General";
+      let subCatStr = item.subCategory || item["Sub Category"] || item["SubCategory"] || "";
+      let imgStr = item.imageUrl || item["Image"] || item["imageUrl"] || item["Photo"] || "";
+
+      let rawStatus = item.status || item["Status"] || "Active";
+      let norStatus = "Active";
+      if (String(rawStatus).toLowerCase().includes("inactive") || String(rawStatus).toLowerCase() === "i") {
+        norStatus = "Inactive";
+      } else if (String(rawStatus).toLowerCase().includes("discon") || String(rawStatus).toLowerCase() === "d") {
+        norStatus = "Discontinued";
       }
 
-      newImportedItems.push({
-        id: `prod-import-${Date.now()}-${Math.floor(Math.random() * 100000)}-${importedCount++}`,
-        productCode: String(codeStr).toUpperCase().trim(),
-        name: String(nameStr).trim(),
-        description: String(descStr || nameStr).trim(),
-        uom: String(uomStr).trim(),
-        category: String(catStr).trim(),
-        subCategory: String(subCatStr).trim(),
-        status: norStatus as any,
-        price: itemPrice !== undefined ? Math.max(0, parseFloat(itemPrice)) : undefined,
-        stock: itemStock !== undefined ? Math.max(0, parseInt(itemStock, 10)) : undefined,
-        imageUrl: String(imgStr || defaultImage).trim(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-    }
-  });
+      let itemPrice = item.price || item["Price"] || item["Rate"];
+      let itemStock = item.stock || item["Stock"] || item["Qty"] || item["Quantity"];
 
-  if (newImportedItems.length === 0) {
-    return res.status(400).json({ error: "No records with at least a valid 'Product Code' and 'Product Name' were detected inside matching headers." });
+      if (codeStr && nameStr) {
+        let defaultImage = "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80";
+        if (String(catStr) === "Electronics") {
+          defaultImage = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80";
+        } else if (String(catStr) === "Home & Lifestyle") {
+          defaultImage = "https://images.unsplash.com/photo-1507512140264-ac60c121b4ae?w=800&auto=format&fit=crop&q=80";
+        } else if (String(catStr) === "Outdoor & Travel") {
+          defaultImage = "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800&auto=format&fit=crop&q=80";
+        }
+
+        newImportedItems.push({
+          id: `prod-import-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+          productCode: String(codeStr).toUpperCase().trim(),
+          name: String(nameStr).trim(),
+          description: String(descStr || nameStr).trim(),
+          uom: String(uomStr).trim(),
+          category: String(catStr).trim(),
+          subCategory: String(subCatStr).trim(),
+          status: norStatus,
+          price: itemPrice !== undefined ? Math.max(0, parseFloat(itemPrice)) : null,
+          stock: itemStock !== undefined ? Math.max(0, parseInt(itemStock, 10)) : null,
+          imageUrl: String(imgStr || defaultImage).trim(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    });
+
+    if (newImportedItems.length === 0) {
+      return res.status(400).json({ error: "No records with at least a valid 'Product Code' and 'Product Name' were detected." });
+    }
+
+    await insertImportBatch(newImportedItems);
+    res.json({ success: true, count: newImportedItems.length });
+  } catch (err: any) {
+    console.error("Error importing products:", err);
+    res.status(500).json({ error: "Failed to import products." });
   }
-
-  // Merge/Replace matching products based on Product Code
-  const codeIndexMap: { [code: string]: number } = {};
-  products.forEach((p: any, idx: number) => {
-    codeIndexMap[p.productCode] = idx;
-  });
-
-  newImportedItems.forEach((newItem) => {
-    const existingIdx = codeIndexMap[newItem.productCode];
-    if (existingIdx !== undefined) {
-      products[existingIdx] = {
-        ...products[existingIdx],
-        ...newItem,
-        id: products[existingIdx].id,
-        createdAt: products[existingIdx].createdAt,
-        updatedAt: new Date().toISOString()
-      };
-    } else {
-      products.push(newItem);
-    }
-  });
-
-  writeProductsToFile(products);
-  res.json({ success: true, count: newImportedItems.length });
 });
 
 // PUT: Update complete product specifications
-app.put("/api/products/:id", (req, res) => {
-  const products = readProductsFromFile();
-  const targetId = req.params.id;
-  const index = products.findIndex((p: any) => p.id === targetId);
+app.put("/api/products/:id", async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const existing = await getProductById(targetId);
 
-  if (index === -1) {
-    return res.status(404).json({ error: `Catalog entry ${targetId} not found.` });
+    if (!existing) {
+      return res.status(404).json({ error: `Catalog entry ${targetId} not found.` });
+    }
+
+    const input = req.body;
+
+    const updatedProduct = {
+      ...existing,
+      productCode: input.productCode !== undefined ? String(input.productCode).toUpperCase().trim() : existing.productCode,
+      name: input.name !== undefined ? String(input.name).trim() : existing.name,
+      description: input.description !== undefined ? String(input.description).trim() : existing.description,
+      uom: input.uom !== undefined ? String(input.uom).trim() : existing.uom,
+      category: input.category !== undefined ? String(input.category).trim() : existing.category,
+      subCategory: input.subCategory !== undefined ? String(input.subCategory).trim() : existing.subCategory,
+      status: ["Active", "Inactive", "Discontinued"].includes(input.status) ? input.status : existing.status,
+      price: input.price !== undefined ? Math.max(0, parseFloat(input.price)) : existing.price,
+      stock: input.stock !== undefined ? Math.max(0, parseInt(input.stock, 10)) : existing.stock,
+      imageUrl: input.imageUrl !== undefined ? String(input.imageUrl).trim() : existing.imageUrl,
+      updatedAt: new Date().toISOString()
+    };
+
+    await upsertProduct(updatedProduct);
+    res.json(updatedProduct);
+  } catch (err: any) {
+    console.error("Error updating product:", err);
+    res.status(500).json({ error: "Failed to update product." });
   }
-
-  const existingProduct = products[index];
-  const input = req.body;
-
-  const updatedProduct = {
-    ...existingProduct,
-    productCode: input.productCode !== undefined ? String(input.productCode).toUpperCase().trim() : existingProduct.productCode,
-    name: input.name !== undefined ? String(input.name).trim() : existingProduct.name,
-    description: input.description !== undefined ? String(input.description).trim() : existingProduct.description,
-    uom: input.uom !== undefined ? String(input.uom).trim() : existingProduct.uom,
-    category: input.category !== undefined ? String(input.category).trim() : existingProduct.category,
-    subCategory: input.subCategory !== undefined ? String(input.subCategory).trim() : existingProduct.subCategory,
-    status: ["Active", "Inactive", "Discontinued"].includes(input.status) ? input.status : existingProduct.status,
-    price: input.price !== undefined ? Math.max(0, parseFloat(input.price)) : existingProduct.price,
-    stock: input.stock !== undefined ? Math.max(0, parseInt(input.stock, 10)) : existingProduct.stock,
-    imageUrl: input.imageUrl !== undefined ? String(input.imageUrl).trim() : existingProduct.imageUrl,
-    updatedAt: new Date().toISOString()
-  };
-
-  products[index] = updatedProduct;
-  writeProductsToFile(products);
-
-  res.json(updatedProduct);
 });
 
 // DELETE: Remove product from catalog
-app.delete("/api/products/:id", (req, res) => {
-  const products = readProductsFromFile();
-  const targetId = req.params.id;
-  const filteredProducts = products.filter((p: any) => p.id !== targetId);
+app.delete("/api/products/:id", async (req, res) => {
+  try {
+    const targetId = req.params.id;
+    const deleted = await deleteProduct(targetId);
 
-  if (filteredProducts.length === products.length) {
-    return res.status(404).json({ error: `Catalog entry ${targetId} not found.` });
+    if (!deleted) {
+      return res.status(404).json({ error: `Catalog entry ${targetId} not found.` });
+    }
+
+    res.json({ success: true, message: `Product ${targetId} deleted from database registry.` });
+  } catch (err: any) {
+    console.error("Error deleting product:", err);
+    res.status(500).json({ error: "Failed to delete product." });
   }
-
-  writeProductsToFile(filteredProducts);
-  res.json({ success: true, message: `Product ${targetId} deleted from database registry.` });
 });
 
-// POST: AI Copywriter assistant with Gemini optimized for the Catalog specific fields
+// POST: AI Copywriter assistant with Gemini
 app.post("/api/ai/copywrite", async (req, res) => {
   try {
     const { name, category, subCategory, keywords, tone } = req.body;
@@ -416,15 +454,15 @@ app.post("/api/ai/copywrite", async (req, res) => {
 
 // --- Server Delivery Pipelines ---
 async function startServer() {
+  await initDb();
+
   if (process.env.NODE_ENV !== "production") {
-    // Mount Vite middleware for direct fast assets HMR and SPA serving in developer sandbox
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    // Serve static compiled app files inside production containers
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
