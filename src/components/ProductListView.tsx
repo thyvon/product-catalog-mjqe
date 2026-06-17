@@ -51,7 +51,7 @@ export default function ProductListView({
               <th className="px-6 py-4.5 w-44 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-slate-50 dark:divide-gray-800">
             {products.map((product) => {
               const imageUrl = product.imageUrl || LIST_PLACEHOLDER;
 
