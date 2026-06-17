@@ -39,6 +39,9 @@ export default function App() {
   const [priceBudget, setPriceBudget] = useState<number>(500);
   const [maxAvailablePrice, setMaxAvailablePrice] = useState<number>(500);
 
+  // Mobile filter toggle
+  const [showFilters, setShowFilters] = useState(false);
+
   // Modals controllers
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -272,6 +275,14 @@ export default function App() {
           {/* Quick Toolbar Actions */}
           <div className="flex flex-wrap items-center gap-2">
             <button
+              id="toggle-filters-btn"
+              onClick={() => setShowFilters(!showFilters)}
+              className="lg:hidden p-2.5 bg-white hover:bg-slate-50 text-slate-500 rounded-xl border border-slate-200 shadow-sm cursor-pointer transition-all flex items-center justify-center h-9"
+              title="Toggle filters"
+            >
+              <Filter className="w-4 h-4" />
+            </button>
+            <button
               id="reload-catalog-btn"
               onClick={fetchCatalog}
               title="Reload catalog"
@@ -315,7 +326,9 @@ export default function App() {
         </div>
 
         {/* Query and Layout Grid Control Bar */}
-        <div id="catalog-controls-panel" className="bg-white border border-slate-100 rounded-2xl p-4 mb-5 shadow-sm space-y-3">
+        <div id="catalog-controls-panel" className={`bg-white border border-slate-100 rounded-2xl p-4 mb-5 shadow-sm space-y-3 ${
+          showFilters ? "block" : "hidden lg:block"
+        }`}>
           <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
             {/* Search Input bar and Category dropdown filter */}
             <div className="flex flex-col sm:flex-row items-stretch gap-3 flex-1">
