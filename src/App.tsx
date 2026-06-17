@@ -32,7 +32,7 @@ export default function App() {
   // Client filtering & sorting state
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "discontinued">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "discontinued">("active");
   const [sortBy, setSortBy] = useState<"name" | "code" | "price-asc" | "price-desc">("name");
 
   // Price range dynamically calculated
@@ -236,18 +236,18 @@ export default function App() {
   }, [products]);
 
   // Pagination
-  const PAGE_SIZE = 12;
+  const [pageSize, setPageSize] = useState(12);
   const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(sortedProducts.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sortedProducts.length / pageSize));
   const paginatedProducts = sortedProducts.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters or page size change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedCategory, statusFilter, sortBy]);
+  }, [searchQuery, selectedCategory, statusFilter, sortBy, pageSize]);
 
   // Calculate quick stats inline to replace heavy cards dashboards
   const activeCount = products.filter((p) => p.status === "Active").length;
@@ -503,11 +503,24 @@ export default function App() {
               <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-bold flex items-center gap-1">
                 <ArrowDownAZ className="w-3.5 h-3.5 text-indigo-500" /> Showing {paginatedProducts.length} of {products.length} registered specs
               </span>
-              {selectedCategory && (
-                <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-750 border border-indigo-100 py-0.5 px-3 rounded-full uppercase tracking-wider">
-                  Filter: {selectedCategory}
-                </span>
-              )}
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-widest">Rows:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="px-2 py-1 border border-slate-200 rounded-lg text-xs font-bold text-slate-600 bg-white focus:outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+                {selectedCategory && (
+                  <span className="text-[10px] font-mono font-bold bg-indigo-50 text-indigo-750 border border-indigo-100 py-0.5 px-3 rounded-full uppercase tracking-wider">
+                    {selectedCategory}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Toggle visual Gallery grid vs List table */}
