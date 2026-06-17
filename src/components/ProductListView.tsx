@@ -69,7 +69,7 @@ export default function ProductListView({
                 >
                   {/* Container Image Column */}
                   <td className="px-6 py-4">
-                    <div className="group relative w-16 h-16 shrink-0">
+                    <div className="group w-16 h-16 shrink-0">
                       <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-100 border border-slate-100 shadow-sm">
                         <img
                           src={imageUrl}
@@ -82,8 +82,8 @@ export default function ProductListView({
                           }}
                         />
                       </div>
-                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <div className="w-48 h-48 rounded-2xl overflow-hidden shadow-2xl border border-white/20 ring-1 ring-slate-900/10 bg-white">
+                      <div className="fixed top-4 right-4 z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <div className="w-60 h-60 rounded-2xl overflow-hidden shadow-2xl border border-white/20 ring-1 ring-slate-900/10 bg-white">
                           <img
                             src={imageUrl}
                             alt={product.name}
