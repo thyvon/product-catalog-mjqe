@@ -1,10 +1,37 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
+import {BrowserRouter, Routes, Route} from 'react-router-dom';
+import {AuthProvider} from './contexts/AuthContext';
+import {RequireAuth} from './App';
+import Layout from './components/Layout';
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import CatalogPage from './pages/CatalogPage';
+import SupplierDocsPage from './pages/SupplierDocsPage';
+import SupplierRegisterPage from './pages/SupplierRegisterPage';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<LoginPage />} />
+          <Route
+            element={
+              <RequireAuth>
+                <Layout />
+              </RequireAuth>
+            }
+          >
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/catalog" element={<CatalogPage />} />
+            <Route path="/supplier-register" element={<SupplierRegisterPage />} />
+            <Route path="/supplier-docs" element={<SupplierDocsPage />} />
+          </Route>
+          <Route path="*" element={<LoginPage />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   </StrictMode>,
 );

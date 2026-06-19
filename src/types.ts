@@ -35,6 +35,61 @@ export interface CatalogStats {
   categoryStats: CategoryStats[];
 }
 
+export interface Supplier {
+  id: string;
+  applicationType: "new" | "update";
+  oldSupplierCode: string;
+  companyName: string;
+  companyNameKhmer: string;
+  registrationType: "vat" | "non-vat";
+  foreignTradeOperator: boolean;
+  contactPerson: string;
+  position: string;
+  email: string;
+  phone: string;
+  mobile: string;
+  website: string;
+  address: string;
+  addressKhmer: string;
+  cityProvince: string;
+  districtKhan: string;
+  businessLicense: string;
+  commercialRegistration: string;
+  taxRegistration: string;
+  vatCertificate: string;
+  patentTaxCertificate: string;
+  nationalId: string;
+  establishedYear: string;
+  businessActivity: string;
+  productServiceType: string;
+  otherDocuments: string;
+  bankName: string;
+  bankBranch: string;
+  bankAccount: string;
+  accountHolderName: string;
+  swiftCode: string;
+  iban: string;
+  checkAuthorization: boolean;
+  paymentMethod: "bank-transfer" | "cheque" | "cash" | "other";
+  paymentMethodOther: string;
+  paymentTerm: "no-credit" | "one-week" | "two-weeks" | "one-month" | "other";
+  paymentTermOther: string;
+  conflictOfInterest: boolean;
+  conflictDetails: string;
+  supplierDeclarationName: string;
+  supplierDeclarationDate: string;
+  buyerCompletedName: string;
+  buyerCompletedDate: string;
+  companyProfile: string;
+  codeOfConductAck: boolean;
+  status: "Pending" | "Approved" | "Rejected" | "Suspended";
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SupplierInput = Omit<Supplier, "id" | "createdAt" | "updatedAt">;
+
 export interface AICopywriterRequest {
   name: string;
   category?: string;

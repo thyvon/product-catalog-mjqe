@@ -62,25 +62,46 @@ async function initDb() {
     return;
   }
   try {
-    await p.query(`
-      CREATE TABLE IF NOT EXISTS products (
-        id TEXT PRIMARY KEY,
-        "productCode" TEXT NOT NULL,
-        name TEXT NOT NULL,
-        description TEXT DEFAULT '',
-        uom TEXT NOT NULL,
-        category TEXT NOT NULL,
-        "subCategory" TEXT DEFAULT '',
-        status TEXT DEFAULT 'Active',
-        price DOUBLE PRECISION,
-        stock INTEGER,
-        "imageUrl" TEXT DEFAULT '',
-        "createdAt" TEXT NOT NULL,
-        "updatedAt" TEXT NOT NULL
-      );
-    `);
+    await p.query("CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, \"productCode\" TEXT NOT NULL, name TEXT NOT NULL, description TEXT DEFAULT '', uom TEXT NOT NULL, category TEXT NOT NULL, \"subCategory\" TEXT DEFAULT '', status TEXT DEFAULT 'Active', price DOUBLE PRECISION, stock INTEGER, \"imageUrl\" TEXT DEFAULT '', \"createdAt\" TEXT NOT NULL, \"updatedAt\" TEXT NOT NULL)");
+    await p.query("CREATE TABLE IF NOT EXISTS suppliers (id TEXT PRIMARY KEY, \"applicationType\" TEXT NOT NULL DEFAULT 'new', \"oldSupplierCode\" TEXT NOT NULL DEFAULT '', \"companyName\" TEXT NOT NULL, \"companyNameKhmer\" TEXT NOT NULL DEFAULT '', \"registrationType\" TEXT NOT NULL DEFAULT 'vat', \"foreignTradeOperator\" BOOLEAN NOT NULL DEFAULT false, \"contactPerson\" TEXT NOT NULL DEFAULT '', position TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '', mobile TEXT NOT NULL DEFAULT '', website TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', \"addressKhmer\" TEXT NOT NULL DEFAULT '', \"cityProvince\" TEXT NOT NULL DEFAULT '', \"districtKhan\" TEXT NOT NULL DEFAULT '', \"businessLicense\" TEXT NOT NULL DEFAULT '', \"commercialRegistration\" TEXT NOT NULL DEFAULT '', \"taxRegistration\" TEXT NOT NULL DEFAULT '', \"vatCertificate\" TEXT NOT NULL DEFAULT '', \"patentTaxCertificate\" TEXT NOT NULL DEFAULT '', \"nationalId\" TEXT NOT NULL DEFAULT '', \"establishedYear\" TEXT NOT NULL DEFAULT '', \"businessActivity\" TEXT NOT NULL DEFAULT '', \"productServiceType\" TEXT NOT NULL DEFAULT '', \"otherDocuments\" TEXT NOT NULL DEFAULT '', \"bankName\" TEXT NOT NULL DEFAULT '', \"bankBranch\" TEXT NOT NULL DEFAULT '', \"bankAccount\" TEXT NOT NULL DEFAULT '', \"accountHolderName\" TEXT NOT NULL DEFAULT '', \"swiftCode\" TEXT NOT NULL DEFAULT '', iban TEXT NOT NULL DEFAULT '', \"checkAuthorization\" BOOLEAN NOT NULL DEFAULT false, \"paymentMethod\" TEXT NOT NULL DEFAULT 'bank-transfer', \"paymentMethodOther\" TEXT NOT NULL DEFAULT '', \"paymentTerm\" TEXT NOT NULL DEFAULT 'no-credit', \"paymentTermOther\" TEXT NOT NULL DEFAULT '', \"conflictOfInterest\" BOOLEAN NOT NULL DEFAULT false, \"conflictDetails\" TEXT NOT NULL DEFAULT '', \"supplierDeclarationName\" TEXT NOT NULL DEFAULT '', \"supplierDeclarationDate\" TEXT NOT NULL DEFAULT '', \"buyerCompletedName\" TEXT NOT NULL DEFAULT '', \"buyerCompletedDate\" TEXT NOT NULL DEFAULT '', \"companyProfile\" TEXT NOT NULL DEFAULT '', \"codeOfConductAck\" BOOLEAN NOT NULL DEFAULT false, status TEXT NOT NULL DEFAULT 'Pending', notes TEXT NOT NULL DEFAULT '', \"createdAt\" TEXT NOT NULL, \"updatedAt\" TEXT NOT NULL)");
+    const supplierColumnMigrations = [
+      "\"applicationType\" TEXT NOT NULL DEFAULT 'new'",
+      "\"oldSupplierCode\" TEXT NOT NULL DEFAULT ''",
+      "\"companyNameKhmer\" TEXT NOT NULL DEFAULT ''",
+      "\"foreignTradeOperator\" BOOLEAN NOT NULL DEFAULT false",
+      "position TEXT NOT NULL DEFAULT ''",
+      "mobile TEXT NOT NULL DEFAULT ''",
+      "website TEXT NOT NULL DEFAULT ''",
+      "\"addressKhmer\" TEXT NOT NULL DEFAULT ''",
+      "\"cityProvince\" TEXT NOT NULL DEFAULT ''",
+      "\"districtKhan\" TEXT NOT NULL DEFAULT ''",
+      "\"taxRegistration\" TEXT NOT NULL DEFAULT ''",
+      "\"nationalId\" TEXT NOT NULL DEFAULT ''",
+      "\"establishedYear\" TEXT NOT NULL DEFAULT ''",
+      "\"businessActivity\" TEXT NOT NULL DEFAULT ''",
+      "\"productServiceType\" TEXT NOT NULL DEFAULT ''",
+      "\"otherDocuments\" TEXT NOT NULL DEFAULT ''",
+      "\"bankBranch\" TEXT NOT NULL DEFAULT ''",
+      "\"accountHolderName\" TEXT NOT NULL DEFAULT ''",
+      "\"swiftCode\" TEXT NOT NULL DEFAULT ''",
+      "iban TEXT NOT NULL DEFAULT ''",
+      "\"checkAuthorization\" BOOLEAN NOT NULL DEFAULT false",
+      "\"paymentMethod\" TEXT NOT NULL DEFAULT 'bank-transfer'",
+      "\"paymentMethodOther\" TEXT NOT NULL DEFAULT ''",
+      "\"paymentTerm\" TEXT NOT NULL DEFAULT 'no-credit'",
+      "\"paymentTermOther\" TEXT NOT NULL DEFAULT ''",
+      "\"conflictOfInterest\" BOOLEAN NOT NULL DEFAULT false",
+      "\"conflictDetails\" TEXT NOT NULL DEFAULT ''",
+      "\"supplierDeclarationName\" TEXT NOT NULL DEFAULT ''",
+      "\"supplierDeclarationDate\" TEXT NOT NULL DEFAULT ''",
+      "\"buyerCompletedName\" TEXT NOT NULL DEFAULT ''",
+      "\"buyerCompletedDate\" TEXT NOT NULL DEFAULT ''",
+    ];
+    for (const columnDefinition of supplierColumnMigrations) {
+      try { await p.query(`ALTER TABLE suppliers ADD COLUMN ${columnDefinition}`); } catch {}
+    }
     dbReady = true;
-    console.log("Database table 'products' is ready.");
+    console.log("Database tables 'products' and 'suppliers' are ready.");
   } catch (err) {
     console.error("Failed to initialize database:", err);
     console.warn("Server will start without database persistence.");
@@ -437,6 +458,284 @@ app.delete("/api/products/:id", async (req, res) => {
   } catch (err: any) {
     console.error("Error deleting product:", err);
     res.status(500).json({ error: "Failed to delete product." });
+  }
+});
+
+// --- Supplier CRUD Endpoints ---
+
+async function getAllSuppliers(): Promise<any[]> {
+  const p = getPool();
+  if (!p || !dbReady) return [];
+  const result = await p.query("SELECT * FROM suppliers ORDER BY \"createdAt\" DESC");
+  return result.rows;
+}
+
+async function getSupplierById(id: string): Promise<any | null> {
+  const p = getPool();
+  if (!p || !dbReady) return null;
+  const result = await p.query("SELECT * FROM suppliers WHERE id = $1", [id]);
+  return result.rows[0] || null;
+}
+
+async function upsertSupplier(supplier: any): Promise<void> {
+  assertDb();
+  const p = getPool()!;
+  const columns = [
+    "id",
+    "\"applicationType\"",
+    "\"oldSupplierCode\"",
+    "\"companyName\"",
+    "\"companyNameKhmer\"",
+    "\"registrationType\"",
+    "\"foreignTradeOperator\"",
+    "\"contactPerson\"",
+    "position",
+    "email",
+    "phone",
+    "mobile",
+    "website",
+    "address",
+    "\"addressKhmer\"",
+    "\"cityProvince\"",
+    "\"districtKhan\"",
+    "\"businessLicense\"",
+    "\"commercialRegistration\"",
+    "\"taxRegistration\"",
+    "\"vatCertificate\"",
+    "\"patentTaxCertificate\"",
+    "\"nationalId\"",
+    "\"establishedYear\"",
+    "\"businessActivity\"",
+    "\"productServiceType\"",
+    "\"otherDocuments\"",
+    "\"bankName\"",
+    "\"bankBranch\"",
+    "\"bankAccount\"",
+    "\"accountHolderName\"",
+    "\"swiftCode\"",
+    "iban",
+    "\"checkAuthorization\"",
+    "\"paymentMethod\"",
+    "\"paymentMethodOther\"",
+    "\"paymentTerm\"",
+    "\"paymentTermOther\"",
+    "\"conflictOfInterest\"",
+    "\"conflictDetails\"",
+    "\"supplierDeclarationName\"",
+    "\"supplierDeclarationDate\"",
+    "\"buyerCompletedName\"",
+    "\"buyerCompletedDate\"",
+    "\"companyProfile\"",
+    "\"codeOfConductAck\"",
+    "status",
+    "notes",
+    "\"createdAt\"",
+    "\"updatedAt\"",
+  ];
+  const values = [
+    supplier.id,
+    supplier.applicationType || "new",
+    supplier.oldSupplierCode || "",
+    supplier.companyName,
+    supplier.companyNameKhmer || "",
+    supplier.registrationType || "vat",
+    supplier.foreignTradeOperator ?? false,
+    supplier.contactPerson || "",
+    supplier.position || "",
+    supplier.email || "",
+    supplier.phone || "",
+    supplier.mobile || "",
+    supplier.website || "",
+    supplier.address || "",
+    supplier.addressKhmer || "",
+    supplier.cityProvince || "",
+    supplier.districtKhan || "",
+    supplier.businessLicense || "",
+    supplier.commercialRegistration || "",
+    supplier.taxRegistration || "",
+    supplier.vatCertificate || "",
+    supplier.patentTaxCertificate || "",
+    supplier.nationalId || "",
+    supplier.establishedYear || "",
+    supplier.businessActivity || "",
+    supplier.productServiceType || "",
+    supplier.otherDocuments || "",
+    supplier.bankName || "",
+    supplier.bankBranch || "",
+    supplier.bankAccount || "",
+    supplier.accountHolderName || "",
+    supplier.swiftCode || "",
+    supplier.iban || "",
+    supplier.checkAuthorization ?? false,
+    supplier.paymentMethod || "bank-transfer",
+    supplier.paymentMethodOther || "",
+    supplier.paymentTerm || "no-credit",
+    supplier.paymentTermOther || "",
+    supplier.conflictOfInterest ?? false,
+    supplier.conflictDetails || "",
+    supplier.supplierDeclarationName || "",
+    supplier.supplierDeclarationDate || "",
+    supplier.buyerCompletedName || "",
+    supplier.buyerCompletedDate || "",
+    supplier.companyProfile || "",
+    supplier.codeOfConductAck ?? false,
+    supplier.status || "Pending",
+    supplier.notes || "",
+    supplier.createdAt,
+    supplier.updatedAt,
+  ];
+  const placeholders = columns.map((_, index) => `$${index + 1}`).join(", ");
+  const updates = columns
+    .filter((column) => column !== "id" && column !== "\"createdAt\"")
+    .map((column) => `${column} = EXCLUDED.${column}`)
+    .join(", ");
+
+  await p.query(
+    `INSERT INTO suppliers (${columns.join(", ")})
+     VALUES (${placeholders})
+     ON CONFLICT (id) DO UPDATE SET ${updates}`,
+    values
+  );
+}
+
+async function deleteSupplier(id: string): Promise<boolean> {
+  assertDb();
+  const p = getPool()!;
+  const result = await p.query("DELETE FROM suppliers WHERE id = $1", [id]);
+  return (result.rowCount ?? 0) > 0;
+}
+
+app.get("/api/suppliers", async (req, res) => {
+  try {
+    const suppliers = await getAllSuppliers();
+    res.json(suppliers);
+  } catch (err: any) {
+    console.error("Error fetching suppliers:", err);
+    res.status(500).json({ error: "Failed to fetch suppliers." });
+  }
+});
+
+app.get("/api/suppliers/:id", async (req, res) => {
+  try {
+    const supplier = await getSupplierById(req.params.id);
+    if (!supplier) return res.status(404).json({ error: "Supplier not found." });
+    res.json(supplier);
+  } catch (err: any) {
+    console.error("Error fetching supplier:", err);
+    res.status(500).json({ error: "Failed to fetch supplier." });
+  }
+});
+
+function cleanText(input: any, field: string, fallback = ""): string {
+  return String(input[field] ?? fallback).trim();
+}
+
+function supplierPayload(input: any, existing: any = {}) {
+  const paymentMethods = ["bank-transfer", "cheque", "cash", "other"];
+  const paymentTerms = ["no-credit", "one-week", "two-weeks", "one-month", "other"];
+  const statuses = ["Pending", "Approved", "Rejected", "Suspended"];
+
+  return {
+    applicationType: input.applicationType !== undefined && ["new", "update"].includes(input.applicationType) ? input.applicationType : existing.applicationType || "new",
+    oldSupplierCode: input.oldSupplierCode !== undefined ? cleanText(input, "oldSupplierCode") : existing.oldSupplierCode || "",
+    companyName: input.companyName !== undefined ? cleanText(input, "companyName") : existing.companyName || "",
+    companyNameKhmer: input.companyNameKhmer !== undefined ? cleanText(input, "companyNameKhmer") : existing.companyNameKhmer || "",
+    registrationType: input.registrationType !== undefined && ["vat", "non-vat"].includes(input.registrationType) ? input.registrationType : existing.registrationType || "vat",
+    foreignTradeOperator: input.foreignTradeOperator !== undefined ? !!input.foreignTradeOperator : existing.foreignTradeOperator ?? false,
+    contactPerson: input.contactPerson !== undefined ? cleanText(input, "contactPerson") : existing.contactPerson || "",
+    position: input.position !== undefined ? cleanText(input, "position") : existing.position || "",
+    email: input.email !== undefined ? cleanText(input, "email") : existing.email || "",
+    phone: input.phone !== undefined ? cleanText(input, "phone") : existing.phone || "",
+    mobile: input.mobile !== undefined ? cleanText(input, "mobile") : existing.mobile || "",
+    website: input.website !== undefined ? cleanText(input, "website") : existing.website || "",
+    address: input.address !== undefined ? cleanText(input, "address") : existing.address || "",
+    addressKhmer: input.addressKhmer !== undefined ? cleanText(input, "addressKhmer") : existing.addressKhmer || "",
+    cityProvince: input.cityProvince !== undefined ? cleanText(input, "cityProvince") : existing.cityProvince || "",
+    districtKhan: input.districtKhan !== undefined ? cleanText(input, "districtKhan") : existing.districtKhan || "",
+    businessLicense: input.businessLicense !== undefined ? cleanText(input, "businessLicense") : existing.businessLicense || "",
+    commercialRegistration: input.commercialRegistration !== undefined ? cleanText(input, "commercialRegistration") : existing.commercialRegistration || "",
+    taxRegistration: input.taxRegistration !== undefined ? cleanText(input, "taxRegistration") : existing.taxRegistration || "",
+    vatCertificate: input.vatCertificate !== undefined ? cleanText(input, "vatCertificate") : existing.vatCertificate || "",
+    patentTaxCertificate: input.patentTaxCertificate !== undefined ? cleanText(input, "patentTaxCertificate") : existing.patentTaxCertificate || "",
+    nationalId: input.nationalId !== undefined ? cleanText(input, "nationalId") : existing.nationalId || "",
+    establishedYear: input.establishedYear !== undefined ? cleanText(input, "establishedYear") : existing.establishedYear || "",
+    businessActivity: input.businessActivity !== undefined ? cleanText(input, "businessActivity") : existing.businessActivity || "",
+    productServiceType: input.productServiceType !== undefined ? cleanText(input, "productServiceType") : existing.productServiceType || "",
+    otherDocuments: input.otherDocuments !== undefined ? cleanText(input, "otherDocuments") : existing.otherDocuments || "",
+    bankName: input.bankName !== undefined ? cleanText(input, "bankName") : existing.bankName || "",
+    bankBranch: input.bankBranch !== undefined ? cleanText(input, "bankBranch") : existing.bankBranch || "",
+    bankAccount: input.bankAccount !== undefined ? cleanText(input, "bankAccount") : existing.bankAccount || "",
+    accountHolderName: input.accountHolderName !== undefined ? cleanText(input, "accountHolderName") : existing.accountHolderName || "",
+    swiftCode: input.swiftCode !== undefined ? cleanText(input, "swiftCode") : existing.swiftCode || "",
+    iban: input.iban !== undefined ? cleanText(input, "iban") : existing.iban || "",
+    checkAuthorization: input.checkAuthorization !== undefined ? !!input.checkAuthorization : existing.checkAuthorization ?? false,
+    paymentMethod: input.paymentMethod !== undefined && paymentMethods.includes(input.paymentMethod) ? input.paymentMethod : existing.paymentMethod || "bank-transfer",
+    paymentMethodOther: input.paymentMethodOther !== undefined ? cleanText(input, "paymentMethodOther") : existing.paymentMethodOther || "",
+    paymentTerm: input.paymentTerm !== undefined && paymentTerms.includes(input.paymentTerm) ? input.paymentTerm : existing.paymentTerm || "no-credit",
+    paymentTermOther: input.paymentTermOther !== undefined ? cleanText(input, "paymentTermOther") : existing.paymentTermOther || "",
+    conflictOfInterest: input.conflictOfInterest !== undefined ? !!input.conflictOfInterest : existing.conflictOfInterest ?? false,
+    conflictDetails: input.conflictDetails !== undefined ? cleanText(input, "conflictDetails") : existing.conflictDetails || "",
+    supplierDeclarationName: input.supplierDeclarationName !== undefined ? cleanText(input, "supplierDeclarationName") : existing.supplierDeclarationName || "",
+    supplierDeclarationDate: input.supplierDeclarationDate !== undefined ? cleanText(input, "supplierDeclarationDate") : existing.supplierDeclarationDate || "",
+    buyerCompletedName: input.buyerCompletedName !== undefined ? cleanText(input, "buyerCompletedName") : existing.buyerCompletedName || "",
+    buyerCompletedDate: input.buyerCompletedDate !== undefined ? cleanText(input, "buyerCompletedDate") : existing.buyerCompletedDate || "",
+    companyProfile: input.companyProfile !== undefined ? cleanText(input, "companyProfile") : existing.companyProfile || "",
+    codeOfConductAck: input.codeOfConductAck !== undefined ? !!input.codeOfConductAck : existing.codeOfConductAck ?? false,
+    status: input.status !== undefined && statuses.includes(input.status) ? input.status : existing.status || "Pending",
+    notes: input.notes !== undefined ? cleanText(input, "notes") : existing.notes || "",
+  };
+}
+
+app.post("/api/suppliers", async (req, res) => {
+  try {
+    const input = req.body;
+    if (!input.companyName) {
+      return res.status(400).json({ error: "Company name is required." });
+    }
+
+    const newSupplier = {
+      id: `sup-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      ...supplierPayload(input),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await upsertSupplier(newSupplier);
+    res.status(201).json(newSupplier);
+  } catch (err: any) {
+    console.error("Error creating supplier:", err);
+    res.status(500).json({ error: "Failed to create supplier." });
+  }
+});
+
+app.put("/api/suppliers/:id", async (req, res) => {
+  try {
+    const existing = await getSupplierById(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Supplier not found." });
+
+    const input = req.body;
+    const updated = {
+      ...existing,
+      ...supplierPayload(input, existing),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await upsertSupplier(updated);
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating supplier:", err);
+    res.status(500).json({ error: "Failed to update supplier." });
+  }
+});
+
+app.delete("/api/suppliers/:id", async (req, res) => {
+  try {
+    const deleted = await deleteSupplier(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Supplier not found." });
+    res.json({ success: true, message: "Supplier deleted." });
+  } catch (err: any) {
+    console.error("Error deleting supplier:", err);
+    res.status(500).json({ error: "Failed to delete supplier." });
   }
 });
 
