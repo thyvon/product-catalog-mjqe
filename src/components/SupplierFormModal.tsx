@@ -117,7 +117,7 @@ export default function SupplierFormModal({
   const inputClass =
     "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50 disabled:text-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:focus:ring-indigo-900/40";
   const labelClass = "text-[11px] font-bold text-slate-600 dark:text-gray-300";
-  const helperClass = "mt-0.5 block text-[10px] text-slate-400 dark:text-gray-500";
+  const helperClass = "text-[10px] font-semibold text-slate-400 dark:text-gray-500";
   const checkClass = "mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500";
 
   const Field = ({
@@ -132,8 +132,10 @@ export default function SupplierFormModal({
     wide?: boolean;
   }) => (
     <label className={wide ? "col-span-1 md:col-span-2" : ""}>
-      <span className={labelClass}>{label}</span>
-      {kh && <span className={helperClass}>{kh}</span>}
+      <span className={labelClass}>
+        {label}
+        {kh && <span className={helperClass}> / {kh}</span>}
+      </span>
       <div className="mt-1">{children}</div>
     </label>
   );
