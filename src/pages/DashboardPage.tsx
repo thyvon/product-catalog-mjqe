@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
   const pathLabel = (p: string) => {
     const map: Record<string, string> = {
-      "/": "Home",
+      "/": "Dashboard",
       "/product-list": "Product List",
       "/dashboard": "Dashboard",
       "/catalog": "Catalog",

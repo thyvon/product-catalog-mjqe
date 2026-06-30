@@ -20,7 +20,7 @@ export default function LoginPage() {
     }
     const success = login(username.trim(), password);
     if (success) {
-      navigate("/dashboard");
+      navigate("/");
     } else {
       setError("Invalid username or password.");
     }

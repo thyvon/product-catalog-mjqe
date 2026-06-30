@@ -1,6 +1,6 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import {BrowserRouter, Routes, Route} from 'react-router-dom';
+import {BrowserRouter, Routes, Route, Navigate} from 'react-router-dom';
 import {AuthProvider} from './contexts/AuthContext';
 import {RequireAuth} from './App';
 import Layout from './components/Layout';
@@ -17,7 +17,7 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/" element={<LoginPage />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/product-list" element={<LandingPage />} />
           <Route
             element={
@@ -26,12 +26,13 @@ createRoot(document.getElementById('root')!).render(
               </RequireAuth>
             }
           >
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/dashboard" element={<Navigate to="/" replace />} />
             <Route path="/catalog" element={<CatalogPage />} />
             <Route path="/supplier-register" element={<SupplierRegisterPage />} />
             <Route path="/supplier-docs" element={<SupplierDocsPage />} />
           </Route>
-          <Route path="*" element={<LoginPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

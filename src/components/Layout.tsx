@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/catalog", label: "Catalog", icon: ShoppingBag },
   { to: "/supplier-register", label: "Supplier Register", icon: Building2 },
   { to: "/supplier-docs", label: "Supplier Docs", icon: FileText },
@@ -30,6 +30,7 @@ export default function Layout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
   const [sidebarMini, setSidebarMini] = useState(() => {
     const stored = localStorage.getItem("sidebarMini");
     return stored === "true";
@@ -121,16 +122,7 @@ export default function Layout() {
           ))}
         </nav>
 
-        <div className="border-t border-slate-100 dark:border-gray-800 p-3 shrink-0">
-          <button
-            onClick={handleLogout}
-            className={`flex items-center justify-center gap-3 w-full px-3 py-3 rounded-xl text-sm font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all cursor-pointer`}
-            title="Sign Out"
-          >
-            <Power className="w-4 h-4 shrink-0" />
-            {!sidebarMini && <span>Sign Out</span>}
-          </button>
-        </div>
+
       </aside>
 
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-200`}>
@@ -187,14 +179,37 @@ export default function Layout() {
               )}
             </div>
 
-            <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-gray-700">
-              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold uppercase shrink-0">
-                {user?.username?.charAt(0) || "U"}
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-xs font-bold text-slate-800 dark:text-gray-200 leading-tight">{user?.username}</p>
-                <p className="text-[10px] text-slate-400 dark:text-gray-500 font-medium leading-tight">{user?.role}</p>
-              </div>
+            <div className="relative border-l border-slate-200 dark:border-gray-700 pl-2">
+              <button
+                onClick={() => setAvatarOpen(!avatarOpen)}
+                className="flex items-center gap-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 p-1.5 rounded-xl transition-all cursor-pointer text-left"
+              >
+                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold uppercase shrink-0">
+                  {user?.username?.charAt(0) || "U"}
+                </div>
+                <div className="hidden sm:block">
+                  <p className="text-xs font-bold text-slate-800 dark:text-gray-200 leading-tight">{user?.username}</p>
+                  <p className="text-[10px] text-slate-400 dark:text-gray-500 font-medium leading-tight">{user?.role}</p>
+                </div>
+              </button>
+
+              {avatarOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setAvatarOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-2xl shadow-xl z-20 p-2">
+                    <button
+                      onClick={() => {
+                        setAvatarOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-sm font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all cursor-pointer"
+                    >
+                      <Power className="w-4 h-4 shrink-0" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
