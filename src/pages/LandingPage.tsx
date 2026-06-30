@@ -154,7 +154,7 @@ export default function LandingPage() {
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full h-full px-3 py-2 border border-slate-200 dark:border-gray-700 rounded-2xl text-xs font-bold text-slate-500 dark:text-gray-400 focus:border-indigo-500 focus:outline-none bg-slate-50/40 dark:bg-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800 cursor-pointer min-h-[36px]"
+                  className="w-full h-full px-3 py-2 border border-slate-200 dark:border-gray-700 rounded-2xl text-xs font-bold text-slate-500 dark:text-gray-400 focus:border-indigo-500 focus:outline-none bg-slate-50/40 dark:bg-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800 cursor-pointer min-h-[36px] dark:[color-scheme:dark]"
                 >
                   <option value="">All Categories ({products.length})</option>
                   {categories.map((cat) => (
@@ -169,7 +169,7 @@ export default function LandingPage() {
                 <select
                   value={statusFilter}
                   onChange={(e: any) => setStatusFilter(e.target.value)}
-                  className="px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold text-slate-500 dark:text-gray-400 focus:border-indigo-500 focus:outline-none bg-slate-50/40 dark:bg-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800 cursor-pointer"
+                  className="px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold text-slate-500 dark:text-gray-400 focus:border-indigo-500 focus:outline-none bg-slate-50/40 dark:bg-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800 cursor-pointer dark:[color-scheme:dark]"
                 >
                   <option value="all">All Lifecycles</option>
                   <option value="active">Active Only</option>
@@ -182,7 +182,7 @@ export default function LandingPage() {
                 <select
                   value={sortBy}
                   onChange={(e: any) => setSortBy(e.target.value)}
-                  className="px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold text-slate-500 dark:text-gray-400 focus:border-indigo-500 focus:outline-none bg-slate-50/40 dark:bg-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800 cursor-pointer"
+                  className="px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl text-xs font-bold text-slate-500 dark:text-gray-400 focus:border-indigo-500 focus:outline-none bg-slate-50/40 dark:bg-gray-800/50 hover:bg-slate-50 dark:hover:bg-gray-800 cursor-pointer dark:[color-scheme:dark]"
                 >
                   <option value="name">Sort: Product Name (A-Z)</option>
                   <option value="code">Sort: Product Code</option>
@@ -231,7 +231,7 @@ export default function LandingPage() {
                   <select
                     value={pageSize}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    className="px-2 py-1 border border-slate-200 dark:border-gray-700 rounded-lg text-xs font-bold text-slate-600 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    className="px-2 py-1 border border-slate-200 dark:border-gray-700 rounded-lg text-xs font-bold text-slate-600 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:border-indigo-500 cursor-pointer dark:[color-scheme:dark]"
                   >
                     <option value={10}>10</option>
                     <option value={20}>20</option>

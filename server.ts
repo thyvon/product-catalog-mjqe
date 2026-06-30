@@ -1,18 +1,13 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
-import { v2 as cloudinary } from "cloudinary";
 import mysql, { type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
 import dotenv from "dotenv";
 
 dotenv.config();
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 const app = express();
 
@@ -264,7 +259,7 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-// POST: Upload custom product images via Base64 stream to Cloudinary
+// POST: Upload custom product images to local storage
 app.post("/api/products/upload-image", (req, res) => {
   try {
     const { image, filename } = req.body;
@@ -272,25 +267,25 @@ app.post("/api/products/upload-image", (req, res) => {
       return res.status(400).json({ error: "Missing image data" });
     }
 
-    const publicId = (filename || "product")
+    const matches = image.match(/^data:(image\/\w+);base64,(.+)$/);
+    if (!matches) {
+      return res.status(400).json({ error: "Invalid image data format." });
+    }
+
+    const ext = matches[1].split("/")[1].replace("jpeg", "jpg");
+    const safeName = (filename || "product")
       .replace(/[^a-zA-Z0-9]/g, "_")
       .toLowerCase()
-      .substring(0, 30) + `_${Date.now()}`;
+      .substring(0, 30);
+    const uniqueName = `${safeName}_${Date.now()}_${crypto.randomBytes(4).toString("hex")}.${ext}`;
+    const filePath = path.join(process.cwd(), "uploads", uniqueName);
+    const buffer = Buffer.from(matches[2], "base64");
 
-    cloudinary.uploader.upload(image, {
-      public_id: publicId,
-      folder: "product-catalog",
-      resource_type: "image",
-    }, (err, result) => {
-      if (err || !result) {
-        console.error("Cloudinary upload error:", err);
-        return res.status(500).json({ error: "Failed to upload image to cloud storage", details: err?.message });
-      }
-      res.json({ imageUrl: result.secure_url });
-    });
+    fs.writeFileSync(filePath, buffer);
+    res.json({ imageUrl: `/uploads/${uniqueName}` });
   } catch (err: any) {
-    console.error("Express photo upload parsing error:", err);
-    res.status(500).json({ error: "Failed to persist image binary content", details: err.message });
+    console.error("Local image upload error:", err);
+    res.status(500).json({ error: "Failed to save image.", details: err.message });
   }
 });
 
@@ -859,6 +854,12 @@ app.post("/api/ai/copywrite", async (req, res) => {
 // --- Server Delivery Pipelines ---
 async function startServer() {
   await initDb();
+
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadsDir));
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
