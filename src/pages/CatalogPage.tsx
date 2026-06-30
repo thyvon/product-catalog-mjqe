@@ -15,6 +15,7 @@ import {
   ChevronRight as AltArrowRight,
 } from "lucide-react";
 import { Product, ProductInput } from "../types";
+import { useAuth } from "../contexts/AuthContext";
 import ProductGalleryView from "../components/ProductGalleryView";
 import ProductListView from "../components/ProductListView";
 import ProductDetailModal from "../components/ProductDetailModal";
@@ -25,11 +26,12 @@ import ConfirmModal from "../components/ConfirmModal";
 import { motion, AnimatePresence } from "motion/react";
 
 export default function CatalogPage() {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const isAdmin = window.location.pathname.endsWith("/admin") || new URLSearchParams(window.location.search).get("admin") === "true";
+  const isAdmin = user?.role === "Admin";
   const [viewMode, setViewMode] = useState<"gallery" | "list">("gallery");
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -388,18 +390,8 @@ export default function CatalogPage() {
 
       <div className="flex-1 min-h-0 overflow-y-auto pb-4 space-y-4">
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="animate-pulse border border-slate-100 bg-white rounded-3xl h-[360px] p-6 flex flex-col justify-between">
-                <div className="space-y-4">
-                  <div className="bg-slate-200 h-40 rounded-2xl w-full"></div>
-                  <div className="h-4 bg-slate-200 rounded w-1/3"></div>
-                  <div className="h-6 bg-slate-200 rounded w-2/3"></div>
-                  <div className="h-4 bg-slate-200 rounded w-full"></div>
-                </div>
-                <div className="h-8 bg-slate-200 rounded w-1/3 mt-6"></div>
-              </div>
-            ))}
+          <div className="flex items-center justify-center py-32">
+            <Refresh className="w-8 h-8 text-indigo-500 animate-spin" />
           </div>
         ) : error ? (
           <div className="bg-rose-50 border border-rose-100 rounded-3xl p-8 text-center max-w-lg mx-auto mt-12 space-y-4">
@@ -416,11 +408,11 @@ export default function CatalogPage() {
             </button>
           </div>
         ) : sortedProducts.length === 0 ? (
-          <div className="text-center py-20 bg-white border border-slate-100 rounded-3xl max-w-xl mx-auto mt-8 p-8 space-y-4 shadow-sm">
-            <Bag className="w-12 h-12 text-slate-300 mx-auto" />
+          <div className="text-center py-20 bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-3xl max-w-xl mx-auto mt-8 p-8 space-y-4 shadow-sm">
+            <Bag className="w-12 h-12 text-slate-300 dark:text-gray-600 mx-auto" />
             <div>
-              <h3 className="text-sm font-bold text-slate-800">No Matching Products Found</h3>
-              <p className="text-xs text-slate-400 mt-2 max-w-md mx-auto leading-relaxed">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-gray-200">No Matching Products Found</h3>
+              <p className="text-xs text-slate-400 dark:text-gray-500 mt-2 max-w-md mx-auto leading-relaxed">
                 We couldn't locate any product SKU matching your filters or search terms inside this category. Modify parameters or import spreadsheets.
               </p>
             </div>
@@ -432,7 +424,7 @@ export default function CatalogPage() {
                   setStatusFilter("all");
                   setPriceBudget(maxAvailablePrice);
                 }}
-                className="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-500 font-bold text-xs rounded-xl cursor-pointer transition-colors"
+                className="px-4 py-2 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-800 text-slate-500 dark:text-gray-400 font-bold text-xs rounded-xl cursor-pointer transition-colors"
               >
                 Reset Search Filters
               </button>

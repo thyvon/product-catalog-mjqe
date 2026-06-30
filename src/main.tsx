@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage';
 import CatalogPage from './pages/CatalogPage';
 import SupplierDocsPage from './pages/SupplierDocsPage';
 import SupplierRegisterPage from './pages/SupplierRegisterPage';
+import LandingPage from './pages/LandingPage';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -17,6 +18,7 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <Routes>
           <Route path="/" element={<LoginPage />} />
+          <Route path="/product-list" element={<LandingPage />} />
           <Route
             element={
               <RequireAuth>

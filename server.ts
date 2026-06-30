@@ -3,7 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { v2 as cloudinary } from "cloudinary";
-import pg from "pg";
+import mysql, { type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -22,111 +22,160 @@ const PORT = parseInt(process.env.PORT || "3000", 10);
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ limit: "20mb", extended: true }));
 
-// PostgreSQL connection pool
-let pool: pg.Pool | null = null;
+// MySQL connection pool (XAMPP for local development)
+let pool: mysql.Pool | null = null;
+let dbReady = false;
 
-function getPool(): pg.Pool | null {
-  if (!pool) {
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) {
-      console.warn("DATABASE_URL not set. Product data will not persist across restarts.");
-      return null;
-    }
-    pool = new pg.Pool({
-      connectionString: dbUrl,
-      ssl: dbUrl.includes("localhost")
-        ? false
-        : { rejectUnauthorized: false },
-    });
-  }
+function getPool(): mysql.Pool | null {
   return pool;
 }
 
+function getDbConfig() {
+  return {
+    host: process.env.DB_HOST || "127.0.0.1",
+    port: Number(process.env.DB_PORT || 3306),
+    user: process.env.DB_USER || "root",
+    password: process.env.DB_PASSWORD || "",
+    database: process.env.DB_DATABASE || "product_catalog",
+  };
+}
+
 async function checkDbConnection(): Promise<boolean> {
-  const p = getPool();
-  if (!p) return false;
+  if (!pool) return false;
   try {
-    await p.query("SELECT 1");
+    await pool.query("SELECT 1");
     return true;
   } catch {
     return false;
   }
 }
 
-let dbReady = false;
-
 async function initDb() {
-  const p = getPool();
-  if (!p) {
-    console.warn("Skipping database initialization — DATABASE_URL not configured.");
+  const config = getDbConfig();
+
+  if (!/^[a-zA-Z0-9_]+$/.test(config.database)) {
+    console.error("DB_DATABASE may contain only letters, numbers, and underscores.");
     return;
   }
+
   try {
-    await p.query("CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, \"productCode\" TEXT NOT NULL, name TEXT NOT NULL, description TEXT DEFAULT '', uom TEXT NOT NULL, category TEXT NOT NULL, \"subCategory\" TEXT DEFAULT '', status TEXT DEFAULT 'Active', price DOUBLE PRECISION, stock INTEGER, \"imageUrl\" TEXT DEFAULT '', \"createdAt\" TEXT NOT NULL, \"updatedAt\" TEXT NOT NULL)");
-    await p.query("CREATE TABLE IF NOT EXISTS suppliers (id TEXT PRIMARY KEY, \"applicationType\" TEXT NOT NULL DEFAULT 'new', \"oldSupplierCode\" TEXT NOT NULL DEFAULT '', \"companyName\" TEXT NOT NULL, \"companyNameKhmer\" TEXT NOT NULL DEFAULT '', \"registrationType\" TEXT NOT NULL DEFAULT 'vat', \"foreignTradeOperator\" BOOLEAN NOT NULL DEFAULT false, \"contactPerson\" TEXT NOT NULL DEFAULT '', position TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '', mobile TEXT NOT NULL DEFAULT '', website TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', \"addressKhmer\" TEXT NOT NULL DEFAULT '', \"cityProvince\" TEXT NOT NULL DEFAULT '', \"districtKhan\" TEXT NOT NULL DEFAULT '', \"businessLicense\" TEXT NOT NULL DEFAULT '', \"commercialRegistration\" TEXT NOT NULL DEFAULT '', \"taxRegistration\" TEXT NOT NULL DEFAULT '', \"vatCertificate\" TEXT NOT NULL DEFAULT '', \"patentTaxCertificate\" TEXT NOT NULL DEFAULT '', \"nationalId\" TEXT NOT NULL DEFAULT '', \"establishedYear\" TEXT NOT NULL DEFAULT '', \"businessActivity\" TEXT NOT NULL DEFAULT '', \"productServiceType\" TEXT NOT NULL DEFAULT '', \"otherDocuments\" TEXT NOT NULL DEFAULT '', \"bankName\" TEXT NOT NULL DEFAULT '', \"bankBranch\" TEXT NOT NULL DEFAULT '', \"bankAccount\" TEXT NOT NULL DEFAULT '', \"accountHolderName\" TEXT NOT NULL DEFAULT '', \"swiftCode\" TEXT NOT NULL DEFAULT '', iban TEXT NOT NULL DEFAULT '', \"checkAuthorization\" BOOLEAN NOT NULL DEFAULT false, \"paymentMethod\" TEXT NOT NULL DEFAULT 'bank-transfer', \"paymentMethodOther\" TEXT NOT NULL DEFAULT '', \"paymentTerm\" TEXT NOT NULL DEFAULT 'no-credit', \"paymentTermOther\" TEXT NOT NULL DEFAULT '', \"conflictOfInterest\" BOOLEAN NOT NULL DEFAULT false, \"conflictDetails\" TEXT NOT NULL DEFAULT '', \"supplierDeclarationName\" TEXT NOT NULL DEFAULT '', \"supplierDeclarationDate\" TEXT NOT NULL DEFAULT '', \"buyerCompletedName\" TEXT NOT NULL DEFAULT '', \"buyerCompletedDate\" TEXT NOT NULL DEFAULT '', \"companyProfile\" TEXT NOT NULL DEFAULT '', \"codeOfConductAck\" BOOLEAN NOT NULL DEFAULT false, status TEXT NOT NULL DEFAULT 'Pending', notes TEXT NOT NULL DEFAULT '', \"createdAt\" TEXT NOT NULL, \"updatedAt\" TEXT NOT NULL)");
-    const supplierColumnMigrations = [
-      "\"applicationType\" TEXT NOT NULL DEFAULT 'new'",
-      "\"oldSupplierCode\" TEXT NOT NULL DEFAULT ''",
-      "\"companyNameKhmer\" TEXT NOT NULL DEFAULT ''",
-      "\"foreignTradeOperator\" BOOLEAN NOT NULL DEFAULT false",
-      "position TEXT NOT NULL DEFAULT ''",
-      "mobile TEXT NOT NULL DEFAULT ''",
-      "website TEXT NOT NULL DEFAULT ''",
-      "\"addressKhmer\" TEXT NOT NULL DEFAULT ''",
-      "\"cityProvince\" TEXT NOT NULL DEFAULT ''",
-      "\"districtKhan\" TEXT NOT NULL DEFAULT ''",
-      "\"taxRegistration\" TEXT NOT NULL DEFAULT ''",
-      "\"nationalId\" TEXT NOT NULL DEFAULT ''",
-      "\"establishedYear\" TEXT NOT NULL DEFAULT ''",
-      "\"businessActivity\" TEXT NOT NULL DEFAULT ''",
-      "\"productServiceType\" TEXT NOT NULL DEFAULT ''",
-      "\"otherDocuments\" TEXT NOT NULL DEFAULT ''",
-      "\"bankBranch\" TEXT NOT NULL DEFAULT ''",
-      "\"accountHolderName\" TEXT NOT NULL DEFAULT ''",
-      "\"swiftCode\" TEXT NOT NULL DEFAULT ''",
-      "iban TEXT NOT NULL DEFAULT ''",
-      "\"checkAuthorization\" BOOLEAN NOT NULL DEFAULT false",
-      "\"paymentMethod\" TEXT NOT NULL DEFAULT 'bank-transfer'",
-      "\"paymentMethodOther\" TEXT NOT NULL DEFAULT ''",
-      "\"paymentTerm\" TEXT NOT NULL DEFAULT 'no-credit'",
-      "\"paymentTermOther\" TEXT NOT NULL DEFAULT ''",
-      "\"conflictOfInterest\" BOOLEAN NOT NULL DEFAULT false",
-      "\"conflictDetails\" TEXT NOT NULL DEFAULT ''",
-      "\"supplierDeclarationName\" TEXT NOT NULL DEFAULT ''",
-      "\"supplierDeclarationDate\" TEXT NOT NULL DEFAULT ''",
-      "\"buyerCompletedName\" TEXT NOT NULL DEFAULT ''",
-      "\"buyerCompletedDate\" TEXT NOT NULL DEFAULT ''",
-    ];
-    for (const columnDefinition of supplierColumnMigrations) {
-      try { await p.query(`ALTER TABLE suppliers ADD COLUMN ${columnDefinition}`); } catch {}
-    }
+    const adminConnection = await mysql.createConnection({
+      host: config.host,
+      port: config.port,
+      user: config.user,
+      password: config.password,
+    });
+    await adminConnection.query(
+      `CREATE DATABASE IF NOT EXISTS \`${config.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+    );
+    await adminConnection.end();
+
+    pool = mysql.createPool({
+      ...config,
+      charset: "utf8mb4",
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS products (
+      id VARCHAR(64) PRIMARY KEY,
+      productCode VARCHAR(100) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      uom VARCHAR(100) NOT NULL,
+      category VARCHAR(150) NOT NULL,
+      subCategory VARCHAR(150) NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'Active',
+      price DOUBLE NULL,
+      stock INT NULL,
+      imageUrl TEXT NOT NULL,
+      createdAt VARCHAR(40) NOT NULL,
+      updatedAt VARCHAR(40) NOT NULL,
+      UNIQUE KEY products_product_code_unique (productCode)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS suppliers (
+      id VARCHAR(64) PRIMARY KEY,
+      applicationType VARCHAR(30) NOT NULL DEFAULT 'new',
+      oldSupplierCode VARCHAR(100) NOT NULL DEFAULT '',
+      companyName VARCHAR(255) NOT NULL,
+      companyNameKhmer VARCHAR(255) NOT NULL DEFAULT '',
+      registrationType VARCHAR(30) NOT NULL DEFAULT 'vat',
+      foreignTradeOperator BOOLEAN NOT NULL DEFAULT FALSE,
+      contactPerson VARCHAR(255) NOT NULL DEFAULT '',
+      position VARCHAR(150) NOT NULL DEFAULT '',
+      email VARCHAR(255) NOT NULL DEFAULT '',
+      phone VARCHAR(100) NOT NULL DEFAULT '',
+      mobile VARCHAR(100) NOT NULL DEFAULT '',
+      website VARCHAR(255) NOT NULL DEFAULT '',
+      address TEXT NOT NULL,
+      addressKhmer TEXT NOT NULL,
+      cityProvince VARCHAR(150) NOT NULL DEFAULT '',
+      districtKhan VARCHAR(150) NOT NULL DEFAULT '',
+      businessLicense VARCHAR(255) NOT NULL DEFAULT '',
+      commercialRegistration VARCHAR(255) NOT NULL DEFAULT '',
+      taxRegistration VARCHAR(255) NOT NULL DEFAULT '',
+      vatCertificate VARCHAR(255) NOT NULL DEFAULT '',
+      patentTaxCertificate VARCHAR(255) NOT NULL DEFAULT '',
+      nationalId VARCHAR(100) NOT NULL DEFAULT '',
+      establishedYear VARCHAR(20) NOT NULL DEFAULT '',
+      businessActivity VARCHAR(255) NOT NULL DEFAULT '',
+      productServiceType VARCHAR(255) NOT NULL DEFAULT '',
+      otherDocuments TEXT NOT NULL,
+      bankName VARCHAR(255) NOT NULL DEFAULT '',
+      bankBranch VARCHAR(255) NOT NULL DEFAULT '',
+      bankAccount VARCHAR(150) NOT NULL DEFAULT '',
+      accountHolderName VARCHAR(255) NOT NULL DEFAULT '',
+      swiftCode VARCHAR(50) NOT NULL DEFAULT '',
+      iban VARCHAR(100) NOT NULL DEFAULT '',
+      checkAuthorization BOOLEAN NOT NULL DEFAULT FALSE,
+      paymentMethod VARCHAR(50) NOT NULL DEFAULT 'bank-transfer',
+      paymentMethodOther VARCHAR(255) NOT NULL DEFAULT '',
+      paymentTerm VARCHAR(50) NOT NULL DEFAULT 'no-credit',
+      paymentTermOther VARCHAR(255) NOT NULL DEFAULT '',
+      conflictOfInterest BOOLEAN NOT NULL DEFAULT FALSE,
+      conflictDetails TEXT NOT NULL,
+      supplierDeclarationName VARCHAR(255) NOT NULL DEFAULT '',
+      supplierDeclarationDate VARCHAR(40) NOT NULL DEFAULT '',
+      buyerCompletedName VARCHAR(255) NOT NULL DEFAULT '',
+      buyerCompletedDate VARCHAR(40) NOT NULL DEFAULT '',
+      companyProfile TEXT NOT NULL,
+      codeOfConductAck BOOLEAN NOT NULL DEFAULT FALSE,
+      status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+      notes TEXT NOT NULL,
+      createdAt VARCHAR(40) NOT NULL,
+      updatedAt VARCHAR(40) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
     dbReady = true;
-    console.log("Database tables 'products' and 'suppliers' are ready.");
+    console.log(`MySQL database '${config.database}' and its tables are ready.`);
   } catch (err) {
-    console.error("Failed to initialize database:", err);
-    console.warn("Server will start without database persistence.");
+    pool = null;
+    dbReady = false;
+    console.error("Failed to initialize MySQL database:", err);
+    console.warn("Start MySQL in XAMPP and verify the DB_* values in .env.");
   }
 }
-
 async function getAllProducts(): Promise<any[]> {
   const p = getPool();
   if (!p || !dbReady) return [];
-  const result = await p.query("SELECT * FROM products ORDER BY name ASC");
-  return result.rows;
+  const [rows] = await p.query<RowDataPacket[]>("SELECT * FROM products ORDER BY name ASC");
+  return rows;
 }
 
 async function getProductById(id: string): Promise<any | null> {
   const p = getPool();
   if (!p || !dbReady) return null;
-  const result = await p.query("SELECT * FROM products WHERE id = $1", [id]);
-  return result.rows[0] || null;
+  const [rows] = await p.execute<RowDataPacket[]>("SELECT * FROM products WHERE id = ?", [id]);
+  return rows[0] || null;
 }
 
 async function getProductByCode(code: string): Promise<any | null> {
   const p = getPool();
   if (!p || !dbReady) return null;
-  const result = await p.query('SELECT * FROM products WHERE "productCode" = $1', [code]);
-  return result.rows[0] || null;
+  const [rows] = await p.execute<RowDataPacket[]>("SELECT * FROM products WHERE productCode = ?", [code]);
+  return rows[0] || null;
 }
 
 function assertDb() {
@@ -136,21 +185,21 @@ function assertDb() {
 async function upsertProduct(product: any): Promise<void> {
   assertDb();
   const p = getPool()!;
-  await p.query(
-    `INSERT INTO products (id, "productCode", name, description, uom, category, "subCategory", status, price, stock, "imageUrl", "createdAt", "updatedAt")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-     ON CONFLICT (id) DO UPDATE SET
-       "productCode" = EXCLUDED."productCode",
-       name = EXCLUDED.name,
-       description = EXCLUDED.description,
-       uom = EXCLUDED.uom,
-       category = EXCLUDED.category,
-       "subCategory" = EXCLUDED."subCategory",
-       status = EXCLUDED.status,
-       price = EXCLUDED.price,
-       stock = EXCLUDED.stock,
-       "imageUrl" = EXCLUDED."imageUrl",
-       "updatedAt" = EXCLUDED."updatedAt"`,
+  await p.execute(
+    `INSERT INTO products (id, productCode, name, description, uom, category, subCategory, status, price, stock, imageUrl, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       productCode = VALUES(productCode),
+       name = VALUES(name),
+       description = VALUES(description),
+       uom = VALUES(uom),
+       category = VALUES(category),
+       subCategory = VALUES(subCategory),
+       status = VALUES(status),
+       price = VALUES(price),
+       stock = VALUES(stock),
+       imageUrl = VALUES(imageUrl),
+       updatedAt = VALUES(updatedAt)`,
     [
       product.id,
       product.productCode,
@@ -172,10 +221,9 @@ async function upsertProduct(product: any): Promise<void> {
 async function deleteProduct(id: string): Promise<boolean> {
   assertDb();
   const p = getPool()!;
-  const result = await p.query("DELETE FROM products WHERE id = $1", [id]);
-  return (result.rowCount ?? 0) > 0;
+  const [result] = await p.execute<ResultSetHeader>("DELETE FROM products WHERE id = ?", [id]);
+  return result.affectedRows > 0;
 }
-
 async function insertImportBatch(products: any[]): Promise<void> {
   for (const p of products) {
     await upsertProduct(p);
@@ -466,17 +514,16 @@ app.delete("/api/products/:id", async (req, res) => {
 async function getAllSuppliers(): Promise<any[]> {
   const p = getPool();
   if (!p || !dbReady) return [];
-  const result = await p.query("SELECT * FROM suppliers ORDER BY \"createdAt\" DESC");
-  return result.rows;
+  const [rows] = await p.query<RowDataPacket[]>("SELECT * FROM suppliers ORDER BY createdAt DESC");
+  return rows;
 }
 
 async function getSupplierById(id: string): Promise<any | null> {
   const p = getPool();
   if (!p || !dbReady) return null;
-  const result = await p.query("SELECT * FROM suppliers WHERE id = $1", [id]);
-  return result.rows[0] || null;
+  const [rows] = await p.execute<RowDataPacket[]>("SELECT * FROM suppliers WHERE id = ?", [id]);
+  return rows[0] || null;
 }
-
 async function upsertSupplier(supplier: any): Promise<void> {
   assertDb();
   const p = getPool()!;
@@ -584,16 +631,18 @@ async function upsertSupplier(supplier: any): Promise<void> {
     supplier.createdAt,
     supplier.updatedAt,
   ];
-  const placeholders = columns.map((_, index) => `$${index + 1}`).join(", ");
-  const updates = columns
-    .filter((column) => column !== "id" && column !== "\"createdAt\"")
-    .map((column) => `${column} = EXCLUDED.${column}`)
+  const columnNames = columns.map((column) => column.replaceAll('"', ""));
+  const escapedColumns = columnNames.map((column) => `\`${column}\``);
+  const placeholders = columnNames.map(() => "?").join(", ");
+  const updates = columnNames
+    .filter((column) => column !== "id" && column !== "createdAt")
+    .map((column) => `\`${column}\` = VALUES(\`${column}\`)`)
     .join(", ");
 
-  await p.query(
-    `INSERT INTO suppliers (${columns.join(", ")})
+  await p.execute(
+    `INSERT INTO suppliers (${escapedColumns.join(", ")})
      VALUES (${placeholders})
-     ON CONFLICT (id) DO UPDATE SET ${updates}`,
+     ON DUPLICATE KEY UPDATE ${updates}`,
     values
   );
 }
@@ -601,10 +650,9 @@ async function upsertSupplier(supplier: any): Promise<void> {
 async function deleteSupplier(id: string): Promise<boolean> {
   assertDb();
   const p = getPool()!;
-  const result = await p.query("DELETE FROM suppliers WHERE id = $1", [id]);
-  return (result.rowCount ?? 0) > 0;
+  const [result] = await p.execute<ResultSetHeader>("DELETE FROM suppliers WHERE id = ?", [id]);
+  return result.affectedRows > 0;
 }
-
 app.get("/api/suppliers", async (req, res) => {
   try {
     const suppliers = await getAllSuppliers();

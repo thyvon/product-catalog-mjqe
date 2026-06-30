@@ -10,16 +10,47 @@ interface SupplierFormModalProps {
   editingSupplier: Supplier | null;
 }
 
+interface FieldProps {
+  label: string;
+  kh?: string;
+  children: React.ReactNode;
+  wide?: boolean;
+}
+
+function Field({ label, kh, children, wide = false }: FieldProps) {
+  return (
+    <label className={wide ? "col-span-1 md:col-span-2" : ""}>
+      <span className="text-[11px] font-bold text-slate-600 dark:text-gray-300">
+        {label}
+        {kh && <span className="text-[10px] font-semibold text-slate-400 dark:text-gray-500"> / {kh}</span>}
+      </span>
+      <div className="mt-1">{children}</div>
+    </label>
+  );
+}
+
+function SectionTitle({ title, kh }: { title: string; kh: string }) {
+  return (
+    <div className="col-span-1 border-b border-slate-100 pb-2 dark:border-gray-800 md:col-span-2">
+      <h3 className="text-xs font-black uppercase tracking-wide text-slate-900 dark:text-gray-100">{title}</h3>
+      <p className="mt-0.5 text-[10px] font-medium text-slate-400 dark:text-gray-500">{kh}</p>
+    </div>
+  );
+}
+
 const STEPS = [
-  { id: 1, label: "Application", sub: "New or update" },
-  { id: 2, label: "Company", sub: "Legal information" },
-  { id: 3, label: "Business", sub: "Activity and address" },
-  { id: 4, label: "Contact", sub: "Contact person" },
-  { id: 5, label: "Bank", sub: "Bank account" },
-  { id: 6, label: "Payment", sub: "Payment instruction" },
-  { id: 7, label: "Conflict", sub: "Interest declaration" },
-  { id: 8, label: "Declaration", sub: "Sign-off" },
+  { id: 1, label: "Company", sub: "Application and legal details" },
+  { id: 2, label: "Business & Contact", sub: "Activity, address, and contact" },
+  { id: 3, label: "Banking & Payment", sub: "Account and payment details" },
+  { id: 4, label: "Declaration", sub: "Conflict and final sign-off" },
 ];
+
+const STEP_SECTIONS: Record<number, number[]> = {
+  1: [1, 2],
+  2: [3, 4],
+  3: [5, 6],
+  4: [7, 8],
+};
 
 const emptyForm: SupplierInput = {
   applicationType: "new",
@@ -116,39 +147,11 @@ export default function SupplierFormModal({
 
   const inputClass =
     "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:bg-slate-50 disabled:text-slate-400 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:disabled:bg-gray-800 dark:focus:ring-indigo-900/40";
-  const labelClass = "text-[11px] font-bold text-slate-600 dark:text-gray-300";
-  const helperClass = "text-[10px] font-semibold text-slate-400 dark:text-gray-500";
   const checkClass = "mt-0.5 h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500";
 
-  const Field = ({
-    label,
-    kh,
-    children,
-    wide = false,
-  }: {
-    label: string;
-    kh?: string;
-    children: React.ReactNode;
-    wide?: boolean;
-  }) => (
-    <label className={wide ? "col-span-1 md:col-span-2" : ""}>
-      <span className={labelClass}>
-        {label}
-        {kh && <span className={helperClass}> / {kh}</span>}
-      </span>
-      <div className="mt-1">{children}</div>
-    </label>
-  );
 
-  const SectionTitle = ({ title, kh }: { title: string; kh: string }) => (
-    <div className="col-span-1 md:col-span-2 border-b border-slate-100 pb-2 dark:border-gray-800">
-      <h3 className="text-xs font-black uppercase tracking-wide text-slate-900 dark:text-gray-100">{title}</h3>
-      <p className="mt-0.5 text-[10px] font-medium text-slate-400 dark:text-gray-500">{kh}</p>
-    </div>
-  );
-
-  const renderStep = () => {
-    switch (step) {
+  const renderSection = (section: number) => {
+    switch (section) {
       case 1:
         return (
           <motion.div key="application" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -365,6 +368,14 @@ export default function SupplierFormModal({
     }
   };
 
+  const renderStep = () => (
+    <div className="space-y-7">
+      {STEP_SECTIONS[step].map((section) => (
+        <React.Fragment key={section}>{renderSection(section)}</React.Fragment>
+      ))}
+    </div>
+  );
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -374,7 +385,7 @@ export default function SupplierFormModal({
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
-            className="relative flex max-h-[92vh] w-full max-w-4xl flex-col rounded-2xl border border-slate-100 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
+            className="relative flex h-[92vh] w-full max-w-4xl flex-col rounded-2xl border border-slate-100 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900"
           >
             <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-5 py-4 dark:border-gray-800">
               <div>
@@ -391,7 +402,7 @@ export default function SupplierFormModal({
             <div className="shrink-0 overflow-x-auto border-b border-slate-100 px-3 py-3 dark:border-gray-800 sm:px-5">
               <div className="flex min-w-max gap-1">
                 {STEPS.map((s) => (
-                  <button key={s.id} onClick={() => setStep(s.id)} className="flex w-32 min-w-32 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50 dark:hover:bg-gray-800">
+                  <button key={s.id} onClick={() => setStep(s.id)} className="flex w-48 min-w-48 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50 dark:hover:bg-gray-800">
                     <span
                       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
                         s.id === step ? "bg-slate-900 text-white dark:bg-indigo-600" : s.id < step ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-400 dark:bg-gray-800"
