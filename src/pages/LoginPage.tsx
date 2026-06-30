@@ -35,7 +35,7 @@ export default function LoginPage() {
               <PackageOpen className="w-8 h-8" />
             </div>
             <h1 className="text-xl font-black text-slate-900 dark:text-gray-100 tracking-tight">
-              Product Catalog
+              PROCUREMENT
             </h1>
             <p className="text-xs text-slate-400 dark:text-gray-500 mt-1 font-medium">
               Sign in to your account

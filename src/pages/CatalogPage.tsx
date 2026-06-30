@@ -361,24 +361,24 @@ export default function CatalogPage() {
               <button
                 onClick={() => setViewMode("gallery")}
                 title="Gallery view layout"
-                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                   viewMode === "gallery"
                     ? "bg-white dark:bg-gray-700 text-slate-900 dark:text-gray-100 shadow-sm"
                     : "text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300"
                 }`}
               >
-                <Widget className="w-4 h-4" />
+                <Widget className="w-4 h-4" /> Gallery
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                title="Detailed list view layout"
-                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                title="Table view layout"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                   viewMode === "list"
                     ? "bg-white dark:bg-gray-700 text-slate-900 dark:text-gray-100 shadow-sm"
                     : "text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300"
                 }`}
               >
-                <List className="w-4 h-4" />
+                <List className="w-4 h-4" /> Table
               </button>
             </div>
           </div>

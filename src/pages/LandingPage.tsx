@@ -8,11 +8,15 @@ import {
   ArrowDownAZ as SortByAlphabet,
   ChevronLeft as AltArrowLeft,
   ChevronRight as AltArrowRight,
+  LayoutGrid as Widget,
+  List,
   Sun,
   Moon,
+  Download,
 } from "lucide-react";
 import { Product } from "../types";
 import ProductGalleryView from "../components/ProductGalleryView";
+import ProductListView from "../components/ProductListView";
 import ProductDetailModal from "../components/ProductDetailModal";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -40,9 +44,36 @@ export default function LandingPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("active");
   const [sortBy, setSortBy] = useState<"name" | "code">("name");
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState<"gallery" | "list">("gallery");
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  const triggerExportCSV = () => {
+    if (products.length === 0) return;
+    const headers = ["Product Code", "Product Name", "Description", "UoM", "Category", "Sub Category", "Status", "Price", "Stock", "Image URL"];
+    const rows = products.map((p) => [
+      p.productCode,
+      p.name,
+      p.description.replace(/"/g, '""'),
+      p.uom,
+      p.category,
+      p.subCategory,
+      p.status,
+      p.price !== undefined ? String(p.price) : "",
+      p.stock !== undefined ? String(p.stock) : "",
+      p.imageUrl || ""
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8,"
+      + [headers.join(","), ...rows.map(e => e.map(val => `"${val}"`).join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Catalog_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const fetchCatalog = async () => {
     setLoading(true);
@@ -61,6 +92,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     fetchCatalog();
+    fetch("/api/visit/log", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: "/product-list" }) }).catch(() => {});
   }, []);
 
   const handleOpenDetailModal = (product: Product) => {
@@ -134,6 +166,13 @@ export default function LandingPage() {
             >
               <Refresh className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </button>
+            <button
+              onClick={triggerExportCSV}
+              disabled={products.length === 0}
+              className="h-9 px-3.5 py-2 bg-white dark:bg-gray-800 hover:bg-slate-50 dark:hover:bg-gray-700 text-slate-600 dark:text-gray-300 border border-slate-200 dark:border-gray-700 rounded-xl font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
           </div>
         </div>
 
@@ -187,6 +226,31 @@ export default function LandingPage() {
                   <option value="name">Sort: Product Name (A-Z)</option>
                   <option value="code">Sort: Product Code</option>
                 </select>
+              </div>
+
+              <div className="flex items-center border border-slate-200 dark:border-gray-700 rounded-xl p-1 bg-slate-50/60 dark:bg-gray-800/60 ml-1.5">
+                <button
+                  onClick={() => setViewMode("gallery")}
+                  title="Gallery view layout"
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    viewMode === "gallery"
+                      ? "bg-white dark:bg-gray-700 text-slate-900 dark:text-gray-100 shadow-sm"
+                      : "text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300"
+                  }`}
+                >
+                  <Widget className="w-4 h-4" /> Gallery
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  title="Table view layout"
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                    viewMode === "list"
+                      ? "bg-white dark:bg-gray-700 text-slate-900 dark:text-gray-100 shadow-sm"
+                      : "text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300"
+                  }`}
+                >
+                  <List className="w-4 h-4" /> Table
+                </button>
               </div>
             </div>
           </div>
@@ -244,18 +308,29 @@ export default function LandingPage() {
 
               <AnimatePresence mode="wait">
                 <motion.div
+                  key={viewMode}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.25 }}
                 >
-                  <ProductGalleryView
-                    products={paginatedProducts}
-                    isAdmin={false}
-                    onView={handleOpenDetailModal}
-                    onEdit={() => {}}
-                    onDelete={() => {}}
-                  />
+                  {viewMode === "gallery" ? (
+                    <ProductGalleryView
+                      products={paginatedProducts}
+                      isAdmin={false}
+                      onView={handleOpenDetailModal}
+                      onEdit={() => {}}
+                      onDelete={() => {}}
+                    />
+                  ) : (
+                    <ProductListView
+                      products={paginatedProducts}
+                      isAdmin={false}
+                      onView={handleOpenDetailModal}
+                      onEdit={() => {}}
+                      onDelete={() => {}}
+                    />
+                  )}
                 </motion.div>
               </AnimatePresence>
 
@@ -317,6 +392,11 @@ export default function LandingPage() {
           isOpen={isDetailOpen}
           onClose={() => { setIsDetailOpen(false); setSelectedProduct(null); }}
         />
+
+        <footer className="shrink-0 border-t border-slate-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 lg:px-6 py-3 flex items-center justify-between text-[10px] text-slate-400 dark:text-gray-500 font-mono">
+          <span>© {new Date().getFullYear()} PROCUREMENT</span>
+          <span>v1.0.0</span>
+        </footer>
       </div>
     </div>
   );

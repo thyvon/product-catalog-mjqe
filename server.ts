@@ -335,6 +335,54 @@ app.get("/api/products/stats", async (req, res) => {
   }
 });
 
+// ─── Live Visit Tracking (in-memory) ───
+interface VisitEntry {
+  path: string;
+  timestamp: number;
+  ip: string;
+}
+const visitLog: VisitEntry[] = [];
+const VISIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes for "live"
+
+// POST: Log a page visit
+app.post("/api/visit/log", (req, res) => {
+  const { path: pagePath } = req.body;
+  const ip = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+  visitLog.push({ path: pagePath || "/", timestamp: Date.now(), ip });
+  // Trim old entries beyond the window
+  const cutoff = Date.now() - VISIT_WINDOW_MS;
+  while (visitLog.length > 0 && visitLog[0].timestamp < cutoff) {
+    visitLog.shift();
+  }
+  res.json({ ok: true });
+});
+
+// GET: Live visit stats
+app.get("/api/visit/stats", (req, res) => {
+  const cutoff = Date.now() - VISIT_WINDOW_MS;
+  const live = visitLog.filter((v) => v.timestamp >= cutoff);
+  const uniqueIps = new Set(live.map((v) => v.ip));
+  // Aggregate per path
+  const pathCounts: Record<string, number> = {};
+  live.forEach((v) => { pathCounts[v.path] = (pathCounts[v.path] || 0) + 1; });
+  const paths = Object.entries(pathCounts)
+    .map(([path, count]) => ({ path, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // Recent visits (last 50)
+  const recent = live.slice(-50).reverse().map((v) => ({
+    path: v.path,
+    time: v.timestamp,
+  }));
+
+  res.json({
+    liveVisitors: uniqueIps.size,
+    totalVisits: live.length,
+    paths,
+    recent,
+  });
+});
+
 // GET: Health check
 app.get("/api/health", async (req, res) => {
   const dbAlive = dbReady && (await checkDbConnection());
@@ -876,7 +924,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Product Catalog Engine successfully serving at http://0.0.0.0:${PORT} on ${process.env.NODE_ENV || 'development'} mode.`);
+    console.log(`PROCUREMENT Engine successfully serving at http://0.0.0.0:${PORT} on ${process.env.NODE_ENV || 'development'} mode.`);
   });
 }
 

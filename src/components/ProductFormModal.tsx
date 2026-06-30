@@ -62,6 +62,7 @@ export default function ProductFormModal({
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
 
   // Product Image Upload states
   const [isUploading, setIsUploading] = useState(false);
@@ -86,42 +87,14 @@ export default function ProductFormModal({
       return;
     }
 
-    setIsUploading(true);
+    // Clean up previous blob URL
+    if (imageUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(imageUrl);
+    }
+
     setUploadError("");
-
-    const reader = new FileReader();
-    reader.onerror = () => {
-      setUploadError("Failed to convert file content to stream format.");
-      setIsUploading(false);
-    };
-
-    reader.onload = async (event) => {
-      try {
-        const base64Data = event.target?.result as string;
-
-        const response = await fetch("/api/products/upload-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            image: base64Data,
-            filename: file.name
-          })
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to upload image file to standard catalog repository.");
-        }
-
-        setImageUrl(data.imageUrl);
-      } catch (err: any) {
-        setUploadError(err.message || "An error occurred during file persistence.");
-      } finally {
-        setIsUploading(false);
-      }
-    };
-
-    reader.readAsDataURL(file);
+    setPendingImageFile(file);
+    setImageUrl(URL.createObjectURL(file));
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -226,13 +199,52 @@ export default function ProductFormModal({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!productCode || !name || !uom || !category) {
       setAlertMessage("Please fill in Product Code, Name, UoM and Category.");
       setIsAlertOpen(true);
       return;
+    }
+
+    let finalImageUrl = imageUrl;
+
+    if (pendingImageFile) {
+      setIsUploading(true);
+      setUploadError("");
+      try {
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("Failed to read file content."));
+          reader.readAsDataURL(pendingImageFile);
+        });
+
+        const response = await fetch("/api/products/upload-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            image: base64Data,
+            filename: pendingImageFile.name
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to upload image.");
+        }
+
+        finalImageUrl = data.imageUrl;
+        setImageUrl(finalImageUrl);
+        setPendingImageFile(null);
+      } catch (err: any) {
+        setAlertMessage(err.message || "An error occurred uploading the image.");
+        setIsAlertOpen(true);
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
     }
 
     const payload: ProductInput = {
@@ -243,7 +255,7 @@ export default function ProductFormModal({
       category: category.trim(),
       subCategory: subCategory.trim() || "General",
       status,
-      imageUrl: imageUrl.trim() || undefined,
+      imageUrl: finalImageUrl.trim() || undefined,
     };
 
     if (editingProduct) {
@@ -421,7 +433,11 @@ export default function ProductFormModal({
                       />
                       <button
                         type="button"
-                        onClick={() => setImageUrl("")}
+                        onClick={() => {
+                          if (imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
+                          setPendingImageFile(null);
+                          setImageUrl("");
+                        }}
                         className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white text-[10px] font-bold"
                       >
                         Remove
@@ -469,9 +485,15 @@ export default function ProductFormModal({
 
                 <input
                   id="input-imageUrl"
-                  type="url"
+                  type="text"
                   value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
+                  onChange={(e) => {
+                    if (pendingImageFile) {
+                      if (imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
+                      setPendingImageFile(null);
+                    }
+                    setImageUrl(e.target.value);
+                  }}
                   placeholder="Or paste an image URL..."
                   className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-xs dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
                 />
