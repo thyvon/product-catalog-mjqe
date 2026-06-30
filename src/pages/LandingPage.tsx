@@ -37,7 +37,7 @@ export default function LandingPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "discontinued">("active");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("active");
   const [sortBy, setSortBy] = useState<"name" | "code">("name");
   const [showFilters, setShowFilters] = useState(false);
 
@@ -79,7 +79,7 @@ export default function LandingPage() {
     let matchesStatus = true;
     if (statusFilter === "active") matchesStatus = p.status === "Active";
     else if (statusFilter === "inactive") matchesStatus = p.status === "Inactive";
-    else if (statusFilter === "discontinued") matchesStatus = p.status === "Discontinued";
+
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
@@ -174,7 +174,7 @@ export default function LandingPage() {
                   <option value="all">All Lifecycles</option>
                   <option value="active">Active Only</option>
                   <option value="inactive">Inactive</option>
-                  <option value="discontinued">Discontinued</option>
+
                 </select>
               </div>
 

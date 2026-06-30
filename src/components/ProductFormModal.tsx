@@ -56,7 +56,7 @@ export default function ProductFormModal({
   const [uom, setUom] = useState(DEFAULT_UOMS[0]);
   const [category, setCategory] = useState(DEFAULT_CATEGORIES[0]);
   const [subCategory, setSubCategory] = useState("");
-  const [status, setStatus] = useState<"Active" | "Inactive" | "Discontinued">("Active");
+  const [status, setStatus] = useState<"Active" | "Inactive">("Active");
   
   // Optional values helpers
   const [price, setPrice] = useState("");
@@ -327,7 +327,7 @@ export default function ProductFormModal({
                 >
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
-                  <option value="Discontinued">Discontinued</option>
+
                 </select>
               </div>
 

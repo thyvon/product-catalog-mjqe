@@ -180,7 +180,7 @@ export default function ExcelImportModal({
             uom: uomVal ? String(uomVal).trim() : "Pcs",
             category: catVal ? String(catVal).trim() : "General",
             subCategory: subCatVal ? String(subCatVal).trim() : "General",
-            status: ["Active", "Inactive", "Discontinued"].includes(statusVal) ? statusVal : "Active",
+            status: ["Active", "Inactive"].includes(statusVal) ? statusVal : "Active",
             price: priceVal ? parseFloat(priceVal) : undefined,
             stock: stockVal ? parseInt(stockVal, 10) : undefined,
           };

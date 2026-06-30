@@ -6,7 +6,6 @@ import {
   Layers,
   CheckCircle,
   TriangleAlert as DangerTriangle,
-  Archive,
   CircleQuestionMark as QuestionCircle,
   Copy,
 } from "lucide-react";
@@ -69,8 +68,6 @@ export default function ProductListView({
                   exit={{ opacity: 0 }}
                    className={`hover:bg-slate-100/50 dark:hover:bg-gray-800/50 transition-colors duration-150 align-middle ${
                     product.status === "Inactive" ? "bg-amber-50/10" : "even:bg-slate-50/40 dark:even:bg-gray-800/30"
-                  } ${
-                    product.status === "Discontinued" ? "bg-rose-50/10 dark:bg-rose-900/20" : ""
                   }`}
                 >
                   {/* Container Image Column */}
@@ -157,13 +154,9 @@ export default function ProductListView({
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[9.5px] font-extrabold bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-150 dark:border-emerald-800 uppercase tracking-wider font-mono">
                         Active
                       </span>
-                    ) : product.status === "Inactive" ? (
+                    ) : (
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[9.5px] font-extrabold bg-amber-50 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-lg border border-amber-150 dark:border-amber-800 uppercase tracking-wider font-mono">
                         Inactive
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[9.5px] font-extrabold bg-rose-50 dark:bg-rose-900/40 text-rose-700 dark:text-rose-400 rounded-lg border border-rose-150 dark:border-rose-800 uppercase tracking-wider font-mono">
-                        Discontinued
                       </span>
                     )}
                   </td>

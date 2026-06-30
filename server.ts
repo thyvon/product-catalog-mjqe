@@ -301,7 +301,7 @@ app.get("/api/products/stats", async (req, res) => {
     const totalProducts = products.length;
     let activeCount = 0;
     let inactiveCount = 0;
-    let discontinuedCount = 0;
+
 
     const categoriesMap: { [cat: string]: { count: number; activeCount: number } } = {};
 
@@ -309,7 +309,7 @@ app.get("/api/products/stats", async (req, res) => {
       const status = String(p.status || "Active");
       if (status === "Active") activeCount++;
       else if (status === "Inactive") inactiveCount++;
-      else if (status === "Discontinued") discontinuedCount++;
+
 
       const cat = p.category || "Uncategorized";
       if (!categoriesMap[cat]) {
@@ -331,7 +331,7 @@ app.get("/api/products/stats", async (req, res) => {
       totalProducts,
       activeCount,
       inactiveCount,
-      discontinuedCount,
+
       categoryStats,
     });
   } catch (err: any) {
@@ -368,7 +368,7 @@ app.post("/api/products", async (req, res) => {
       uom: String(input.uom).trim(),
       category: String(input.category).trim(),
       subCategory: String(input.subCategory || "General").trim(),
-      status: ["Active", "Inactive", "Discontinued"].includes(input.status) ? input.status : "Active",
+      status: ["Active", "Inactive"].includes(input.status) ? input.status : "Active",
       price: input.price !== undefined ? Math.max(0, parseFloat(input.price)) : null,
       stock: input.stock !== undefined ? Math.max(0, parseInt(input.stock, 10)) : null,
       imageUrl: String(input.imageUrl || defaultImage).trim(),
@@ -415,8 +415,6 @@ app.post("/api/products/import", async (req, res) => {
       let norStatus = "Active";
       if (String(rawStatus).toLowerCase().includes("inactive") || String(rawStatus).toLowerCase() === "i") {
         norStatus = "Inactive";
-      } else if (String(rawStatus).toLowerCase().includes("discon") || String(rawStatus).toLowerCase() === "d") {
-        norStatus = "Discontinued";
       }
 
       let itemPrice = item.price || item["Price"] || item["Rate"];
@@ -477,7 +475,7 @@ app.put("/api/products/:id", async (req, res) => {
       uom: input.uom !== undefined ? String(input.uom).trim() : existing.uom,
       category: input.category !== undefined ? String(input.category).trim() : existing.category,
       subCategory: input.subCategory !== undefined ? String(input.subCategory).trim() : existing.subCategory,
-      status: ["Active", "Inactive", "Discontinued"].includes(input.status) ? input.status : existing.status,
+      status: ["Active", "Inactive"].includes(input.status) ? input.status : existing.status,
       price: input.price !== undefined ? Math.max(0, parseFloat(input.price)) : existing.price,
       stock: input.stock !== undefined ? Math.max(0, parseInt(input.stock, 10)) : existing.stock,
       imageUrl: input.imageUrl !== undefined ? String(input.imageUrl).trim() : existing.imageUrl,

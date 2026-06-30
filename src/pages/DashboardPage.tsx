@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { ShoppingBag, CheckCircle, XCircle, Archive, RefreshCw, Layers, Sparkles } from "lucide-react";
+import { ShoppingBag, CheckCircle, XCircle, RefreshCw, Layers, Sparkles } from "lucide-react";
 import type { CatalogStats } from "../types";
 
 export default function DashboardPage() {
@@ -45,12 +45,6 @@ export default function DashboardPage() {
       value: stats?.inactiveCount ?? 0,
       icon: XCircle,
       color: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400",
-    },
-    {
-      label: "Discontinued",
-      value: stats?.discontinuedCount ?? 0,
-      icon: Archive,
-      color: "bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400",
     },
   ];
 

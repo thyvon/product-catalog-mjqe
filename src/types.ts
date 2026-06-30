@@ -11,7 +11,7 @@ export interface Product {
   uom: string; // Unit of Measure (UoM)
   category: string; // Category
   subCategory: string; // Sub Category
-  status: "Active" | "Inactive" | "Discontinued"; // Status
+  status: "Active" | "Inactive"; // Status
   price?: number; // Optional price helper
   stock?: number; // Optional stock quantity helper
   imageUrl?: string; // High-resolution visual URL
@@ -31,7 +31,7 @@ export interface CatalogStats {
   totalProducts: number;
   activeCount: number;
   inactiveCount: number;
-  discontinuedCount: number;
+
   categoryStats: CategoryStats[];
 }
 

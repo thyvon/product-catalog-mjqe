@@ -6,7 +6,6 @@ import {
   Layers,
   CheckCircle,
   TriangleAlert as DangerTriangle,
-  Archive,
   Copy,
 } from "lucide-react";
 import { Product } from "../types";
@@ -56,8 +55,6 @@ export default function ProductGalleryView({
             onClick={() => onView(product)}
             className={`group bg-white dark:bg-gray-900 rounded-2xl overflow-hidden border border-slate-100/80 dark:border-gray-800 hover:shadow-[0_12px_24px_-8px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_12px_24px_-8px_rgba(0,0,0,0.3)] hover:border-slate-200/90 dark:hover:border-gray-700 transition-all duration-305 flex flex-col h-full cursor-pointer relative ${
               product.status === "Inactive" ? "opacity-90 border-dashed border-amber-200" : ""
-            } ${
-              product.status === "Discontinued" ? "bg-rose-50/10 dark:bg-rose-900/20 border-rose-100/60 dark:border-rose-900" : ""
             }`}
           >
             {/* Visual Header Image Container */}
@@ -80,13 +77,9 @@ export default function ProductGalleryView({
                   <span className="px-1.5 py-0.5 text-[8px] font-extrabold bg-emerald-500 text-white rounded-md tracking-wide uppercase shadow-md flex items-center gap-1">
                     <CheckCircle className="w-2.5 h-2.5" /> Active
                   </span>
-                ) : product.status === "Inactive" ? (
+                ) : (
                   <span className="px-1.5 py-0.5 text-[8px] font-extrabold bg-amber-500 text-white rounded-md tracking-wide uppercase shadow-md flex items-center gap-1">
                     <DangerTriangle className="w-2.5 h-2.5" /> Inactive
-                  </span>
-                ) : (
-                  <span className="px-1.5 py-0.5 text-[8px] font-extrabold bg-rose-500 text-white rounded-md tracking-wide uppercase shadow-md flex items-center gap-1">
-                    <Archive className="w-2.5 h-2.5" /> Discontinued
                   </span>
                 )}
               </div>

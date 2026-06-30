@@ -4,7 +4,6 @@ import {
   SquarePen as PenNewSquare,
   Trash2 as TrashBinMinimalistic,
   Layers,
-  Archive,
   CheckCircle,
   TriangleAlert as DangerTriangle,
   CircleQuestionMark as QuestionCircle,
@@ -51,8 +50,6 @@ export default function ProductCard({
       transition={{ duration: 0.25 }}
       className={`group bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-[0_12px_24px_-4px_rgba(0,0,0,0.04)] hover:border-slate-200 transition-all duration-300 flex flex-col h-full ${
         product.status === "Inactive" ? "opacity-90 border-dashed border-amber-200" : ""
-      } ${
-        product.status === "Discontinued" ? "bg-rose-50/10 border-rose-100/60" : ""
       }`}
     >
       {/* Upper Color Block / Visual representation */}
@@ -74,13 +71,9 @@ export default function ProductCard({
             <span className="px-2.5 py-0.5 text-[9px] font-bold bg-emerald-500/90 text-white rounded-md tracking-wider uppercase font-mono shadow-sm flex items-center gap-1">
               <CheckCircle className="w-3 h-3 shrink-0" /> Active
             </span>
-          ) : product.status === "Inactive" ? (
+          ) : (
             <span className="px-2.5 py-0.5 text-[9px] font-bold bg-amber-500/90 text-white rounded-md tracking-wider uppercase font-mono shadow-sm flex items-center gap-1">
               <DangerTriangle className="w-3 h-3 shrink-0" /> Inactive
-            </span>
-          ) : (
-            <span className="px-2.5 py-0.5 text-[9px] font-bold bg-rose-500/90 text-white rounded-md tracking-wider uppercase font-mono shadow-sm flex items-center gap-1">
-              <Archive className="w-3 h-3 shrink-0" /> Discontinued
             </span>
           )}
         </div>

@@ -36,7 +36,7 @@ export default function CatalogPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "discontinued">("active");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("active");
   const [sortBy, setSortBy] = useState<"name" | "code" | "price-asc" | "price-desc">("name");
 
   const [priceBudget, setPriceBudget] = useState<number>(500);
@@ -199,8 +199,6 @@ export default function CatalogPage() {
       matchesStatus = p.status === "Active";
     } else if (statusFilter === "inactive") {
       matchesStatus = p.status === "Inactive";
-    } else if (statusFilter === "discontinued") {
-      matchesStatus = p.status === "Discontinued";
     }
 
     return matchesSearch && matchesCategory && matchesStatus;
@@ -240,7 +238,6 @@ export default function CatalogPage() {
   }, [searchQuery, selectedCategory, statusFilter, sortBy, pageSize]);
 
   const activeCount = products.filter((p) => p.status === "Active").length;
-  const discontinuedCount = products.filter((p) => p.status === "Discontinued").length;
 
   return (
     <div className="p-4 lg:p-6 flex flex-col min-h-0 h-full">
@@ -345,7 +342,7 @@ export default function CatalogPage() {
                 <option value="all">All Lifecycles</option>
                 <option value="active">Active Only</option>
                 <option value="inactive">Inactive Staged</option>
-                <option value="discontinued">Discontinued SKU</option>
+
               </select>
             </div>
 

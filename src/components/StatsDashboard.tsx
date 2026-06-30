@@ -3,7 +3,6 @@ import {
   Layers,
   CheckCircle,
   ShieldAlert as ShieldWarning,
-  XCircle as CloseCircle,
   RefreshCw as Refresh,
   ChartColumn as Chart,
 } from "lucide-react";
@@ -117,29 +116,6 @@ export default function StatsDashboard({
           </div>
         </motion.div>
 
-        {/* Stat 4: Discontinued */}
-        <motion.div
-          id="stat-discontinued"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, delay: 0.15 }}
-          className="bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-2xl p-5 hover:border-slate-200 dark:hover:border-gray-700 transition-colors duration-200 flex items-center justify-between shadow-sm"
-        >
-          <div>
-            <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest block">
-              Discontinued
-            </span>
-            <h3 className="text-2xl font-extrabold text-rose-600 mt-1 font-sans tracking-tight">
-              {stats.discontinuedCount}
-            </h3>
-            <span className="text-[11px] text-rose-500 dark:text-rose-400 font-medium font-sans block mt-1 cursor-pointer hover:underline" onClick={onRefresh}>
-              Click to reload from database
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-xl bg-rose-50 dark:bg-rose-900/50 text-rose-500 dark:text-rose-400 flex items-center justify-center">
-            <CloseCircle className="w-5 h-5" />
-          </div>
-        </motion.div>
       </div>
 
       {/* Category distribution panel */}

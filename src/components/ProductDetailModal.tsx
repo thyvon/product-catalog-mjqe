@@ -75,13 +75,9 @@ export default function ProductDetailModal({
                   <span className="px-2 py-0.5 text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md uppercase tracking-wider font-mono">
                     Active
                   </span>
-                ) : product.status === "Inactive" ? (
+                ) : (
                   <span className="px-2 py-0.5 text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 rounded-md uppercase tracking-wider font-mono">
                     Inactive
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-100 rounded-md uppercase tracking-wider font-mono">
-                    Discontinued
                   </span>
                 )}
               </div>
