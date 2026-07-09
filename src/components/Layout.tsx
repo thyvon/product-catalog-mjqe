@@ -15,6 +15,9 @@ import {
   Bell,
   PanelLeftClose,
   PanelLeftOpen,
+  Receipt,
+  Mail,
+  ClipboardList,
 } from "lucide-react";
 
 const navItems = [
@@ -22,6 +25,9 @@ const navItems = [
   { to: "/catalog", label: "Catalog", icon: ShoppingBag },
   { to: "/supplier-register", label: "Supplier Register", icon: Building2 },
   { to: "/supplier-docs", label: "Supplier Docs", icon: FileText },
+  { to: "/stock-issue-items", label: "Stock Issue Items", icon: ClipboardList },
+  { to: "/debit-notes", label: "Debit Notes", icon: Receipt },
+  { to: "/debit-note-emails", label: "DN Emails", icon: Mail },
 ];
 
 export default function Layout() {
@@ -219,7 +225,7 @@ export default function Layout() {
         </main>
 
         <footer className="shrink-0 border-t border-slate-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 lg:px-6 py-3 flex items-center justify-between text-[10px] text-slate-400 dark:text-gray-500 font-mono">
-          <span>© {new Date().getFullYear()} PROCUREMENT</span>
+          <span>© {new Date().getFullYear()} PROCUREMENT - Vun Thy - Procurement Officer</span>
           <span>v1.0.0</span>
         </footer>
       </div>

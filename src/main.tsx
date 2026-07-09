@@ -10,6 +10,9 @@ import CatalogPage from './pages/CatalogPage';
 import SupplierDocsPage from './pages/SupplierDocsPage';
 import SupplierRegisterPage from './pages/SupplierRegisterPage';
 import LandingPage from './pages/LandingPage';
+import DebitNoteListPage from './pages/DebitNoteListPage';
+import DebitNoteEmailsPage from './pages/DebitNoteEmailsPage';
+import StockIssueItemsPage from './pages/StockIssueItemsPage';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -31,6 +34,9 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/catalog" element={<CatalogPage />} />
             <Route path="/supplier-register" element={<SupplierRegisterPage />} />
             <Route path="/supplier-docs" element={<SupplierDocsPage />} />
+            <Route path="/debit-notes" element={<DebitNoteListPage />} />
+            <Route path="/debit-note-emails" element={<DebitNoteEmailsPage />} />
+            <Route path="/stock-issue-items" element={<StockIssueItemsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

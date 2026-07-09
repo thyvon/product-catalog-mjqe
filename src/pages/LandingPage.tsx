@@ -394,7 +394,7 @@ export default function LandingPage() {
         />
 
         <footer className="shrink-0 border-t border-slate-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 lg:px-6 py-3 flex items-center justify-between text-[10px] text-slate-400 dark:text-gray-500 font-mono">
-          <span>© {new Date().getFullYear()} PROCUREMENT</span>
+          <span>© {new Date().getFullYear()} PROCUREMENT - Vun Thy - Procurement Officer</span>
           <span>v1.0.0</span>
         </footer>
       </div>
