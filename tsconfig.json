@@ -17,7 +17,7 @@
                             "jsx":  "react-jsx",
                             "paths":  {
                                           "@/*":  [
-                                                      "./*"
+                                                      "./src/*"
                                                   ]
                                       },
                             "allowImportingTsExtensions":  true,
@@ -26,6 +26,7 @@
     "exclude":  [
                     "business-platform",
                     "node_modules",
-                    "dist"
+                    "dist",
+                    "src/test"
                 ]
 }

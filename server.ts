@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { createServer as createHttpServer } from "http";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import mysql, { type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
@@ -787,6 +788,28 @@ app.get("/api/suppliers", async (req, res) => {
   }
 });
 
+app.get("/api/suppliers/filters/values", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const [statuses] = await p.query<RowDataPacket[]>("SELECT DISTINCT status FROM suppliers WHERE status != '' ORDER BY status");
+    const [applicationTypes] = await p.query<RowDataPacket[]>("SELECT DISTINCT applicationType FROM suppliers WHERE applicationType != '' ORDER BY applicationType");
+    const registrationTypes = ["vat", "non-vat"];
+    const paymentMethods = ["bank-transfer", "cheque", "cash", "other"];
+    const paymentTerms = ["no-credit", "one-week", "two-weeks", "one-month", "other"];
+    res.json({
+      statuses: statuses.map((row: any) => row.status),
+      applicationTypes: applicationTypes.map((row: any) => row.applicationType),
+      registrationTypes,
+      paymentMethods,
+      paymentTerms,
+    });
+  } catch (err: any) {
+    console.error("Error fetching supplier filter values:", err);
+    res.status(500).json({ error: "Failed to fetch supplier filter values." });
+  }
+});
+
 app.get("/api/suppliers/:id", async (req, res) => {
   try {
     const supplier = await getSupplierById(req.params.id);
@@ -918,30 +941,127 @@ app.get("/api/stock-issue-items", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
-    const { warehouse, department, campus, startDate, endDate } = req.query;
-    let sql = "SELECT * FROM stock_issue_items WHERE 1=1";
+    const { warehouse, department, campus, startDate, endDate, transactionType, search, page, pageSize } = req.query;
+    const whereClauses: string[] = [];
     const params: any[] = [];
 
-    if (warehouse) { sql += " AND warehouse = ?"; params.push(warehouse); }
-    if (department) { sql += " AND department = ?"; params.push(department); }
-    if (campus) { sql += " AND campus = ?"; params.push(campus); }
-    if (startDate) { sql += " AND transactionDate >= ?"; params.push(startDate); }
-    if (endDate) { sql += " AND transactionDate <= ?"; params.push(endDate); }
+    if (warehouse) { whereClauses.push("warehouse = ?"); params.push(warehouse); }
+    if (department) { whereClauses.push("department = ?"); params.push(department); }
+    if (campus) { whereClauses.push("campus = ?"); params.push(campus); }
+    if (startDate) { whereClauses.push("transactionDate >= ?"); params.push(startDate); }
+    if (endDate) { whereClauses.push("transactionDate <= ?"); params.push(endDate); }
+    if (transactionType) { whereClauses.push("transactionType = ?"); params.push(transactionType); }
+    if (search) {
+      const q = `%${search}%`;
+      whereClauses.push("(itemCode LIKE ? OR description LIKE ? OR requesterName LIKE ? OR warehouse LIKE ? OR division LIKE ? OR department LIKE ? OR campus LIKE ? OR referenceNo LIKE ? OR accountCode LIKE ? OR remarks LIKE ?)");
+      params.push(q, q, q, q, q, q, q, q, q, q);
+    }
 
-    sql += " ORDER BY transactionDate DESC, createdAt DESC";
-    const [rows] = await p.query<RowDataPacket[]>(sql, params);
-    res.json(rows);
+    const whereSql = whereClauses.length > 0 ? " WHERE " + whereClauses.join(" AND ") : "";
+    const orderSql = " ORDER BY transactionDate DESC, createdAt DESC";
+
+    const [countRows] = await p.query<RowDataPacket[]>(`SELECT COUNT(*) as count FROM stock_issue_items${whereSql}`, params);
+    const total = (countRows[0] as any).count;
+
+    let rows: RowDataPacket[];
+    if (page && pageSize) {
+      const offset = (Number(page) - 1) * Number(pageSize);
+      [rows] = await p.query<RowDataPacket[]>(`SELECT * FROM stock_issue_items${whereSql}${orderSql} LIMIT ? OFFSET ?`, [...params, Number(pageSize), offset]);
+    } else {
+      [rows] = await p.query<RowDataPacket[]>(`SELECT * FROM stock_issue_items${whereSql}${orderSql}`, params);
+    }
+    res.json({ items: rows, total });
   } catch (err: any) {
     console.error("Error fetching stock issue items:", err);
     res.status(500).json({ error: "Failed to fetch stock issue items." });
   }
 });
 
-// Delete a stock issue item
+app.get("/api/stock-issue-items/filters/values", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const [campuses] = await p.query<RowDataPacket[]>("SELECT DISTINCT campus FROM stock_issue_items WHERE campus != '' ORDER BY campus");
+    const [transactionTypes] = await p.query<RowDataPacket[]>("SELECT DISTINCT transactionType FROM stock_issue_items WHERE transactionType != '' ORDER BY transactionType");
+    res.json({
+      campuses: campuses.map((row: any) => row.campus),
+      transactionTypes: transactionTypes.map((row: any) => row.transactionType),
+    });
+  } catch (err: any) {
+    console.error("Error fetching stock issue item filter values:", err);
+    res.status(500).json({ error: "Failed to fetch stock issue item filter values." });
+  }
+});
+
+// Bulk delete stock issue items by filter (requires at least one filter)
+app.delete("/api/stock-issue-items/bulk", async (req, res) => {
+  console.log("[BULK ROUTE HIT]", req.url);
+  try {
+    assertDb();
+    const p = getPool()!;
+    const { warehouse, department, campus, transactionType, startDate, endDate, search } = req.query;
+    const whereClauses: string[] = [];
+    const params: any[] = [];
+
+    if (warehouse) { whereClauses.push("warehouse = ?"); params.push(warehouse); }
+    if (department) { whereClauses.push("department = ?"); params.push(department); }
+    if (campus) { whereClauses.push("campus = ?"); params.push(campus); }
+    if (transactionType) { whereClauses.push("transactionType = ?"); params.push(transactionType); }
+    if (startDate) { whereClauses.push("transactionDate >= ?"); params.push(startDate); }
+    if (endDate) { whereClauses.push("transactionDate <= ?"); params.push(endDate); }
+    if (search) {
+      const q = `%${search}%`;
+      whereClauses.push("(itemCode LIKE ? OR description LIKE ? OR requesterName LIKE ? OR warehouse LIKE ? OR division LIKE ? OR department LIKE ? OR campus LIKE ? OR referenceNo LIKE ? OR accountCode LIKE ? OR remarks LIKE ?)");
+      params.push(q, q, q, q, q, q, q, q, q, q);
+    }
+
+    if (whereClauses.length === 0) {
+      return res.status(400).json({ error: "At least one filter is required for bulk delete." });
+    }
+
+    const whereSql = " WHERE " + whereClauses.join(" AND ");
+    const [result] = await p.execute<ResultSetHeader>(`DELETE FROM stock_issue_items${whereSql}`, params);
+    res.json({ success: true, count: result.affectedRows });
+  } catch (err: any) {
+    console.error("Error bulk deleting stock issue items:", err);
+    res.status(500).json({ error: "Failed to bulk delete items." });
+  }
+});
+
+// Delete a stock issue item (also supports bulk delete via :id=bulk + query params)
 app.delete("/api/stock-issue-items/:id", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
+
+    // Bulk delete when id is "bulk" and filter query params are provided
+    console.log("[ID ROUTE HIT] params.id:", req.params.id, "url:", req.url);
+    if (req.params.id === "bulk") {
+      const { warehouse, department, campus, transactionType, startDate, endDate, search } = req.query;
+      const whereClauses: string[] = [];
+      const params: any[] = [];
+
+      if (warehouse) { whereClauses.push("warehouse = ?"); params.push(warehouse); }
+      if (department) { whereClauses.push("department = ?"); params.push(department); }
+      if (campus) { whereClauses.push("campus = ?"); params.push(campus); }
+      if (transactionType) { whereClauses.push("transactionType = ?"); params.push(transactionType); }
+      if (startDate) { whereClauses.push("transactionDate >= ?"); params.push(startDate); }
+      if (endDate) { whereClauses.push("transactionDate <= ?"); params.push(endDate); }
+      if (search) {
+        const q = `%${search}%`;
+        whereClauses.push("(itemCode LIKE ? OR description LIKE ? OR requesterName LIKE ? OR warehouse LIKE ? OR division LIKE ? OR department LIKE ? OR campus LIKE ? OR referenceNo LIKE ? OR accountCode LIKE ? OR remarks LIKE ?)");
+        params.push(q, q, q, q, q, q, q, q, q, q);
+      }
+
+      if (whereClauses.length === 0) {
+        return res.status(400).json({ error: "At least one filter is required for bulk delete." });
+      }
+
+      const whereSql = " WHERE " + whereClauses.join(" AND ");
+      const [bulkResult] = await p.execute<ResultSetHeader>(`DELETE FROM stock_issue_items${whereSql}`, params);
+      return res.json({ success: true, count: bulkResult.affectedRows });
+    }
+
     const [result] = await p.execute<ResultSetHeader>("DELETE FROM stock_issue_items WHERE id = ?", [req.params.id]);
     if (result.affectedRows === 0) return res.status(404).json({ error: "Item not found." });
     res.json({ success: true });
@@ -1031,6 +1151,24 @@ app.get("/api/debit-note/emails", async (req, res) => {
   } catch (err: any) {
     console.error("Error fetching debit note emails:", err);
     res.status(500).json({ error: "Failed to fetch email configs." });
+  }
+});
+
+app.get("/api/debit-note/emails/filters/values", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const [warehouses] = await p.query<RowDataPacket[]>("SELECT DISTINCT warehouse FROM debit_note_emails WHERE warehouse != '' ORDER BY warehouse");
+    const [departments] = await p.query<RowDataPacket[]>("SELECT DISTINCT department FROM debit_note_emails WHERE department != '' ORDER BY department");
+    const [campuses] = await p.query<RowDataPacket[]>("SELECT DISTINCT campus FROM debit_note_emails WHERE campus != '' ORDER BY campus");
+    res.json({
+      warehouses: warehouses.map((row: any) => row.warehouse),
+      departments: departments.map((row: any) => row.department),
+      campuses: campuses.map((row: any) => row.campus),
+    });
+  } catch (err: any) {
+    console.error("Error fetching debit note email filter values:", err);
+    res.status(500).json({ error: "Failed to fetch debit note email filter values." });
   }
 });
 
@@ -1267,28 +1405,40 @@ app.get("/api/debit-notes", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
-    const { warehouse, department, campus, status, startDate, endDate } = req.query;
-    let sql = "SELECT * FROM debit_notes WHERE 1=1";
+    const { warehouse, department, campus, status, startDate, endDate, search, page, pageSize } = req.query;
+    const whereClauses: string[] = [];
     const params: any[] = [];
 
-    if (warehouse) { sql += " AND warehouse = ?"; params.push(warehouse); }
-    if (department) { sql += " AND department = ?"; params.push(department); }
-    if (campus) { sql += " AND campus = ?"; params.push(campus); }
+    if (warehouse) { whereClauses.push("warehouse = ?"); params.push(warehouse); }
+    if (department) { whereClauses.push("department = ?"); params.push(department); }
+    if (campus) { whereClauses.push("campus = ?"); params.push(campus); }
     if (status) {
       const statuses = String(status).split(",");
-      sql += ` AND status IN (${statuses.map(() => "?").join(",")})`;
+      whereClauses.push(`status IN (${statuses.map(() => "?").join(",")})`);
       params.push(...statuses);
     }
-    if (startDate) { sql += " AND startDate >= ?"; params.push(startDate); }
-    if (endDate) { sql += " AND endDate <= ?"; params.push(endDate); }
+    if (startDate) { whereClauses.push("startDate >= ?"); params.push(startDate); }
+    if (endDate) { whereClauses.push("endDate <= ?"); params.push(endDate); }
+    if (search) {
+      const q = `%${search}%`;
+      whereClauses.push("(referenceNumber LIKE ? OR warehouse LIKE ? OR department LIKE ? OR campus LIKE ? OR createdBy LIKE ? OR status LIKE ?)");
+      params.push(q, q, q, q, q, q);
+    }
 
-    sql += " ORDER BY createdAt DESC";
+    const whereSql = whereClauses.length > 0 ? " WHERE " + whereClauses.join(" AND ") : "";
+    const orderSql = " ORDER BY createdAt DESC";
 
     // Get total count
-    const [countRows] = await p.query<RowDataPacket[]>(sql.replace("SELECT *", "SELECT COUNT(*) as total"), params);
+    const [countRows] = await p.query<RowDataPacket[]>(`SELECT COUNT(*) as total FROM debit_notes${whereSql}`, params);
     const total = countRows[0]?.total || 0;
 
-    const [rows] = await p.query<RowDataPacket[]>(sql, params);
+    let rows: RowDataPacket[];
+    if (page && pageSize) {
+      const offset = (Number(page) - 1) * Number(pageSize);
+      [rows] = await p.query<RowDataPacket[]>(`SELECT * FROM debit_notes${whereSql}${orderSql} LIMIT ? OFFSET ?`, [...params, Number(pageSize), offset]);
+    } else {
+      [rows] = await p.query<RowDataPacket[]>(`SELECT * FROM debit_notes${whereSql}${orderSql}`, params);
+    }
 
     // Attach item count and email config to each note
     const result = [];
@@ -1975,10 +2125,12 @@ app.get("/api/debit-notes/filters/values", async (req, res) => {
     const [warehouses] = await p.query<RowDataPacket[]>("SELECT DISTINCT warehouse FROM stock_issue_items WHERE warehouse != '' ORDER BY warehouse");
     const [departments] = await p.query<RowDataPacket[]>("SELECT DISTINCT department FROM stock_issue_items WHERE department != '' ORDER BY department");
     const [campuses] = await p.query<RowDataPacket[]>("SELECT DISTINCT campus FROM stock_issue_items WHERE campus != '' ORDER BY campus");
+    const [statuses] = await p.query<RowDataPacket[]>("SELECT DISTINCT status FROM debit_notes WHERE status != '' ORDER BY status");
     res.json({
       warehouses: warehouses.map((r: any) => r.warehouse),
       departments: departments.map((r: any) => r.department),
       campuses: campuses.map((r: any) => r.campus),
+      statuses: statuses.map((r: any) => r.status),
     });
   } catch (err: any) {
     console.error("Error fetching filter values:", err);
@@ -2069,7 +2221,7 @@ async function startServer() {
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: { port: 0 } },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -2081,9 +2233,29 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`PROCUREMENT Engine successfully serving at http://0.0.0.0:${PORT} on ${process.env.NODE_ENV || 'development'} mode.`);
-  });
+  const tryListen = (port: number) => {
+    const server = createHttpServer(app);
+
+    server.once("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        const fallbackPort = port + 1;
+        console.warn(`Port ${port} is already in use. Trying ${fallbackPort} instead.`);
+        tryListen(fallbackPort);
+        return;
+      }
+
+      console.error("Failed to start server:", err);
+      process.exit(1);
+    });
+
+    server.listen(port, "0.0.0.0", () => {
+      const address = server.address();
+      const actualPort = typeof address === "object" && address ? address.port : port;
+      console.log(`PROCUREMENT Engine successfully serving at http://0.0.0.0:${actualPort} on ${process.env.NODE_ENV || 'development'} mode.`);
+    });
+  };
+
+  tryListen(PORT);
 }
 
 startServer();
