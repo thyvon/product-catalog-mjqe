@@ -3,6 +3,8 @@ import { PlusCircle, RefreshCw, Pencil, Trash2, Mail, X } from "lucide-react";
 import DataTable from "@/features/shared/components/DataTable";
 import ListPageLayout from "@/features/shared/components/ListPageLayout";
 import SelectField from "@/features/shared/components/SelectField";
+import ConfirmModal from "@/features/shared/components/ConfirmModal";
+import { useToast } from "@/features/shared/components/Toast";
 
 interface EmailConfig {
   id: string;
@@ -17,6 +19,8 @@ interface EmailConfig {
 }
 
 export default function DebitNoteEmailsPage() {
+  const { toast } = useToast();
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; id: string }>({ isOpen: false, id: "" });
   const [configs, setConfigs] = useState<EmailConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -82,7 +86,7 @@ export default function DebitNoteEmailsPage() {
 
   const handleSave = async () => {
     if (!formData.warehouse || !formData.department || !formData.campus || !formData.receiverName) {
-      alert("Warehouse, Department, Campus, and Receiver Name are required.");
+      toast.error("Warehouse, Department, Campus, and Receiver Name are required.");
       return;
     }
 
@@ -90,7 +94,7 @@ export default function DebitNoteEmailsPage() {
     const ccToEmails = formData.ccToEmail.split("\n").map((e) => e.trim()).filter(Boolean);
 
     if (sendToEmails.length === 0) {
-      alert("At least one send-to email is required.");
+      toast.error("At least one send-to email is required.");
       return;
     }
 
@@ -122,23 +126,29 @@ export default function DebitNoteEmailsPage() {
       if (res.ok) {
         setShowForm(false);
         fetchConfigs();
+        toast.success(editing ? "Email configuration updated." : "Email configuration created.");
       } else {
         const err = await res.json();
-        alert(err.error || "Failed to save.");
+        toast.error(err.error || "Failed to save.");
       }
     } catch {
-      alert("Failed to save email config.");
+      toast.error("Failed to save email config.");
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this email configuration?")) return;
+  const handleDelete = (id: string) => {
+    setDeleteConfirm({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    const id = deleteConfirm.id;
+    setDeleteConfirm({ isOpen: false, id: "" });
     try {
       const res = await fetch(`/api/debit-note/emails/${id}`, { method: "DELETE" });
-      if (res.ok) fetchConfigs();
-      else alert("Failed to delete.");
+      if (res.ok) { fetchConfigs(); toast.success("Email configuration deleted."); }
+      else toast.error("Failed to delete.");
     } catch {
-      alert("Failed to delete.");
+      toast.error("Failed to delete.");
     }
   };
 
@@ -233,6 +243,15 @@ export default function DebitNoteEmailsPage() {
         </>
       )}
     >
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Email Config"
+        message="Are you sure you want to delete this email configuration?"
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: "" })}
+      />
+
       {showForm && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-lg p-6">

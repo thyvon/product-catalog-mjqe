@@ -19,8 +19,10 @@ import ProductGalleryView from "@/features/products/components/ProductGalleryVie
 import ProductListView from "@/features/products/components/ProductListView";
 import ProductDetailModal from "@/features/products/components/ProductDetailModal";
 import { motion, AnimatePresence } from "motion/react";
+import { useToast } from "@/features/shared/components/Toast";
 
 export default function LandingPage() {
+  const { toast } = useToast();
   const [darkMode, setDarkMode] = useState(() => {
     const stored = localStorage.getItem("darkMode");
     const isDark = stored === "true";
@@ -85,6 +87,7 @@ export default function LandingPage() {
       setProducts(prodData);
     } catch (err: any) {
       setError(err.message || "Failed to load catalog.");
+      toast.error(err.message || "Failed to load catalog.");
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useToast } from "@/features/shared/components/Toast";
 import {
   RefreshCw, Send, Download, Trash2, Eye, FileText, PlusCircle,
   AlertCircle, Loader2, FileSpreadsheet,
@@ -39,6 +40,7 @@ interface EmailProgress {
 
 export default function DebitNoteListPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [notes, setNotes] = useState<DebitNote[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -69,15 +71,19 @@ export default function DebitNoteListPage() {
     isOpen: boolean;
     title: string;
     message: string;
+    confirmLabel?: string;
     onConfirm: () => void;
-  }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+  }>({ isOpen: false, title: "", message: "", confirmLabel: "Delete", onConfirm: () => {} });
 
   // Filter dropdown values
+  const fetchIdRef = useRef(0);
+
   const [filterValues, setFilterValues] = useState<{ warehouses: string[]; departments: string[]; campuses: string[]; statuses: string[] }>({
     warehouses: [], departments: [], campuses: [], statuses: [],
   });
 
   const fetchNotes = useCallback(async () => {
+    const id = ++fetchIdRef.current;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -92,12 +98,12 @@ export default function DebitNoteListPage() {
       params.set("pageSize", String(pageSize));
 
       const res = await fetch(`/api/debit-notes?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        setNotes(data.data || []);
-        setTotal(data.total || 0);
-      }
-    } catch { } finally { setLoading(false); }
+      if (!res.ok) return;
+      const data = await res.json();
+      if (id !== fetchIdRef.current) return;
+      setNotes(data.data || []);
+      setTotal(data.total || 0);
+    } catch { } finally { if (id === fetchIdRef.current) setLoading(false); }
   }, [warehouse, department, campus, statusFilter, startDate, endDate, searchQuery, currentPage, pageSize]);
 
   const fetchFilterValues = async () => {
@@ -141,7 +147,7 @@ export default function DebitNoteListPage() {
     return () => clearInterval(interval);
   }, [sendingEmails, fetchNotes]);
 
-  const handleSendEmails = async () => {
+  const handleSendEmails = useCallback(async () => {
     setConfirmState({
       isOpen: true,
       title: "Share Debit Notes",
@@ -166,38 +172,46 @@ export default function DebitNoteListPage() {
           const data = await res.json();
           if (!res.ok) {
             setSendingEmails(false);
-            alert(data.error || "Failed to send emails.");
+            toast.error(data.error || "Failed to send emails.");
           }
         } catch {
           setSendingEmails(false);
-          alert("Failed to send emails.");
+          toast.error("Failed to send emails.");
         }
       },
     });
-  };
+  }, []);
 
-  const handleResend = async (id: string) => {
-    if (!confirm("Resend email for this debit note?")) return;
-    setSendingEmails(true);
-    setProgress({ status: "Starting...", finished: false });
-    try {
-      const res = await fetch(`/api/debit-notes/${id}/resend`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user: user?.username || "anonymous" }),
-      });
-      if (!res.ok) {
-        setSendingEmails(false);
-        const data = await res.json();
-        alert(data.error || "Failed to resend.");
-      }
-    } catch {
-      setSendingEmails(false);
-      alert("Failed to resend.");
-    }
-  };
+  const handleResend = useCallback((id: string) => {
+    setConfirmState({
+      isOpen: true,
+      title: "Resend Email",
+      message: "Resend email for this debit note?",
+      confirmLabel: "Resend",
+      onConfirm: async () => {
+        setConfirmState((prev) => ({ ...prev, isOpen: false }));
+        setSendingEmails(true);
+        setProgress({ status: "Starting...", finished: false });
+        try {
+          const res = await fetch(`/api/debit-notes/${id}/resend`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user: user?.username || "anonymous" }),
+          });
+          if (!res.ok) {
+            setSendingEmails(false);
+            const data = await res.json();
+            toast.error(data.error || "Failed to resend.");
+          }
+        } catch {
+          setSendingEmails(false);
+          toast.error("Failed to resend.");
+        }
+      },
+    });
+  }, [user, toast]);
 
-  const handleExport = async (id: string) => {
+  const handleExport = useCallback(async (id: string) => {
     try {
       const res = await fetch(`/api/debit-notes/${id}/export`);
       if (res.ok) {
@@ -210,9 +224,9 @@ export default function DebitNoteListPage() {
         window.URL.revokeObjectURL(url);
       }
     } catch {
-      alert("Failed to export.");
+      toast.error("Failed to export.");
     }
-  };
+  }, []);
 
   const handleBulkExport = async () => {
     try {
@@ -238,22 +252,30 @@ export default function DebitNoteListPage() {
         window.URL.revokeObjectURL(url);
       }
     } catch {
-      alert("Failed to bulk export.");
+      toast.error("Failed to bulk export.");
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this debit note? This action cannot be undone.")) return;
-    try {
-      const res = await fetch(`/api/debit-notes/${id}`, { method: "DELETE" });
-      if (res.ok) fetchNotes();
-      else alert("Failed to delete.");
-    } catch {
-      alert("Failed to delete.");
-    }
-  };
+  const handleDelete = useCallback((id: string) => {
+    setConfirmState({
+      isOpen: true,
+      title: "Delete Debit Note",
+      message: "Delete this debit note? This action cannot be undone.",
+      confirmLabel: "Delete",
+      onConfirm: async () => {
+        setConfirmState((prev) => ({ ...prev, isOpen: false }));
+        try {
+          const res = await fetch(`/api/debit-notes/${id}`, { method: "DELETE" });
+          if (res.ok) fetchNotes();
+          else toast.error("Failed to delete.");
+        } catch {
+          toast.error("Failed to delete.");
+        }
+      },
+    });
+  }, [fetchNotes, toast]);
 
-  const handlePreview = async (id: string) => {
+  const handlePreview = useCallback(async (id: string) => {
     try {
       const res = await fetch(`/api/debit-notes/${id}`);
       if (res.ok) {
@@ -261,18 +283,18 @@ export default function DebitNoteListPage() {
         setShowPreview(true);
       }
     } catch {
-      alert("Failed to load details.");
+      toast.error("Failed to load details.");
     }
-  };
+  }, []);
 
-  const statusBadge = (status: string) => {
+  const statusBadge = useCallback((status: string) => {
     const styles: Record<string, string> = {
       pending: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400",
       sending: "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
       sent: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400",
     };
     return styles[status] || "bg-slate-50 dark:bg-gray-800 text-slate-500 dark:text-gray-400";
-  };
+  }, []);
 
   const clearFilters = () => {
     setWarehouse("");
@@ -288,6 +310,37 @@ export default function DebitNoteListPage() {
     { value: "", label: allLabel },
     ...values.map((value) => ({ value, label: value })),
   ], []);
+
+  const columns = useMemo(() => [
+    { key: "referenceNumber", header: "Reference", cellClassName: "font-bold text-slate-700 dark:text-gray-300 font-mono" },
+    { key: "warehouse", header: "Warehouse", cellClassName: "text-slate-600 dark:text-gray-400" },
+    { key: "department", header: "Department", cellClassName: "text-slate-600 dark:text-gray-400" },
+    { key: "campus", header: "Campus", cellClassName: "text-slate-600 dark:text-gray-400" },
+    { key: "period", header: "Period", cellClassName: "text-[10px] text-slate-500 dark:text-gray-500 font-mono", render: (n: DebitNote) => <>{n.startDate} - {n.endDate}</> },
+    { key: "itemCount", header: "Items", align: "right" as const, cellClassName: "font-mono", render: (n: DebitNote) => <span className="text-slate-700 dark:text-gray-300">{n.itemCount}</span> },
+    { key: "totalAmount", header: "Total", align: "right" as const, cellClassName: "font-mono", render: (n: DebitNote) => <span className="text-slate-700 dark:text-gray-300">${Number(n.totalAmount).toFixed(2)}</span> },
+    { key: "status", header: "Status", align: "center" as const, render: (n: DebitNote) => (
+      <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${statusBadge(n.status)}`}>{n.status}</span>
+    )},
+    { key: "actions", header: "Actions", align: "right" as const, render: (n: DebitNote) => (
+      <div className="flex items-center justify-end gap-1">
+        <button onClick={() => handlePreview(n.id)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg cursor-pointer transition-all" title="Preview">
+          <Eye className="w-3.5 h-3.5" />
+        </button>
+        <button onClick={() => handleExport(n.id)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg cursor-pointer transition-all" title="Export Excel">
+          <FileSpreadsheet className="w-3.5 h-3.5" />
+        </button>
+        {n.status !== "sending" && (
+          <button onClick={() => handleResend(n.id)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg cursor-pointer transition-all" title="Resend Email">
+            <Send className="w-3.5 h-3.5" />
+          </button>
+        )}
+        <button onClick={() => handleDelete(n.id)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg cursor-pointer transition-all" title="Delete">
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    )},
+  ], [statusBadge, handlePreview, handleExport, handleResend, handleDelete]);
 
   return (
     <ListPageLayout
@@ -396,43 +449,14 @@ export default function DebitNoteListPage() {
         isOpen={confirmState.isOpen}
         title={confirmState.title}
         message={confirmState.message}
-        confirmLabel="Share"
+        confirmLabel={confirmState.confirmLabel || "Delete"}
         cancelLabel="Cancel"
         onConfirm={confirmState.onConfirm}
         onCancel={() => setConfirmState((prev) => ({ ...prev, isOpen: false }))}
       />
 
       <DataTable<DebitNote>
-        columns={[
-          { key: "referenceNumber", header: "Reference", cellClassName: "font-bold text-slate-700 dark:text-gray-300 font-mono" },
-          { key: "warehouse", header: "Warehouse", cellClassName: "text-slate-600 dark:text-gray-400" },
-          { key: "department", header: "Department", cellClassName: "text-slate-600 dark:text-gray-400" },
-          { key: "campus", header: "Campus", cellClassName: "text-slate-600 dark:text-gray-400" },
-          { key: "period", header: "Period", cellClassName: "text-[10px] text-slate-500 dark:text-gray-500 font-mono", render: (n) => <>{n.startDate} - {n.endDate}</> },
-          { key: "itemCount", header: "Items", align: "right", cellClassName: "font-mono", render: (n) => <span className="text-slate-700 dark:text-gray-300">{n.itemCount}</span> },
-          { key: "totalAmount", header: "Total", align: "right", cellClassName: "font-mono", render: (n) => <span className="text-slate-700 dark:text-gray-300">${Number(n.totalAmount).toFixed(2)}</span> },
-          { key: "status", header: "Status", align: "center", render: (n) => (
-            <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold ${statusBadge(n.status)}`}>{n.status}</span>
-          )},
-          { key: "actions", header: "Actions", align: "right", render: (n) => (
-            <div className="flex items-center justify-end gap-1">
-              <button onClick={() => handlePreview(n.id)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg cursor-pointer transition-all" title="Preview">
-                <Eye className="w-3.5 h-3.5" />
-              </button>
-              <button onClick={() => handleExport(n.id)} className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg cursor-pointer transition-all" title="Export Excel">
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-              </button>
-              {n.status !== "sending" && (
-                <button onClick={() => handleResend(n.id)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg cursor-pointer transition-all" title="Resend Email">
-                  <Send className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <button onClick={() => handleDelete(n.id)} className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg cursor-pointer transition-all" title="Delete">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )},
-        ]}
+        columns={columns}
         data={notes}
         loading={loading}
         emptyIcon={<FileText className="w-8 h-8" />}

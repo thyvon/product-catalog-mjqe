@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Loader2 } from "lucide-react";
 import BaseModal from "@/features/shared/components/BaseModal";
 import DatePicker from "@/features/shared/components/DatePicker";
+import { useToast } from "@/features/shared/components/Toast";
 import { useAuth } from "@/features/auth/AuthContext";
 
 interface DebitNoteGenerateModalProps {
@@ -12,6 +13,7 @@ interface DebitNoteGenerateModalProps {
 
 export default function DebitNoteGenerateModal({ isOpen, onClose, onGenerated }: DebitNoteGenerateModalProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [genStartDate, setGenStartDate] = useState("");
   const [genEndDate, setGenEndDate] = useState("");
   const [genWarehouse, setGenWarehouse] = useState("");
@@ -21,7 +23,7 @@ export default function DebitNoteGenerateModal({ isOpen, onClose, onGenerated }:
 
   const handleGenerate = async () => {
     if (!genStartDate || !genEndDate) {
-      alert("Start date and end date are required.");
+      toast.error("Start date and end date are required.");
       return;
     }
     setGenerating(true);
@@ -41,12 +43,12 @@ export default function DebitNoteGenerateModal({ isOpen, onClose, onGenerated }:
       const data = await res.json();
       if (res.ok) {
         onGenerated();
-        alert(`Generated ${data.count} debit note(s) successfully.`);
+        toast.success(`Generated ${data.count} debit note(s) successfully.`);
       } else {
-        alert(data.error || "Failed to generate.");
+        toast.error(data.error || "Failed to generate.");
       }
     } catch {
-      alert("Failed to generate debit notes.");
+      toast.error("Failed to generate debit notes.");
     } finally { setGenerating(false); }
   };
 

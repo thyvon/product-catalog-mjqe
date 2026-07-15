@@ -3,15 +3,13 @@ import {
   XCircle as CloseCircle,
   FileText,
   Download,
-  AlertCircle as DangerCircle,
   CheckCircle,
   CloudUpload,
   Eye,
   RefreshCw as Refresh,
-  Layers,
 } from "lucide-react";
-import * as XLSX from "xlsx";
 import BaseModal from "@/features/shared/components/BaseModal";
+import { useToast } from "@/features/shared/components/Toast";
 
 interface ExcelImportModalProps {
   isOpen: boolean;
@@ -24,9 +22,9 @@ export default function ExcelImportModal({
   onClose,
   onImportComplete,
 }: ExcelImportModalProps) {
+  const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [parsedRows, setParsedRows] = useState<any[]>([]);
-  const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [successCount, setSuccessCount] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,7 +32,8 @@ export default function ExcelImportModal({
   if (!isOpen) return null;
 
   // Generate a fully compliant Excel (.xlsx) template file client-side
-  const downloadExcelTemplate = () => {
+  const downloadExcelTemplate = async () => {
+    const XLSX = await import("xlsx");
     // Column Headers matching the required fields
     const headers = [
       "Product Code",
@@ -108,7 +107,6 @@ export default function ExcelImportModal({
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    setErrorMsg("");
     setSuccessCount(null);
     const droppedFile = e.dataTransfer.files[0];
     if (droppedFile) {
@@ -117,7 +115,6 @@ export default function ExcelImportModal({
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setErrorMsg("");
     setSuccessCount(null);
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
@@ -126,11 +123,12 @@ export default function ExcelImportModal({
   };
 
   // Parse Excel / CSV files client side
-  const processFile = (selectedFile: File) => {
+  const processFile = async (selectedFile: File) => {
+    const XLSX = await import("xlsx");
     const validExtensions = [".xlsx", ".xls", ".csv"];
     const ext = selectedFile.name.substring(selectedFile.name.lastIndexOf(".")).toLowerCase();
     if (!validExtensions.includes(ext)) {
-      setErrorMsg("Invalid file format. Please upload a spreadsheet file (.xlsx, .xls or .csv).");
+      toast.error("Invalid file format. Please upload a spreadsheet file (.xlsx, .xls or .csv).");
       return;
     }
 
@@ -196,7 +194,7 @@ export default function ExcelImportModal({
         setParsedRows(validatedRows);
       } catch (err: any) {
         console.error("Excel format error:", err);
-        setErrorMsg(err.message || "Unable to extract items from your spreadsheet.");
+        toast.error(err.message || "Unable to extract items from your spreadsheet.");
         setFile(null);
         setParsedRows([]);
       } finally {
@@ -216,7 +214,6 @@ export default function ExcelImportModal({
     if (parsedRows.length === 0) return;
 
     setLoading(true);
-    setErrorMsg("");
 
     try {
       const response = await fetch("/api/products/import", {
@@ -231,18 +228,14 @@ export default function ExcelImportModal({
         throw new Error(data.error || "Failed to commit spreadsheet upload.");
       }
 
-      setSuccessCount(data.count);
+      toast.success(`Successfully imported ${data.count} product(s).`);
       setParsedRows([]);
       setFile(null);
-
-      // Trigger hot state callback
-      setTimeout(() => {
-        onImportComplete();
-      }, 1200);
+      onImportComplete();
 
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || "An unexpected error occurred uploading batch entries.");
+      toast.error(err.message || "An unexpected error occurred uploading batch entries.");
     } finally {
       setLoading(false);
     }
@@ -251,7 +244,6 @@ export default function ExcelImportModal({
   const clearStagedFile = () => {
     setFile(null);
     setParsedRows([]);
-    setErrorMsg("");
     setSuccessCount(null);
   };
 
@@ -305,25 +297,6 @@ export default function ExcelImportModal({
             <Download className="w-3.5 h-3.5" /> Download Template (.xlsx)
           </button>
         </div>
-
-        {/* Error notifications */}
-        {errorMsg && (
-          <div className="p-4 bg-rose-50 dark:bg-rose-900/30 border border-rose-100 dark:border-rose-800 rounded-xl flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
-            <DangerCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        {/* Success notifications */}
-        {successCount !== null && (
-          <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-150/30 dark:border-emerald-800 rounded-xl text-center space-y-2">
-            <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto" />
-            <h4 className="text-xs font-bold text-slate-800 dark:text-gray-100">Batch Ingestion Successful!</h4>
-            <p className="text-[11px] text-emerald-650 dark:text-emerald-400 font-mono">
-              Succesfully ingested {successCount} products into database v2 catalog! Reloading grid...
-            </p>
-          </div>
-        )}
 
         {/* File Drag-and-drop zone */}
         {!file && successCount === null && (

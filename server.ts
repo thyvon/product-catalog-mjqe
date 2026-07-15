@@ -530,22 +530,22 @@ app.post("/api/products/import", async (req, res) => {
     const itemsToUpsert: any[] = [];
 
     incoming.forEach((item: any) => {
-      let codeStr = item.productCode || item["Product Code"] || item["code"] || item["Code"];
-      let nameStr = item.name || item["Product Name"] || item["Name"] || item["Product Name/Description"] || item["Description"];
-      let descStr = item.description || item["Description"] || item["Product Name/Description"] || "";
-      let uomStr = item.uom || item["UoM"] || item["unit"] || item["Unit"] || "Pcs";
-      let catStr = item.category || item["Category"] || "General";
-      let subCatStr = item.subCategory || item["Sub Category"] || item["SubCategory"] || "";
-      let imgStr = item.imageUrl || item["Image"] || item["imageUrl"] || item["Photo"] || "";
+      const codeStr = item.productCode || item["Product Code"] || item["code"] || item["Code"];
+      const nameStr = item.name || item["Product Name"] || item["Name"] || item["Product Name/Description"] || item["Description"];
+      const descStr = item.description || item["Description"] || item["Product Name/Description"] || "";
+      const uomStr = item.uom || item["UoM"] || item["unit"] || item["Unit"] || "Pcs";
+      const catStr = item.category || item["Category"] || "General";
+      const subCatStr = item.subCategory || item["Sub Category"] || item["SubCategory"] || "";
+      const imgStr = item.imageUrl || item["Image"] || item["imageUrl"] || item["Photo"] || "";
 
-      let rawStatus = item.status || item["Status"] || "Active";
+      const rawStatus = item.status || item["Status"] || "Active";
       let norStatus = "Active";
       if (String(rawStatus).toLowerCase().includes("inactive") || String(rawStatus).toLowerCase() === "i") {
         norStatus = "Inactive";
       }
 
-      let itemPrice = item.price || item["Price"] || item["Rate"];
-      let itemStock = item.stock || item["Stock"] || item["Qty"] || item["Quantity"];
+      const itemPrice = item.price || item["Price"] || item["Rate"];
+      const itemStock = item.stock || item["Stock"] || item["Qty"] || item["Quantity"];
 
       if (codeStr && nameStr) {
         const normalizedCode = String(codeStr).toUpperCase().trim();
@@ -995,7 +995,6 @@ app.get("/api/stock-issue-items/filters/values", async (req, res) => {
 
 // Bulk delete stock issue items by filter (requires at least one filter)
 app.delete("/api/stock-issue-items/bulk", async (req, res) => {
-  console.log("[BULK ROUTE HIT]", req.url);
   try {
     assertDb();
     const p = getPool()!;
@@ -1035,7 +1034,6 @@ app.delete("/api/stock-issue-items/:id", async (req, res) => {
     const p = getPool()!;
 
     // Bulk delete when id is "bulk" and filter query params are provided
-    console.log("[ID ROUTE HIT] params.id:", req.params.id, "url:", req.url);
     if (req.params.id === "bulk") {
       const { warehouse, department, campus, transactionType, startDate, endDate, search } = req.query;
       const whereClauses: string[] = [];
@@ -1068,6 +1066,60 @@ app.delete("/api/stock-issue-items/:id", async (req, res) => {
   } catch (err: any) {
     console.error("Error deleting stock issue item:", err);
     res.status(500).json({ error: "Failed to delete item." });
+  }
+});
+
+// POST: Create a single stock issue item
+app.post("/api/stock-issue-items", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const { itemCode, description, quantity, uom, unitPrice, totalPrice, transactionDate, warehouse, division, department, campus, requesterName, referenceNo, transactionType, accountCode, remarks } = req.body;
+
+    if (!itemCode || !description) {
+      return res.status(400).json({ error: "Item code and description are required." });
+    }
+
+    const id = `sii-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    const now = new Date().toISOString();
+
+    await p.execute(
+      `INSERT INTO stock_issue_items (id, itemCode, description, quantity, uom, unitPrice, totalPrice, transactionDate, warehouse, division, department, campus, requesterName, referenceNo, transactionType, accountCode, remarks, importedAt, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, itemCode, description, quantity ?? 0, uom ?? "Pcs", unitPrice ?? 0, totalPrice ?? 0,
+       transactionDate || null, warehouse || "", division || "", department || "", campus || "",
+       requesterName || "", referenceNo || "", transactionType || "", accountCode || "", remarks || "",
+       now, now, now]
+    );
+
+    res.json({ success: true, id });
+  } catch (err: any) {
+    console.error("Error creating stock issue item:", err);
+    res.status(500).json({ error: "Failed to create item." });
+  }
+});
+
+// PUT: Update a stock issue item
+app.put("/api/stock-issue-items/:id", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const { itemCode, description, quantity, uom, unitPrice, totalPrice, transactionDate, warehouse, division, department, campus, requesterName, referenceNo, transactionType, accountCode, remarks } = req.body;
+
+    const now = new Date().toISOString();
+    const [result] = await p.execute<ResultSetHeader>(
+      `UPDATE stock_issue_items SET itemCode = ?, description = ?, quantity = ?, uom = ?, unitPrice = ?, totalPrice = ?, transactionDate = ?, warehouse = ?, division = ?, department = ?, campus = ?, requesterName = ?, referenceNo = ?, transactionType = ?, accountCode = ?, remarks = ?, updatedAt = ? WHERE id = ?`,
+      [itemCode, description, quantity ?? 0, uom ?? "Pcs", unitPrice ?? 0, totalPrice ?? 0,
+       transactionDate || null, warehouse || "", division || "", department || "", campus || "",
+       requesterName || "", referenceNo || "", transactionType || "", accountCode || "", remarks || "",
+       now, req.params.id]
+    );
+
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Item not found." });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error updating stock issue item:", err);
+    res.status(500).json({ error: "Failed to update item." });
   }
 });
 
@@ -1440,25 +1492,45 @@ app.get("/api/debit-notes", async (req, res) => {
       [rows] = await p.query<RowDataPacket[]>(`SELECT * FROM debit_notes${whereSql}${orderSql}`, params);
     }
 
-    // Attach item count and email config to each note
-    const result = [];
-    for (const row of rows) {
-      const [itemRows] = await p.execute<RowDataPacket[]>(
-        "SELECT COUNT(*) as count, COALESCE(SUM(totalPrice), 0) as totalAmount FROM debit_note_items WHERE debitNoteId = ?",
-        [row.id]
+    // Bulk-fetch item counts and email configs to avoid N+1 queries
+    const ids = rows.map((r) => r.id);
+    const idPlaceholders = ids.length > 0 ? ids.map(() => "?").join(",") : "";
+
+    // Item counts in bulk
+    const itemCountMap = new Map<string, { count: number; totalAmount: number }>();
+    if (idPlaceholders) {
+      const [itemRows] = await p.query<RowDataPacket[]>(
+        `SELECT debitNoteId, COUNT(*) as count, COALESCE(SUM(totalPrice), 0) as totalAmount FROM debit_note_items WHERE debitNoteId IN (${idPlaceholders}) GROUP BY debitNoteId`,
+        ids
       );
-      let emailConfig = null;
-      if (row.debitNoteEmailId) {
-        const [emailRows] = await p.execute<RowDataPacket[]>("SELECT * FROM debit_note_emails WHERE id = ?", [row.debitNoteEmailId]);
-        emailConfig = emailRows[0] || null;
+      for (const r of itemRows) {
+        itemCountMap.set(r.debitNoteId, { count: r.count, totalAmount: r.totalAmount });
       }
-      result.push({
-        ...row,
-        itemCount: itemRows[0]?.count || 0,
-        totalAmount: itemRows[0]?.totalAmount || 0,
-        debitNoteEmail: emailConfig,
-      });
     }
+
+    // Email configs in bulk
+    const emailIds = rows.map((r) => r.debitNoteEmailId).filter(Boolean);
+    const emailIdPlaceholders = emailIds.length > 0 ? emailIds.map(() => "?").join(",") : "";
+    const emailMap = new Map<string, any>();
+    if (emailIdPlaceholders) {
+      const [emailRows] = await p.query<RowDataPacket[]>(
+        `SELECT * FROM debit_note_emails WHERE id IN (${emailIdPlaceholders})`,
+        emailIds
+      );
+      for (const r of emailRows) {
+        emailMap.set(r.id, r);
+      }
+    }
+
+    const result = rows.map((row) => {
+      const itemData = itemCountMap.get(row.id) || { count: 0, totalAmount: 0 };
+      return {
+        ...row,
+        itemCount: itemData.count,
+        totalAmount: itemData.totalAmount,
+        debitNoteEmail: row.debitNoteEmailId ? emailMap.get(row.debitNoteEmailId) || null : null,
+      };
+    });
 
     res.json({ data: result, total });
   } catch (err: any) {
@@ -1543,13 +1615,13 @@ async function runSendDebitNotesEmail(
     // Lock and update statuses within a transaction
     const conn = await p.getConnection();
     let connReleased = false;
-    let noteDetails: any[] = [];
+    const noteDetails: any[] = [];
     let notes: any[] = [];
     try {
       await conn.beginTransaction();
 
       const placeholders = debitNoteIds.map(() => "?").join(",");
-      let statusFilter = allowResend ? "status != 'sending'" : "status = 'pending'";
+      const statusFilter = allowResend ? "status != 'sending'" : "status = 'pending'";
       const [lockedNotes] = await conn.execute<RowDataPacket[]>(
         `SELECT * FROM debit_notes WHERE id IN (${placeholders}) AND ${statusFilter} FOR UPDATE`,
         debitNoteIds

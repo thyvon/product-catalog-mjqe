@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface Column<T> {
@@ -135,7 +135,7 @@ function PaginationBar({ currentPage, pageSize, total, onPageChange, onPageSizeC
   );
 }
 
-export default function DataTable<T>({
+function DataTableInner<T>({
   columns,
   data,
   loading = false,
@@ -220,3 +220,5 @@ export default function DataTable<T>({
     </div>
   );
 }
+
+export default memo(DataTableInner) as typeof DataTableInner;

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from "react";
-import { FileText, Download, CloudUpload, AlertCircle, CheckCircle, Eye, XCircle, RefreshCw } from "lucide-react";
-import * as XLSX from "xlsx";
+import { FileText, Download, CloudUpload, CheckCircle, Eye, XCircle, RefreshCw } from "lucide-react";
 import BaseModal from "@/features/shared/components/BaseModal";
+import { useToast } from "@/features/shared/components/Toast";
 
 const IMPORT_COLUMNS = [
   "Date", "Code", "Description", "Qty", "UoM", "Unit Price", "Total Amount",
@@ -16,14 +16,14 @@ interface StockImportModalProps {
 }
 
 export default function StockImportModal({ isOpen, onClose, onImportComplete }: StockImportModalProps) {
+  const { toast } = useToast();
   const [importFile, setImportFile] = useState<File | null>(null);
   const [parsedRows, setParsedRows] = useState<any[]>([]);
-  const [importError, setImportError] = useState("");
   const [importLoading, setImportLoading] = useState(false);
-  const [successCount, setSuccessCount] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const downloadExcelTemplate = () => {
+  const downloadExcelTemplate = async () => {
+    const XLSX = await import("xlsx");
     const sampleRows = [
       ["2026-06-01", "ITEM-001", "Sample item description", 10, "Pcs", 5.50, 55.00, "Vun Thy", "PP", "Admin", "IT", "Monthly supply", "IO-2026-001", "Issue", "ACC-001"],
       ["2026-06-02", "ITEM-002", "Another sample item", 5, "Box", 12.00, 60.00, "Sokha", "PP", "Finance", "Accounting", "Office use", "IO-2026-002", "Transfer", "ACC-002"],
@@ -40,12 +40,13 @@ export default function StockImportModal({ isOpen, onClose, onImportComplete }: 
     URL.revokeObjectURL(url);
   };
 
-  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); setImportError(""); setSuccessCount(null); const f = e.dataTransfer.files[0]; if (f) processFile(f); };
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { setImportError(""); setSuccessCount(null); const f = e.target.files?.[0]; if (f) processFile(f); };
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) processFile(f); };
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) processFile(f); };
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
+    const XLSX = await import("xlsx");
     const ext = file.name.substring(file.name.lastIndexOf(".")).toLowerCase();
-    if (![".xlsx", ".xls", ".csv"].includes(ext)) { setImportError("Invalid format. Use .xlsx, .xls, or .csv."); return; }
+    if (![".xlsx", ".xls", ".csv"].includes(ext)) { toast.error("Invalid format. Use .xlsx, .xls, or .csv."); return; }
     setImportFile(file);
     setImportLoading(true);
     const reader = new FileReader();
@@ -99,7 +100,7 @@ export default function StockImportModal({ isOpen, onClose, onImportComplete }: 
         const valid = formatted.filter((r: any) => r.itemCode && r.description);
         if (valid.length === 0) throw new Error("No rows with valid 'Code' and 'Description' headers.");
         setParsedRows(valid);
-      } catch (err: any) { setImportError(err.message || "Failed to parse file."); setImportFile(null); setParsedRows([]); }
+      } catch (err: any) { toast.error(err.message || "Failed to parse file."); setImportFile(null); setParsedRows([]); }
       finally { setImportLoading(false); }
     };
     if (ext === ".csv") reader.readAsText(file); else reader.readAsBinaryString(file);
@@ -107,25 +108,24 @@ export default function StockImportModal({ isOpen, onClose, onImportComplete }: 
 
   const submitImport = async () => {
     if (parsedRows.length === 0) return;
-    setImportLoading(true); setImportError("");
+    setImportLoading(true);
     try {
       const res = await fetch("/api/stock-issue-items/import", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsedRows),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Import failed.");
-      setSuccessCount(data.count);
+      toast.success(`Imported ${data.count} item(s) successfully.`);
       setParsedRows([]); setImportFile(null);
-      setTimeout(() => { setSuccessCount(null); onClose(); onImportComplete(); }, 1200);
-    } catch (err: any) { setImportError(err.message); }
+      onClose(); onImportComplete();
+    } catch (err: any) { toast.error(err.message); }
     finally { setImportLoading(false); }
   };
 
-  const clearStaged = () => { setImportFile(null); setParsedRows([]); setImportError(""); setSuccessCount(null); };
+  const clearStaged = () => { setImportFile(null); setParsedRows([]); };
 
   const handleClose = () => {
     if (importLoading) return;
-    setSuccessCount(null);
     onClose();
   };
 
@@ -161,20 +161,7 @@ export default function StockImportModal({ isOpen, onClose, onImportComplete }: 
           </button>
         </div>
 
-        {importError && (
-          <div className="p-4 bg-rose-50 dark:bg-rose-900/30 border border-rose-100 dark:border-rose-800 rounded-xl flex items-start gap-2.5 text-xs text-rose-700 dark:text-rose-400">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /><span>{importError}</span>
-          </div>
-        )}
-
-        {successCount !== null && (
-          <div className="p-4 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-150/30 dark:border-emerald-800 rounded-xl text-center space-y-2">
-            <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto" />
-            <p className="text-xs font-bold text-slate-800 dark:text-gray-100">Imported {successCount} item(s) successfully!</p>
-          </div>
-        )}
-
-        {!importFile && successCount === null && (
+        {!importFile && (
           <div onDragOver={(e) => e.preventDefault()} onDrop={handleFileDrop}
             onClick={() => fileInputRef.current?.click()}
             className="border-2 border-dashed border-slate-200 dark:border-gray-700 hover:border-indigo-500 bg-slate-50/20 dark:bg-gray-800/20 rounded-2xl p-10 text-center space-y-3 cursor-pointer transition-all">

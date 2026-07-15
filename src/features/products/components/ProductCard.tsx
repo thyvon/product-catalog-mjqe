@@ -1,4 +1,4 @@
-import React from "react";
+import { memo } from "react";
 import {
   Eye,
   SquarePen as PenNewSquare,
@@ -30,7 +30,7 @@ const CATEGORY_GRADIENTS: { [key: string]: string } = {
   "Office Tools": "from-fuchsia-500 to-pink-600",
 };
 
-export default function ProductCard({
+const ProductCard = memo(function ProductCard({
   product,
   isAdmin,
   onView,
@@ -167,4 +167,6 @@ export default function ProductCard({
       </div>
     </motion.div>
   );
-}
+});
+
+export default ProductCard;

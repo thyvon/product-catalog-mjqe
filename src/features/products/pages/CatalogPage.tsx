@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   PlusCircle as AddCircle,
   Search as Magnifer,
@@ -60,7 +60,7 @@ export default function CatalogPage() {
     onConfirm: () => void;
   }>({ isOpen: false, title: "", message: "", onConfirm: () => {} });
 
-  const fetchCatalog = async () => {
+  const fetchCatalog = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -81,23 +81,23 @@ export default function CatalogPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchCatalog();
-  }, []);
+  }, [fetchCatalog]);
 
-  const handleOpenDetailModal = (product: Product) => {
+  const handleOpenDetailModal = useCallback((product: Product) => {
     setSelectedProduct(product);
     setIsDetailOpen(true);
-  };
+  }, []);
 
-  const handleOpenEditModal = (product: Product) => {
+  const handleOpenEditModal = useCallback((product: Product) => {
     setEditingProduct(product);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const handleAddEditProduct = async (productData: ProductInput | Product) => {
+  const handleAddEditProduct = useCallback(async (productData: ProductInput | Product) => {
     try {
       const isEdit = "id" in productData;
       const url = isEdit ? `/api/products/${(productData as Product).id}` : "/api/products";
@@ -117,12 +117,13 @@ export default function CatalogPage() {
       setIsFormOpen(false);
       setEditingProduct(null);
       await fetchCatalog();
+      toast.success(isEdit ? "Product has been updated." : "Product has been created.");
     } catch (err: any) {
       toast.error(`Error submitting product details config: ${err.message}`);
     }
-  };
+  }, []);
 
-  const handleDeleteProduct = async (productId: string) => {
+  const handleDeleteProduct = useCallback(async (productId: string) => {
     const target = products.find((p) => p.id === productId);
     if (!target) return;
 
@@ -142,14 +143,15 @@ export default function CatalogPage() {
           }
 
           await fetchCatalog();
+          toast.success("Product has been deleted.");
         } catch (err: any) {
           toast.error(`Error removing SKU from database: ${err.message}`);
         }
       },
     });
-  };
+  }, [products, fetchCatalog]);
 
-  const triggerExportCSV = () => {
+  const triggerExportCSV = useCallback(() => {
     if (products.length === 0) return;
 
     const headers = ["Product Code", "Product Name", "Description", "UoM", "Category", "Sub Category", "Status", "Price", "Stock", "Image URL"];
@@ -176,7 +178,7 @@ export default function CatalogPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [products]);
 
   const filteredProducts = products.filter((p) => {
     const query = searchQuery.toLowerCase().trim();
@@ -570,6 +572,7 @@ export default function CatalogPage() {
         onImportComplete={async () => {
           setIsImportOpen(false);
           await fetchCatalog();
+          toast.success("Products imported successfully.");
         }}
       />
 

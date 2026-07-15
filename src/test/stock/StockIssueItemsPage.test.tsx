@@ -89,7 +89,7 @@ describe('StockIssueItemsPage', () => {
       if (warehouseBtn) fireEvent.click(warehouseBtn);
     });
     await waitFor(() => {
-      const option = screen.getByText('WH-A');
+      const option = screen.getByRole('button', { name: 'WH-A' });
       if (option) fireEvent.click(option);
     });
     await waitFor(() => {
@@ -142,7 +142,7 @@ describe('StockIssueItemsPage', () => {
       if (btn) fireEvent.click(btn);
     });
     await waitFor(() => {
-      const opt = screen.getByText('WH-A');
+      const opt = screen.getByRole('button', { name: 'WH-A' });
       if (opt) fireEvent.click(opt);
     });
     await waitFor(() => {
@@ -165,7 +165,7 @@ describe('StockIssueItemsPage', () => {
       if (btn) fireEvent.click(btn);
     });
     await waitFor(() => {
-      const opt = screen.getByText('WH-A');
+      const opt = screen.getByRole('button', { name: 'WH-A' });
       if (opt) fireEvent.click(opt);
     });
     await waitFor(() => {
@@ -189,7 +189,7 @@ describe('StockIssueItemsPage', () => {
       if (btn) fireEvent.click(btn);
     });
     await waitFor(() => {
-      const opt = screen.getByText('WH-A');
+      const opt = screen.getByRole('button', { name: 'WH-A' });
       if (opt) fireEvent.click(opt);
     });
     await waitFor(() => {
@@ -216,7 +216,7 @@ describe('StockIssueItemsPage', () => {
       if (warehouseBtn) fireEvent.click(warehouseBtn);
     });
     await waitFor(() => {
-      const option = screen.getByText('WH-A');
+      const option = screen.getByRole('button', { name: 'WH-A' });
       if (option) fireEvent.click(option);
     });
     await waitFor(() => {

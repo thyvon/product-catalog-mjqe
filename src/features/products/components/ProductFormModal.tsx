@@ -9,6 +9,7 @@ import {
 import { Product, ProductInput } from "@/features/shared/types";
 import { useToast } from "@/features/shared/components/Toast";
 import BaseModal from "@/features/shared/components/BaseModal";
+import SelectField from "@/features/shared/components/SelectField";
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -307,7 +308,7 @@ export default function ProductFormModal({
               value={productCode}
               onChange={(e) => setProductCode(e.target.value)}
               placeholder="e.g. STO-SSD-291"
-              className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-805 dark:text-gray-200 font-mono text-xs uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
+              className="w-full h-[38px] px-3 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-805 dark:text-gray-200 font-mono text-xs uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
             />
           </div>
 
@@ -316,16 +317,15 @@ export default function ProductFormModal({
             <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
               Item Status <span className="text-rose-500">*</span>
             </label>
-            <select
-              id="input-status"
+            <SelectField
               value={status}
-              onChange={(e: any) => setStatus(e.target.value)}
-              className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-800 dark:text-gray-200 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
-            >
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-
-            </select>
+              onChange={(v) => setStatus(v as "Active" | "Inactive")}
+              options={[
+                { value: "Active", label: "Active" },
+                { value: "Inactive", label: "Inactive" },
+              ]}
+              id="input-status"
+            />
           </div>
 
           {/* 3. Product Title/Name */}
@@ -340,7 +340,7 @@ export default function ProductFormModal({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Quantum Sonic High Fidelity Speaker"
-              className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-800 dark:text-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
+              className="w-full h-[38px] px-3 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-800 dark:text-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
             />
           </div>
 
@@ -349,18 +349,12 @@ export default function ProductFormModal({
             <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
               Category <span className="text-rose-500">*</span>
             </label>
-            <select
-              id="input-category"
+            <SelectField
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-850 dark:text-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
-            >
-              {mergedCategories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
+              onChange={setCategory}
+              options={mergedCategories.map((cat) => ({ value: cat, label: cat }))}
+              id="input-category"
+            />
           </div>
 
           {/* 5. Subcategory */}
@@ -374,7 +368,7 @@ export default function ProductFormModal({
               value={subCategory}
               onChange={(e) => setSubCategory(e.target.value)}
               placeholder="e.g. Audio Tech"
-              className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-800 dark:text-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
+              className="w-full h-[38px] px-3 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-800 dark:text-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
             />
           </div>
 
@@ -383,24 +377,22 @@ export default function ProductFormModal({
             <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
               Unit of Measure (UoM) <span className="text-rose-500">*</span>
             </label>
-            <select
+            <SelectField
+              value={mergedUoms.includes(uom) ? uom : "__other__"}
+              onChange={(v) => { if (v !== "__other__") setUom(v); }}
+              options={[
+                ...mergedUoms.map((opt) => ({ value: opt, label: opt })),
+                { value: "__other__", label: "Other..." },
+              ]}
               id="input-uom"
-              value={mergedUoms.includes(uom) ? uom : "other"}
-              onChange={(e) => setUom(e.target.value)}
-              className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-xs dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
-            >
-              {mergedUoms.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-              <option value="other">Other...</option>
-            </select>
+            />
             {!mergedUoms.includes(uom) && (
               <input
                 type="text"
                 value={uom}
                 onChange={(e) => setUom(e.target.value)}
                 placeholder="Type custom UoM..."
-                className="w-full mt-2 px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-xs dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
+                className="w-full mt-2 h-[38px] px-3 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-xs dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
               />
             )}
           </div>
@@ -480,7 +472,7 @@ export default function ProductFormModal({
                 setImageUrl(e.target.value);
               }}
               placeholder="Or paste an image URL..."
-              className="w-full px-3.5 py-2 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-xs dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
+              className="w-full h-[38px] px-3 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-xs dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
             />
           </div>
 
@@ -492,14 +484,14 @@ export default function ProductFormModal({
             id="btn-cancel-form"
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-800 text-slate-600 dark:text-gray-400 font-bold text-xs rounded-xl cursor-pointer"
+            className="px-4 h-[38px] inline-flex items-center border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-800 text-slate-600 dark:text-gray-400 font-bold text-xs rounded-xl cursor-pointer"
           >
             Cancel
           </button>
           <button
             id="btn-submit-form"
             type="submit"
-            className="px-5 py-2 bg-slate-900 dark:bg-indigo-700 hover:bg-indigo-650 dark:hover:bg-indigo-800 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer"
+            className="px-5 h-[38px] inline-flex items-center bg-slate-900 dark:bg-indigo-700 hover:bg-indigo-650 dark:hover:bg-indigo-800 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer"
           >
             {editingProduct ? "Save Specifications" : "Register Product"}
           </button>

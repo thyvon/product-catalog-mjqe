@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
+import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface DatePickerProps {
@@ -22,7 +23,8 @@ const monthLabels = [
 
 function parseDateValue(value: string): Date | null {
   if (!value) return null;
-  const [year, month, day] = value.split("-").map(Number);
+  const clean = value.slice(0, 10);
+  const [year, month, day] = clean.split("-").map(Number);
   if (!year || !month || !day) return null;
   const parsed = new Date(year, month - 1, day);
   if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) {
@@ -71,7 +73,7 @@ function buildCalendarDays(viewDate: Date) {
   return days;
 }
 
-export default function DatePicker({
+const DatePicker = memo(function DatePicker({
   value,
   onChange,
   label,
@@ -85,7 +87,9 @@ export default function DatePicker({
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => parseDateValue(value) ?? new Date());
-  const pickerRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedDate = useMemo(() => parseDateValue(value), [value]);
   const calendarDays = useMemo(() => buildCalendarDays(viewDate), [viewDate]);
@@ -99,7 +103,10 @@ export default function DatePicker({
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+      if (
+        triggerRef.current && !triggerRef.current.contains(event.target as Node) &&
+        dropdownRef.current && !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -110,6 +117,14 @@ export default function DatePicker({
   const openPicker = () => {
     if (disabled) return;
     setViewDate(selectedDate ?? new Date());
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
     setIsOpen(true);
   };
 
@@ -120,7 +135,7 @@ export default function DatePicker({
   };
 
   return (
-    <div ref={pickerRef} className={`relative ${containerClassName}`.trim()}>
+    <div ref={triggerRef} className={`relative ${containerClassName}`.trim()}>
       {label ? (
         <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">
           {label}
@@ -143,19 +158,23 @@ export default function DatePicker({
         <button
           type="button"
           onClick={openPicker}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-gray-700 dark:hover:text-gray-200 cursor-pointer"
         >
           <CalendarDays className="h-4 w-4" />
         </button>
       </div>
 
-      {isOpen ? (
-        <div className="absolute z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-200/70 dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/20">
+      {isOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{ position: "fixed", top: dropdownPosition.top, left: dropdownPosition.left, minWidth: Math.max(280, dropdownPosition.width), zIndex: 9999 }}
+          className="rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-200/70 dark:border-gray-700 dark:bg-gray-900 dark:shadow-black/20"
+        >
           <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}
-              className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+              className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200 cursor-pointer"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -165,7 +184,7 @@ export default function DatePicker({
             <button
               type="button"
               onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}
-              className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
+              className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200 cursor-pointer"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -190,7 +209,7 @@ export default function DatePicker({
                   key={`${day.toDateString()}-${index}`}
                   type="button"
                   onClick={() => selectDate(day)}
-                  className={`flex h-8 items-center justify-center rounded-full text-[11px] font-medium transition-all ${
+                  className={`flex h-8 items-center justify-center rounded-full text-[11px] font-medium transition-all cursor-pointer ${
                     isCurrentMonth ? "text-slate-700 dark:text-gray-200" : "text-slate-300 dark:text-gray-600"
                   } ${isSelected ? "bg-indigo-600 text-white shadow-sm" : "hover:bg-slate-100 dark:hover:bg-gray-800"} ${isToday && !isSelected ? "ring-1 ring-indigo-200 dark:ring-indigo-500/30" : ""}`}
                 >
@@ -199,8 +218,11 @@ export default function DatePicker({
               );
             })}
           </div>
-        </div>
-      ) : null}
+        </div>,
+        document.body
+      )}
     </div>
   );
-}
+});
+
+export default DatePicker;
