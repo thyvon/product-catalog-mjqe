@@ -28,8 +28,10 @@ router.get("/api/stock-issue-items", async (req, res) => {
     const whereSql = whereClauses.length > 0 ? " WHERE " + whereClauses.join(" AND ") : "";
     const orderSql = " ORDER BY createdAt DESC";
 
-    const [countRows] = await p.query<RowDataPacket[]>(`SELECT COUNT(*) as total FROM stock_issue_items${whereSql}`, params);
-    const total = countRows[0]?.total || 0;
+    const [aggRows] = await p.query<RowDataPacket[]>(`SELECT COUNT(*) as total, COALESCE(SUM(quantity),0) as totalQty, COALESCE(SUM(totalPrice),0) as totalAmount FROM stock_issue_items${whereSql}`, params);
+    const total = aggRows[0]?.total || 0;
+    const totalQty = aggRows[0]?.totalQty || 0;
+    const totalAmount = aggRows[0]?.totalAmount || 0;
 
     let rows: RowDataPacket[];
     if (page && pageSize) {
@@ -39,7 +41,7 @@ router.get("/api/stock-issue-items", async (req, res) => {
       [rows] = await p.query<RowDataPacket[]>(`SELECT * FROM stock_issue_items${whereSql}${orderSql}`, params);
     }
 
-    res.json({ items: rows, total });
+    res.json({ items: rows, total, totalQty, totalAmount });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch stock issue items." });
   }
@@ -159,23 +161,43 @@ router.post("/api/stock-issue-items/import", async (req, res) => {
       return res.status(400).json({ error: "Body must be a non-empty array." });
     }
     const now = new Date().toISOString();
-    let count = 0;
-    for (const item of items) {
-      const id = crypto.randomUUID();
-      await p.execute(
-        `INSERT INTO stock_issue_items (id, itemCode, description, quantity, uom, unitPrice, totalPrice, transactionDate, warehouse, division, department, campus, requesterName, referenceNo, transactionType, accountCode, remarks, importedAt, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, item.itemCode || "", item.description || "", item.quantity || 0, item.uom || "Pcs",
-         item.unitPrice || 0, item.totalPrice || 0, item.transactionDate || null,
-         item.warehouse || "", item.division || "", item.department || "", item.campus || "",
-         item.requesterName || "", item.referenceNo || "", item.transactionType || "", item.accountCode || "",
-         item.remarks || "", now, now, now]
-      );
-      count++;
+    const conn = await p.getConnection();
+    try {
+      await conn.query("START TRANSACTION");
+      const BATCH_SIZE = 500;
+      let count = 0;
+      for (let i = 0; i < items.length; i += BATCH_SIZE) {
+        const batch = items.slice(i, i + BATCH_SIZE);
+        const placeholders: string[] = [];
+        const params: any[] = [];
+        for (const item of batch) {
+          placeholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+          params.push(
+            crypto.randomUUID(), item.itemCode || "", item.description || "", item.quantity || 0, item.uom || "Pcs",
+            item.unitPrice || 0, item.totalPrice || 0, item.transactionDate || null,
+            item.warehouse || "", item.division || "", item.department || "", item.campus || "",
+            item.requesterName || "", item.referenceNo || "", item.transactionType || "", item.accountCode || "",
+            item.remarks || "", now, now, now
+          );
+        }
+        await conn.query(
+          `INSERT INTO stock_issue_items (id, itemCode, description, quantity, uom, unitPrice, totalPrice, transactionDate, warehouse, division, department, campus, requesterName, referenceNo, transactionType, accountCode, remarks, importedAt, createdAt, updatedAt) VALUES ${placeholders.join(", ")}`,
+          params
+        );
+        count += batch.length;
+      }
+      await conn.query("COMMIT");
+      res.json({ count, success: true });
+    } catch (batchErr) {
+      try { await conn.query("ROLLBACK"); } catch {}
+      throw batchErr;
+    } finally {
+      try { conn.release(); } catch {}
     }
-    res.json({ count, success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || "Import failed." });
+    const msg = err?.sqlMessage || err?.message || String(err) || "Unknown error";
+    console.error("[Stock Import]", msg);
+    res.status(500).json({ error: msg });
   }
 });
 

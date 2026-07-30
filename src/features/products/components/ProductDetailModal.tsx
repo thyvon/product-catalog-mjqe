@@ -1,17 +1,12 @@
-import React from "react";
 import {
-  XCircle as CloseCircle,
   Calendar,
-  Layers,
-  FileText,
-  CheckCircle,
-  Bookmark,
   Package as Box,
-  Info as InfoCircle,
-  DollarSign as Dollar,
 } from "lucide-react";
 import { Product } from "@/features/shared/types";
 import BaseModal from "@/features/shared/components/BaseModal";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { DetailRow } from "@/features/shared/components/DetailRow";
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -19,28 +14,20 @@ interface ProductDetailModalProps {
   onClose: () => void;
 }
 
-// Category-based background color helpers
-const CATEGORY_BG_BADGES: { [key: string]: string } = {
-  "Electronics": "bg-indigo-50 text-indigo-700 border-indigo-100",
-  "Home & Lifestyle": "bg-amber-50 text-amber-700 border-amber-100",
-  "Wearables": "bg-purple-50 text-purple-700 border-purple-100",
-  "Outdoor & Travel": "bg-emerald-50 text-emerald-700 border-emerald-100",
-  "Automotive": "bg-blue-50 text-blue-700 border-blue-100",
-  "Office Tools": "bg-pink-50 text-pink-700 border-pink-100",
-};
+const badgeStyle = "bg-muted text-foreground border-border";
 
 export default function ProductDetailModal({
   product,
   isOpen,
   onClose,
 }: ProductDetailModalProps) {
-  const badgeStyle = CATEGORY_BG_BADGES[product?.category || ""] || "bg-slate-50 text-slate-700 border-slate-100";
+
 
   return (
     <BaseModal
       isOpen={isOpen && !!product}
       onClose={onClose}
-      maxWidth="max-w-3xl"
+      size="3xl"
       maxHeight="max-h-[90vh]"
       rounded="rounded-3xl"
       backdropBlur="backdrop-blur-md"
@@ -48,40 +35,26 @@ export default function ProductDetailModal({
     >
       {product && (
         <>
-          <div className="flex justify-between items-center border-b border-slate-100 dark:border-gray-800 pb-4 mb-5 shrink-0">
+          <div className="flex justify-between items-center border-b border-border pb-4 mb-5 shrink-0">
             <div className="space-y-1">
-              <span className="text-[10px] uppercase tracking-widest font-mono text-indigo-650 dark:text-indigo-400 font-bold block">
+              <span className="text-xs uppercase tracking-widest font-mono text-muted-foreground font-medium block">
                 Catalog Sheet Spec
               </span>
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 font-mono text-xs font-black bg-slate-900 dark:bg-indigo-700 text-white rounded-md tracking-wider">
+                <span className="px-2.5 py-0.5 font-mono text-xs font-semibold bg-primary text-primary-foreground rounded-md tracking-wider">
                   {product.productCode}
                 </span>
 
-                {product.status === "Active" ? (
-                  <span className="px-2 py-0.5 text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md uppercase tracking-wider font-mono">
-                    Active
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-100 rounded-md uppercase tracking-wider font-mono">
-                    Inactive
-                  </span>
-                )}
+                <Badge variant={product.status === "Active" ? "default" : "secondary"} className="text-xs font-medium uppercase tracking-wider font-mono">
+                  {product.status}
+                </Badge>
               </div>
             </div>
-
-            <button
-              id="btn-close-detail"
-              onClick={onClose}
-              className="p-1.5 hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-200 rounded-full transition-colors cursor-pointer"
-            >
-              <CloseCircle className="w-5 h-5" />
-            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start flex-1 overflow-visible">
             {product.imageUrl ? (
-              <div className="md:col-span-5 w-full aspect-square rounded-2xl overflow-hidden bg-slate-50 dark:bg-gray-800 border border-slate-100 dark:border-gray-700 shadow-sm relative shrink-0">
+              <div className="md:col-span-5 w-full aspect-square rounded-2xl overflow-hidden bg-muted border border-border shadow-sm relative shrink-0">
                 <img
                   src={product.imageUrl}
                   alt={product.name}
@@ -90,60 +63,36 @@ export default function ProductDetailModal({
                 />
               </div>
             ) : (
-              <div className="md:col-span-5 w-full aspect-square rounded-2xl bg-slate-50 dark:bg-gray-800 border border-slate-150 dark:border-gray-700 flex flex-col items-center justify-center text-slate-300 dark:text-gray-500 p-4 shrink-0">
+              <div className="md:col-span-5 w-full aspect-square rounded-2xl bg-muted border border-border flex flex-col items-center justify-center text-muted-foreground p-4 shrink-0">
                 <Box className="w-12 h-12 stroke-[1.5]" />
-                <span className="text-[10px] font-bold font-mono uppercase tracking-wider mt-2">No Image Provided</span>
+                <span className="text-xs font-medium font-mono uppercase tracking-wider mt-2">No Image Provided</span>
               </div>
             )}
 
             <div className="md:col-span-7 flex flex-col justify-between h-full space-y-5">
               <div className="space-y-4">
                 <div>
-                  <span className="text-[10px] uppercase tracking-wider font-mono text-slate-400 dark:text-gray-500 font-bold block">Product Name</span>
-                  <h2 className="text-base md:text-lg font-black text-slate-800 dark:text-gray-100 leading-snug tracking-tight font-sans mt-0.5">
+                  <span className="text-xs uppercase tracking-wider font-mono text-muted-foreground font-medium block">Product Name</span>
+                  <h2 className="text-base md:text-lg font-bold text-foreground leading-snug tracking-tight font-sans mt-0.5">
                     {product.name}
                   </h2>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3.5 bg-slate-50/70 dark:bg-gray-800/70 rounded-2xl p-4 border border-slate-100/50 dark:border-gray-700">
-                  <div>
-                    <span className="text-[9px] text-slate-400 dark:text-gray-500 font-mono font-bold tracking-wider uppercase block">Category</span>
-                    <span className="text-xs font-bold text-slate-800 dark:text-gray-200 truncate block mt-0.5">
-                      {product.category}
-                    </span>
-                  </div>
-                  
-                  <div>
-                    <span className="text-[9px] text-slate-400 dark:text-gray-500 font-mono font-bold tracking-wider uppercase block">Sub Category</span>
-                    <span className="text-xs font-bold text-slate-800 dark:text-gray-200 truncate block mt-0.5 font-sans">
-                      {product.subCategory || "General"}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-[9px] text-slate-400 dark:text-gray-500 font-mono font-bold tracking-wider uppercase block">UoM</span>
-                    <span className="text-xs font-black text-indigo-700 dark:text-indigo-400 font-mono block mt-0.5">
-                      {product.uom || "Pcs"}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-[9px] text-slate-400 dark:text-gray-500 font-mono font-bold tracking-wider uppercase block">Availability</span>
-                    <span className={`text-xs font-bold block mt-0.5 ${
-                      product.status === "Active" ? "text-emerald-600" : "text-amber-600"
-                    }`}>
-                      {product.status}
-                    </span>
-                  </div>
+                <div className="grid grid-cols-2 gap-3.5 bg-muted/70 rounded-2xl p-4 border border-border/50">
+                  <DetailRow label="Category" value={product.category} />
+                  <DetailRow label="Sub Category" value={product.subCategory || "General"} />
+                  <DetailRow label="UoM" value={product.uom || "Pcs"} />
+                  <DetailRow label="Availability" value={product.status} />
                 </div>
               </div>
 
-              <div className="border-t border-slate-100/80 dark:border-gray-800 pt-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-[9px] text-slate-400 dark:text-gray-500 font-mono">
+              <Separator className="my-4" />
+              <div className="pt-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-xs text-muted-foreground font-mono">
                 <span className="flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-slate-300 dark:text-gray-600" /> Created: {new Date(product.createdAt).toLocaleDateString()}
+                  <Calendar className="w-3.5 h-3.5 text-muted-foreground" /> Created: {new Date(product.createdAt).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })}
                 </span>
                 <span>
-                  Modified: {new Date(product.updatedAt).toLocaleDateString()}
+                  Modified: {new Date(product.updatedAt).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })}
                 </span>
               </div>
             </div>

@@ -1,12 +1,16 @@
 import React, { useState, useRef } from "react";
-import { FileText, Download, CloudUpload, CheckCircle, Eye, XCircle, RefreshCw } from "lucide-react";
+import { FileText, Download, CloudUpload, CheckCircle, Eye, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import BaseModal from "@/features/shared/components/BaseModal";
 import { useToast } from "@/features/shared/components/Toast";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FormLabel } from "@/features/shared/components/FormLabel";
 
 const IMPORT_COLUMNS = [
   "Date", "Code", "Description", "Qty", "UoM", "Unit Price", "Total Amount",
   "Requester", "Campus", "Division", "Department", "Description/ Purpose",
-  "Ref.No", "Transaction Type", "Account Code"
+  "Ref.No", "Transaction Type", "Account Code", "Warehouse"
 ];
 
 interface StockImportModalProps {
@@ -25,8 +29,8 @@ export default function StockImportModal({ isOpen, onClose, onImportComplete }: 
   const downloadExcelTemplate = async () => {
     const XLSX = await import("xlsx");
     const sampleRows = [
-      ["2026-06-01", "ITEM-001", "Sample item description", 10, "Pcs", 5.50, 55.00, "Vun Thy", "PP", "Admin", "IT", "Monthly supply", "IO-2026-001", "Issue", "ACC-001"],
-      ["2026-06-02", "ITEM-002", "Another sample item", 5, "Box", 12.00, 60.00, "Sokha", "PP", "Finance", "Accounting", "Office use", "IO-2026-002", "Transfer", "ACC-002"],
+      ["2026-06-01", "ITEM-001", "Sample item description", 10, "Pcs", 5.50, 55.00, "Vun Thy", "PP", "Admin", "IT", "Monthly supply", "IO-2026-001", "Issue", "ACC-001", "WH-A"],
+      ["2026-06-02", "ITEM-002", "Another sample item", 5, "Box", 12.00, 60.00, "Sokha", "PP", "Finance", "Accounting", "Office use", "IO-2026-002", "Transfer", "ACC-002", "WH-B"],
     ];
     const ws = XLSX.utils.aoa_to_sheet([IMPORT_COLUMNS, ...sampleRows]);
     const wb = XLSX.utils.book_new();
@@ -113,8 +117,12 @@ export default function StockImportModal({ isOpen, onClose, onImportComplete }: 
       const res = await fetch("/api/stock-issue-items/import", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsedRows),
       });
+      if (!res.ok) {
+        let msg = `HTTP ${res.status} ${res.statusText}`;
+        try { const d = await res.json(); if (d.error) msg = d.error; } catch {}
+        throw new Error(msg);
+      }
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Import failed.");
       toast.success(`Imported ${data.count} item(s) successfully.`);
       setParsedRows([]); setImportFile(null);
       onClose(); onImportComplete();
@@ -133,99 +141,91 @@ export default function StockImportModal({ isOpen, onClose, onImportComplete }: 
     <BaseModal
       isOpen={isOpen}
       onClose={handleClose}
-      maxWidth="max-w-4xl"
+      size="4xl"
+      title="Import Stock Issue Items"
+      description="From .xlsx, .xls, or .csv"
       rounded="rounded-3xl"
       className="flex flex-col max-h-[90vh]"
     >
-      <div className="p-5 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center bg-slate-50/50 dark:bg-gray-800/50">
-        <div>
-          <h2 className="text-sm font-bold text-slate-800 dark:text-gray-100 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-            Import Stock Issue Items
-          </h2>
-          <p className="text-xs text-slate-400 dark:text-gray-500 mt-0.5">From .xlsx, .xls, or .csv</p>
-        </div>
-        <button onClick={handleClose} className="p-1.5 hover:bg-slate-200 dark:hover:bg-gray-800 text-slate-400 rounded-full cursor-pointer transition-all">
-          <XCircle className="w-5 h-5" />
-        </button>
-      </div>
 
       <div className="p-6 overflow-y-auto space-y-6 flex-1">
-        <div className="bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-800 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="bg-muted border-border p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest block">Columns expected</span>
-            <p className="text-xs text-slate-500 dark:text-gray-400 mt-1 font-mono">{IMPORT_COLUMNS.join(" | ")}</p>
+            <FormLabel variant="mono">Columns expected</FormLabel>
+            <p className="text-xs text-muted-foreground mt-1 font-mono">{IMPORT_COLUMNS.join(" | ")}</p>
           </div>
-          <button onClick={downloadExcelTemplate} className="px-3 py-1.5 bg-white dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-150/40 dark:border-indigo-800/40 shadow-sm flex items-center gap-1 cursor-pointer shrink-0 transition-all">
-            <Download className="w-3.5 h-3.5" /> Download Template
-          </button>
+          <Button variant="outline" size="sm" onClick={downloadExcelTemplate}>
+            <Download /> Download Template
+          </Button>
         </div>
 
         {!importFile && (
           <div onDragOver={(e) => e.preventDefault()} onDrop={handleFileDrop}
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-slate-200 dark:border-gray-700 hover:border-indigo-500 bg-slate-50/20 dark:bg-gray-800/20 rounded-2xl p-10 text-center space-y-3 cursor-pointer transition-all">
+            className="border-2 border-dashed border-border hover:border-border bg-muted/20 rounded-2xl p-10 text-center space-y-3 cursor-pointer transition-all">
             <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".xlsx,.xls,.csv" className="hidden" />
-            <CloudUpload className="w-6 h-6 text-slate-400 mx-auto" />
-            <p className="text-xs font-bold text-slate-700 dark:text-gray-300">Drop file here, or <span className="text-indigo-600 underline">browse</span></p>
-            <p className="text-[10px] text-slate-400 font-mono">.xlsx .xls .csv</p>
+            <CloudUpload className="w-6 h-6 text-muted-foreground mx-auto" />
+            <p className="text-xs font-bold text-foreground">Drop file here, or <span className="text-primary underline">browse</span></p>
+            <p className="text-xs text-muted-foreground font-mono">.xlsx .xls .csv</p>
           </div>
         )}
 
         {parsedRows.length > 0 && (
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+              <FormLabel variant="mono" className="flex items-center gap-1">
                 <Eye className="w-3.5 h-3.5" /> {parsedRows.length} rows ready
-              </span>
-              <button onClick={clearStaged} className="text-xs text-rose-600 hover:text-rose-800 font-bold cursor-pointer">Clear</button>
+              </FormLabel>
+              <Button variant="ghost" size="sm" onClick={clearStaged}>Clear</Button>
             </div>
-            <div className="border border-slate-100 dark:border-gray-800 rounded-xl overflow-hidden max-h-[260px] overflow-y-auto">
-              <table className="w-full text-[10px]">
-                <thead className="bg-slate-50 dark:bg-gray-800 text-slate-400 font-mono font-bold uppercase sticky top-0">
-                  <tr>
-                    <th className="px-2 py-2 text-left">Date</th>
-                    <th className="px-2 py-2 text-left">Code</th>
-                    <th className="px-2 py-2 text-left">Description</th>
-                    <th className="px-2 py-2 text-right">Qty</th>
-                    <th className="px-2 py-2 text-left">WH</th>
-                    <th className="px-2 py-2 text-left">Dept</th>
-                    <th className="px-2 py-2 text-left">Campus</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-gray-800">
+            <div className="max-h-[260px] overflow-y-auto">
+              <Table>
+                <TableHeader className="bg-muted text-muted-foreground font-mono font-bold uppercase sticky top-0">
+                  <TableRow>
+                    <TableHead className="px-2 py-2 text-left">Date</TableHead>
+                    <TableHead className="px-2 py-2 text-left">Code</TableHead>
+                    <TableHead className="px-2 py-2 text-left">Description</TableHead>
+                    <TableHead className="px-2 py-2 text-right">Qty</TableHead>
+                    <TableHead className="px-2 py-2 text-left">Dept</TableHead>
+                    <TableHead className="px-2 py-2 text-left">Campus</TableHead>
+                    <TableHead className="px-2 py-2 text-left">WH</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {parsedRows.slice(0, 15).map((r: any, i: number) => (
-                    <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-gray-800/50 bg-white dark:bg-gray-900">
-                      <td className="px-2 py-1.5 font-mono text-slate-500">{r.transactionDate}</td>
-                      <td className="px-2 py-1.5 font-mono font-bold text-slate-700 dark:text-gray-200">{r.itemCode}</td>
-                      <td className="px-2 py-1.5 text-slate-600 dark:text-gray-300 truncate max-w-[180px]">{r.description}</td>
-                      <td className="px-2 py-1.5 text-right font-mono text-slate-700">{r.quantity}</td>
-                      <td className="px-2 py-1.5 text-slate-500">{r.warehouse}</td>
-                      <td className="px-2 py-1.5 text-slate-500">{r.department}</td>
-                      <td className="px-2 py-1.5 text-slate-500">{r.campus}</td>
-                    </tr>
+                    <TableRow key={i}>
+                      <TableCell className="px-2 py-1.5 font-mono">{r.transactionDate}</TableCell>
+                      <TableCell className="px-2 py-1.5 font-mono font-bold">{r.itemCode}</TableCell>
+                      <TableCell className="px-2 py-1.5 truncate max-w-[180px]">{r.description}</TableCell>
+                      <TableCell className="px-2 py-1.5 text-right font-mono">{r.quantity}</TableCell>
+                      <TableCell className="px-2 py-1.5">{r.department}</TableCell>
+                      <TableCell className="px-2 py-1.5">{r.campus}</TableCell>
+                      <TableCell className="px-2 py-1.5">{r.warehouse}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
               {parsedRows.length > 15 && (
-                <div className="text-[10px] text-center text-slate-400 py-2.5 border-t border-slate-100 dark:border-gray-800 bg-slate-50/20">...and {parsedRows.length - 15} more rows</div>
+                <>
+                  <Separator className="my-4" />
+                  <div className="text-xs text-center text-muted-foreground py-2.5 bg-muted/20">...and {parsedRows.length - 15} more rows</div>
+                </>
               )}
             </div>
           </div>
         )}
       </div>
 
-      <div className="p-4 border-t border-slate-100 dark:border-gray-800 flex justify-end gap-3 bg-slate-50/30 dark:bg-gray-800/30">
-        <button onClick={handleClose} disabled={importLoading}
-          className="px-4 py-2 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 text-slate-600 rounded-xl font-bold text-xs cursor-pointer transition-colors">Cancel</button>
-        <button onClick={submitImport} disabled={importLoading || parsedRows.length === 0}
-          className="px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all shadow-md cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none">
+      <Separator className="my-4" />
+      <div className="p-4 flex justify-end gap-3 bg-muted/30">
+        <Button variant="outline" onClick={handleClose} disabled={importLoading}>Cancel</Button>
+        <Button onClick={submitImport} disabled={importLoading || parsedRows.length === 0}>
           {importLoading ? (
-            <><RefreshCw className="w-4 h-4 animate-spin" /> Uploading...</>
+            <><RefreshCw className="animate-spin" /> Uploading...</>
           ) : (
-            <><CheckCircle className="w-4 h-4" /> Import {parsedRows.length} items</>
+            <><CheckCircle /> Import {parsedRows.length} items</>
           )}
-        </button>
+        </Button>
       </div>
     </BaseModal>
   );

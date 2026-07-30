@@ -1,20 +1,49 @@
-import { memo, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { useMemo } from "react";
+import {
+  type ColumnDef,
+  type SortingState,
+  type OnChangeFn,
+  type RowData,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
-interface Column<T> {
-  key: string;
-  header: string;
-  render?: (row: T) => ReactNode;
-  align?: "left" | "right" | "center";
-  width?: string;
-  sortable?: boolean;
-  headerClassName?: string;
-  cellClassName?: string;
-}
-
-interface SortConfig {
-  key: string;
-  direction: "asc" | "desc";
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    align?: "left" | "center" | "right";
+    width?: string;
+    className?: string;
+  }
 }
 
 interface PaginationConfig {
@@ -22,203 +51,232 @@ interface PaginationConfig {
   pageSize: number;
   total: number;
   onPageChange: (page: number) => void;
-  onPageSizeChange?: (size: number) => void;
-  pageSizeOptions?: number[];
+  onPageSizeChange: (size: number) => void;
+  pageSizeOptions: number[];
 }
 
-interface DataTableProps<T> {
-  columns: Column<T>[];
-  data: T[];
+interface DataTableProps<TData> {
+  columns: ColumnDef<TData, any>[];
+  data: TData[];
   loading?: boolean;
-  emptyIcon?: ReactNode;
+  emptyIcon?: React.ReactNode;
   emptyMessage?: string;
   emptyAction?: { label: string; onClick: () => void };
   skeletonRows?: number;
-  rowKey: (row: T) => string | number;
-  rowClassName?: (row: T, index: number) => string;
-  containerClassName?: string;
+  getRowId?: (row: TData) => string;
   pagination?: PaginationConfig;
-  sort?: SortConfig;
-  onSort?: (config: SortConfig) => void;
+  sorting?: SortingState;
+  onSortingChange?: OnChangeFn<SortingState>;
+  rowClassName?: (row: TData, index: number) => string;
+  aggregates?: React.ReactNode;
 }
 
-const alignClass = {
-  left: "text-left",
-  right: "text-right",
-  center: "text-center",
-};
-
-function SortIcon({ column, currentSort, onSort }: { column: Column<any>; currentSort?: SortConfig; onSort?: (config: SortConfig) => void }) {
-  if (!column.sortable) return null;
-  const active = currentSort?.key === column.key;
-  const direction = active && currentSort ? currentSort.direction : undefined;
-  return (
-    <button
-      onClick={() => onSort?.({ key: column.key, direction: active && direction === "asc" ? "desc" : "asc" })}
-      className="inline-flex items-center gap-1 cursor-pointer hover:text-slate-600 dark:hover:text-gray-300 transition-colors"
-    >
-      {column.header}
-      {!active && <ArrowUpDown className="w-3 h-3 opacity-40" />}
-      {direction === "asc" && <ArrowUp className="w-3 h-3" />}
-      {direction === "desc" && <ArrowDown className="w-3 h-3" />}
-    </button>
-  );
-}
-
-function PaginationBar({ currentPage, pageSize, total, onPageChange, onPageSizeChange, pageSizeOptions }: PaginationConfig) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  if (totalPages <= 1 && !onPageSizeChange) return null;
-
-  const pages: (number | string)[] = [];
-  if (totalPages <= 5) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i);
-  } else {
-    pages.push(1);
-    if (currentPage > 3) pages.push("...");
-    const start = Math.max(2, currentPage - 1);
-    const end = Math.min(totalPages - 1, currentPage + 1);
-    for (let i = start; i <= end; i++) pages.push(i);
-    if (currentPage < totalPages - 2) pages.push("...");
-    pages.push(totalPages);
-  }
-
-  return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-gray-800 flex-wrap gap-3">
-      <div className="flex items-center gap-3">
-        <span className="text-[10px] text-slate-400 dark:text-gray-500 font-mono whitespace-nowrap">{total} item{total !== 1 ? "s" : ""}</span>
-        {onPageSizeChange && pageSizeOptions && (
-          <select
-            value={pageSize}
-            onChange={(e) => { onPageSizeChange(Number(e.target.value)); onPageChange(1); }}
-            className="text-[10px] bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg px-2 py-1 text-slate-500 dark:text-gray-400 font-mono focus:outline-none cursor-pointer"
-          >
-            {pageSizeOptions.map((s) => (
-              <option key={s} value={s}>{s} / page</option>
-            ))}
-          </select>
-        )}
-      </div>
-      <div className="flex items-center gap-1">
-        <button
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        {pages.map((page, idx) =>
-          page === "..." ? (
-            <span key={`ellipsis-${idx}`} className="px-1.5 text-[10px] text-slate-400 font-mono">...</span>
-          ) : (
-            <button
-              key={page}
-              onClick={() => onPageChange(page as number)}
-              className={`min-w-[28px] h-7 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                page === currentPage
-                  ? "bg-slate-900 dark:bg-indigo-600 text-white"
-                  : "text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-gray-800"
-              }`}
-            >
-              {page}
-            </button>
-          )
-        )}
-        <button
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-gray-800"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function DataTableInner<T>({
+export default function DataTable<TData>({
   columns,
   data,
-  loading = false,
+  loading,
   emptyIcon,
-  emptyMessage = "No data found.",
+  emptyMessage,
   emptyAction,
-  skeletonRows = 4,
-  rowKey,
-  rowClassName,
-  containerClassName = "",
+  skeletonRows = 5,
+  getRowId,
   pagination,
-  sort,
-  onSort,
-}: DataTableProps<T>) {
+  sorting,
+  onSortingChange,
+  rowClassName,
+  aggregates,
+}: DataTableProps<TData>) {
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    manualPagination: true,
+    manualSorting: true,
+    pageCount: pagination ? Math.ceil(pagination.total / pagination.pageSize) : -1,
+    state: sorting ? { sorting } : {},
+    onSortingChange,
+    getRowId,
+    defaultColumn: {
+      cell: ({ getValue }) => (getValue() as string) ?? "—",
+    },
+  });
+
+  const totalPages = useMemo(
+    () => (pagination ? Math.max(1, Math.ceil(pagination.total / pagination.pageSize)) : 1),
+    [pagination]
+  );
+
+  const visiblePages = useMemo(() => {
+    if (!pagination) return [];
+    const cp = pagination.currentPage;
+    const pages: (number | "...")[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (cp > 3) pages.push("...");
+      const start = Math.max(2, cp - 1);
+      const end = Math.min(totalPages - 1, cp + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (cp < totalPages - 2) pages.push("...");
+      pages.push(totalPages);
+    }
+    return pages;
+  }, [pagination, totalPages]);
+
   return (
-    <div className={`bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-2xl shadow-sm overflow-hidden ${containerClassName}`}>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/30">
-              {columns.map((col) => (
-                <th
-                  key={col.key}
-                  className={`px-4 py-3 text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest ${alignClass[col.align || "left"]} ${col.headerClassName || ""}`}
-                  style={col.width ? { width: col.width } : undefined}
-                >
-                  <SortIcon column={col} currentSort={sort} onSort={onSort} />
-                  {!col.sortable && col.header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
+    <div className="space-y-3">
+      <div className="rounded-lg border overflow-x-auto">
+        <Table className="w-full min-w-max">
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  const meta = header.column.columnDef.meta;
+                  const canSort = header.column.getCanSort();
+                  return (
+                    <TableHead
+                      key={header.id}
+                      className={`whitespace-nowrap${canSort ? " cursor-pointer select-none" : ""}`}
+                      onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                      style={{ textAlign: meta?.align || "left", width: meta?.width }}
+                    >
+                      <span className="inline-flex items-center">
+                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                        {canSort && (
+                          header.column.getIsSorted() === "asc" ? (
+                            <ArrowUp className="ml-1 size-3" />
+                          ) : header.column.getIsSorted() === "desc" ? (
+                            <ArrowDown className="ml-1 size-3" />
+                          ) : (
+                            <ArrowUpDown className="ml-1 size-3 text-muted-foreground/50" />
+                          )
+                        )}
+                      </span>
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
             {loading ? (
               Array.from({ length: skeletonRows }).map((_, i) => (
-                <tr key={i} className="border-b border-slate-50 dark:border-gray-800/50">
-                  {Array.from({ length: columns.length }).map((_, j) => (
-                    <td key={j} className="px-4 py-3">
-                      <div className="h-4 bg-slate-200 dark:bg-gray-700 rounded animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} />
-                    </td>
+                <TableRow key={`skel-${i}`}>
+                  {columns.map((_, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
                   ))}
-                </tr>
+                </TableRow>
               ))
-            ) : data.length === 0 ? (
-              <tr>
-                <td colSpan={columns.length} className="px-4 py-12 text-center">
-                  <div className="flex flex-col items-center gap-2">
-                    {emptyIcon && <span className="text-slate-300 dark:text-gray-600">{emptyIcon}</span>}
-                    <p className="text-xs text-slate-400 dark:text-gray-500">{emptyMessage}</p>
+            ) : table.getRowModel().rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-40 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    {emptyIcon}
+                    <p className="text-sm">{emptyMessage || "No data found."}</p>
                     {emptyAction && (
-                      <button
-                        onClick={emptyAction.onClick}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 cursor-pointer"
-                      >
+                      <Button variant="outline" size="sm" onClick={emptyAction.onClick}>
                         {emptyAction.label}
-                      </button>
+                      </Button>
                     )}
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
-              data.map((row, index) => (
-                <tr
-                  key={rowKey(row)}
-                  className={`border-b border-slate-50 dark:border-gray-800/50 hover:bg-slate-50/50 dark:hover:bg-gray-800/20 ${rowClassName?.(row, index) || ""}`}
+              table.getRowModel().rows.map((row, idx) => (
+                <TableRow
+                  key={row.id}
+                  className={rowClassName?.(row.original, idx)}
+                  data-state={row.getIsSelected() ? "selected" : undefined}
                 >
-                  {columns.map((col) => (
-                    <td
-                      key={col.key}
-                      className={`px-4 py-3 text-xs ${alignClass[col.align || "left"]} ${col.cellClassName || ""}`}
-                    >
-                      {col.render ? col.render(row) : (row as any)[col.key] ?? "—"}
-                    </td>
-                  ))}
-                </tr>
+                  {row.getVisibleCells().map((cell) => {
+                    const meta = cell.column.columnDef.meta;
+                    return (
+                      <TableCell
+                        key={cell.id}
+                        className={meta?.className}
+                        style={{ textAlign: meta?.align || "left", width: meta?.width }}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
               ))
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
-      {pagination && <PaginationBar {...pagination} />}
+
+      {aggregates && (
+        <div className="flex items-center gap-4 px-1 text-sm text-muted-foreground">
+          {aggregates}
+        </div>
+      )}
+
+      {pagination && !loading && (
+        <div className="flex items-center justify-between gap-4 min-w-0">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground shrink-0">
+            <span className="whitespace-nowrap">Rows per page:</span>
+            <Select
+              value={String(pagination.pageSize)}
+              onValueChange={(v) => pagination.onPageSizeChange(Number(v))}
+            >
+              <SelectTrigger className="h-8 w-16">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {pagination.pageSizeOptions.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="whitespace-nowrap">
+              {Math.min((pagination.currentPage - 1) * pagination.pageSize + 1, pagination.total)}
+              –{Math.min(pagination.currentPage * pagination.pageSize, pagination.total)} of{" "}
+              {pagination.total}
+            </span>
+          </div>
+
+          <Pagination className="mx-0 w-auto">
+            <PaginationContent className="flex-nowrap">
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={(e) => { e.preventDefault(); pagination.onPageChange(pagination.currentPage - 1); }}
+                  className={pagination.currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+              {visiblePages.map((page, i) =>
+                page === "..." ? (
+                  <PaginationItem key={`ellipsis-${i}`}>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                ) : (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      isActive={page === pagination.currentPage}
+                      onClick={(e) => { e.preventDefault(); pagination.onPageChange(page as number); }}
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                )
+              )}
+              <PaginationItem>
+                <PaginationNext
+                  onClick={(e) => { e.preventDefault(); pagination.onPageChange(pagination.currentPage + 1); }}
+                  className={pagination.currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
     </div>
   );
 }
-
-export default memo(DataTableInner) as typeof DataTableInner;

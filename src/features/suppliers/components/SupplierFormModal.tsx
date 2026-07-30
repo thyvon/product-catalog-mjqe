@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion } from "motion/react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import BaseModal from "@/features/shared/components/BaseModal";
 import SelectField from "@/features/shared/components/SelectField";
 import DatePicker from "@/features/shared/components/DatePicker";
 import Checkbox from "@/features/shared/components/Checkbox";
+import { Field } from "@/features/shared/components/Field";
+import { SectionTitle } from "@/features/shared/components/SectionTitle";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import type { Supplier, SupplierInput } from "@/features/shared/types";
 
 interface SupplierFormModalProps {
@@ -14,33 +20,7 @@ interface SupplierFormModalProps {
   editingSupplier: Supplier | null;
 }
 
-interface FieldProps {
-  label: string;
-  kh?: string;
-  children: React.ReactNode;
-  wide?: boolean;
-}
 
-function Field({ label, kh, children, wide = false }: FieldProps) {
-  return (
-    <label className={wide ? "col-span-1 md:col-span-2" : ""}>
-      <span className="text-[11px] font-bold text-slate-600 dark:text-gray-300">
-        {label}
-        {kh && <span className="text-[10px] font-semibold text-slate-400 dark:text-gray-500"> / {kh}</span>}
-      </span>
-      <div className="mt-1">{children}</div>
-    </label>
-  );
-}
-
-function SectionTitle({ title, kh }: { title: string; kh: string }) {
-  return (
-    <div className="col-span-1 border-b border-slate-100 pb-2 dark:border-gray-800 md:col-span-2">
-      <h3 className="text-xs font-black uppercase tracking-wide text-slate-900 dark:text-gray-100">{title}</h3>
-      <p className="mt-0.5 text-[10px] font-medium text-slate-400 dark:text-gray-500">{kh}</p>
-    </div>
-  );
-}
 
 const STEPS = [
   { id: 1, label: "Company", sub: "Application and legal details" },
@@ -171,9 +151,6 @@ export default function SupplierFormModal({
     }
   };
 
-  const inputClass =
-    "w-full h-[38px] rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:disabled:bg-gray-800 dark:focus:ring-indigo-900/40";
-
   const optionLabel = (value: string, labels: Record<string, string>) => labels[value] || value;
 
   const applicationTypeOptions = optionValues.applicationTypes.length > 0
@@ -206,7 +183,7 @@ export default function SupplierFormModal({
               <SelectField value={form.applicationType} onChange={(v) => handleChange("applicationType", v as SupplierInput["applicationType"])} options={applicationTypeOptions} />
             </Field>
             <Field label="Old Supplier Code" kh="លេខកូដអ្នកផ្គត់ផ្គង់ចាស់">
-              <input value={form.oldSupplierCode} onChange={(e) => handleChange("oldSupplierCode", e.target.value)} className={inputClass} placeholder="Fill only when updating an existing supplier" disabled={form.applicationType !== "update"} />
+              <Input value={form.oldSupplierCode} onChange={(e) => handleChange("oldSupplierCode", e.target.value)} placeholder="Fill only when updating an existing supplier" disabled={form.applicationType !== "update"} />
             </Field>
           </motion.div>
         );
@@ -216,22 +193,22 @@ export default function SupplierFormModal({
           <motion.div key="company" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <SectionTitle title="2. Company / Legal Information" kh="ព័ត៌មានក្រុមហ៊ុន / ច្បាប់" />
             <Field label="Company / Shop Name in English" kh="ឈ្មោះក្រុមហ៊ុន / ហាង (អង់គ្លេស)">
-              <input value={form.companyName} onChange={(e) => handleChange("companyName", e.target.value)} className={inputClass} required />
+              <Input value={form.companyName} onChange={(e) => handleChange("companyName", e.target.value)} required />
             </Field>
             <Field label="Company / Shop Name in Khmer" kh="ឈ្មោះក្រុមហ៊ុន / ហាង (ខ្មែរ)">
-              <input value={form.companyNameKhmer} onChange={(e) => handleChange("companyNameKhmer", e.target.value)} className={inputClass} />
+              <Input value={form.companyNameKhmer} onChange={(e) => handleChange("companyNameKhmer", e.target.value)} />
             </Field>
             <Field label="Tax Registration" kh="ចុះបញ្ជីពន្ធដារ">
-              <input value={form.taxRegistration} onChange={(e) => handleChange("taxRegistration", e.target.value)} className={inputClass} />
+              <Input value={form.taxRegistration} onChange={(e) => handleChange("taxRegistration", e.target.value)} />
             </Field>
             <Field label="Commercial Registration Certificate" kh="វិញ្ញាបនបត្រចុះបញ្ជីពាណិជ្ជកម្ម">
-              <input value={form.commercialRegistration} onChange={(e) => handleChange("commercialRegistration", e.target.value)} className={inputClass} />
+              <Input value={form.commercialRegistration} onChange={(e) => handleChange("commercialRegistration", e.target.value)} />
             </Field>
             <Field label="Patent Tax Certificate" kh="បណ្ណពន្ធប៉ាតង់">
-              <input value={form.patentTaxCertificate} onChange={(e) => handleChange("patentTaxCertificate", e.target.value)} className={inputClass} />
+              <Input value={form.patentTaxCertificate} onChange={(e) => handleChange("patentTaxCertificate", e.target.value)} />
             </Field>
             <Field label="National ID Number" kh="លេខអត្តសញ្ញាណបណ្ណ">
-              <input value={form.nationalId} onChange={(e) => handleChange("nationalId", e.target.value)} className={inputClass} />
+              <Input value={form.nationalId} onChange={(e) => handleChange("nationalId", e.target.value)} />
             </Field>
             <Checkbox
               checked={form.foreignTradeOperator}
@@ -249,22 +226,22 @@ export default function SupplierFormModal({
           <motion.div key="business" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <SectionTitle title="3. Business Details" kh="ឆ្នាំបង្កើត, សកម្មភាព, ផលិតផល/សេវា, អាសយដ្ឋាន" />
             <Field label="Business Address" kh="អាសយដ្ឋានអាជីវកម្ម" wide>
-              <textarea value={form.address} onChange={(e) => handleChange("address", e.target.value)} className={`${inputClass} min-h-20 resize-y`} />
+              <Textarea value={form.address} onChange={(e) => handleChange("address", e.target.value)} className="min-h-20 resize-y" />
             </Field>
             <Field label="VAT Status" kh="ស្ថានភាព VAT">
               <SelectField value={form.registrationType} onChange={(v) => handleChange("registrationType", v as SupplierInput["registrationType"])} options={registrationTypeOptions} />
             </Field>
             <Field label="Established Year" kh="ឆ្នាំបង្កើត">
-              <input value={form.establishedYear} onChange={(e) => handleChange("establishedYear", e.target.value)} className={inputClass} placeholder="Example: 2020" />
+              <Input value={form.establishedYear} onChange={(e) => handleChange("establishedYear", e.target.value)} placeholder="Example: 2020" />
             </Field>
             <Field label="Business Activity" kh="ប្រភេទអាជីវកម្ម / សកម្មភាពអាជីវករ">
-              <input value={form.businessActivity} onChange={(e) => handleChange("businessActivity", e.target.value)} className={inputClass} />
+              <Input value={form.businessActivity} onChange={(e) => handleChange("businessActivity", e.target.value)} />
             </Field>
             <Field label="Product / Service Type" kh="ប្រភេទផលិតផល / សេវាកម្ម">
-              <input value={form.productServiceType} onChange={(e) => handleChange("productServiceType", e.target.value)} className={inputClass} />
+              <Input value={form.productServiceType} onChange={(e) => handleChange("productServiceType", e.target.value)} />
             </Field>
             <Field label="Other Documents" kh="ឯកសារផ្សេងៗ" wide>
-              <textarea value={form.otherDocuments} onChange={(e) => handleChange("otherDocuments", e.target.value)} className={`${inputClass} min-h-16 resize-y`} />
+              <Textarea value={form.otherDocuments} onChange={(e) => handleChange("otherDocuments", e.target.value)} className="min-h-16 resize-y" />
             </Field>
           </motion.div>
         );
@@ -274,22 +251,22 @@ export default function SupplierFormModal({
           <motion.div key="contact" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <SectionTitle title="4. Contact Person" kh="ព័ត៌មានទំនាក់ទំនង" />
             <Field label="Contact Person" kh="អ្នកទំនាក់ទំនង">
-              <input value={form.contactPerson} onChange={(e) => handleChange("contactPerson", e.target.value)} className={inputClass} />
+              <Input value={form.contactPerson} onChange={(e) => handleChange("contactPerson", e.target.value)} />
             </Field>
             <Field label="Position" kh="តួនាទី">
-              <input value={form.position} onChange={(e) => handleChange("position", e.target.value)} className={inputClass} />
+              <Input value={form.position} onChange={(e) => handleChange("position", e.target.value)} />
             </Field>
             <Field label="Phone" kh="លេខទូរសព្ទ">
-              <input value={form.phone} onChange={(e) => handleChange("phone", e.target.value)} className={inputClass} />
+              <Input value={form.phone} onChange={(e) => handleChange("phone", e.target.value)} />
             </Field>
             <Field label="Mobile" kh="លេខទូរសព្ទដៃ">
-              <input value={form.mobile} onChange={(e) => handleChange("mobile", e.target.value)} className={inputClass} />
+              <Input value={form.mobile} onChange={(e) => handleChange("mobile", e.target.value)} />
             </Field>
             <Field label="Email" kh="សារអេឡិចត្រូនិក">
-              <input type="email" value={form.email} onChange={(e) => handleChange("email", e.target.value)} className={inputClass} />
+              <Input type="email" value={form.email} onChange={(e) => handleChange("email", e.target.value)} />
             </Field>
             <Field label="Website" kh="គេហទំព័រ">
-              <input value={form.website} onChange={(e) => handleChange("website", e.target.value)} className={inputClass} />
+              <Input value={form.website} onChange={(e) => handleChange("website", e.target.value)} />
             </Field>
           </motion.div>
         );
@@ -299,16 +276,16 @@ export default function SupplierFormModal({
           <motion.div key="bank" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <SectionTitle title="5. Bank Account Information" kh="ព័ត៌មានគណនីធនាគារ" />
             <Field label="Bank Name" kh="ឈ្មោះធនាគារ">
-              <input value={form.bankName} onChange={(e) => handleChange("bankName", e.target.value)} className={inputClass} />
+              <Input value={form.bankName} onChange={(e) => handleChange("bankName", e.target.value)} />
             </Field>
             <Field label="Branch" kh="សាខា">
-              <input value={form.bankBranch} onChange={(e) => handleChange("bankBranch", e.target.value)} className={inputClass} />
+              <Input value={form.bankBranch} onChange={(e) => handleChange("bankBranch", e.target.value)} />
             </Field>
             <Field label="Account Name" kh="ឈ្មោះគណនី">
-              <input value={form.accountHolderName} onChange={(e) => handleChange("accountHolderName", e.target.value)} className={inputClass} />
+              <Input value={form.accountHolderName} onChange={(e) => handleChange("accountHolderName", e.target.value)} />
             </Field>
             <Field label="Account Number" kh="លេខគណនី">
-              <input value={form.bankAccount} onChange={(e) => handleChange("bankAccount", e.target.value)} className={inputClass} />
+              <Input value={form.bankAccount} onChange={(e) => handleChange("bankAccount", e.target.value)} />
             </Field>
             <Checkbox
               checked={form.checkAuthorization}
@@ -318,10 +295,10 @@ export default function SupplierFormModal({
               className="md:col-span-2"
             />
             <Field label="SWIFT Code" kh="លេខកូដ SWIFT">
-              <input value={form.swiftCode} onChange={(e) => handleChange("swiftCode", e.target.value)} className={inputClass} />
+              <Input value={form.swiftCode} onChange={(e) => handleChange("swiftCode", e.target.value)} />
             </Field>
             <Field label="IBAN" kh="លេខ IBAN">
-              <input value={form.iban} onChange={(e) => handleChange("iban", e.target.value)} className={inputClass} />
+              <Input value={form.iban} onChange={(e) => handleChange("iban", e.target.value)} />
             </Field>
           </motion.div>
         );
@@ -334,13 +311,13 @@ export default function SupplierFormModal({
               <SelectField value={form.paymentMethod} onChange={(v) => handleChange("paymentMethod", v as SupplierInput["paymentMethod"])} options={paymentMethodOptions} />
             </Field>
             <Field label="Other Payment Method" kh="វិធីសាស្រ្តទូទាត់ផ្សេងទៀត">
-              <input value={form.paymentMethodOther} onChange={(e) => handleChange("paymentMethodOther", e.target.value)} className={inputClass} disabled={form.paymentMethod !== "other"} />
+              <Input value={form.paymentMethodOther} onChange={(e) => handleChange("paymentMethodOther", e.target.value)} disabled={form.paymentMethod !== "other"} />
             </Field>
             <Field label="Payment Term" kh="កាលកំណត់ទូទាត់">
               <SelectField value={form.paymentTerm} onChange={(v) => handleChange("paymentTerm", v as SupplierInput["paymentTerm"])} options={paymentTermOptions} />
             </Field>
             <Field label="Other Payment Term" kh="កាលកំណត់ទូទាត់ផ្សេងទៀត">
-              <input value={form.paymentTermOther} onChange={(e) => handleChange("paymentTermOther", e.target.value)} className={inputClass} disabled={form.paymentTerm !== "other"} />
+              <Input value={form.paymentTermOther} onChange={(e) => handleChange("paymentTermOther", e.target.value)} disabled={form.paymentTerm !== "other"} />
             </Field>
           </motion.div>
         );
@@ -358,7 +335,7 @@ export default function SupplierFormModal({
               className="md:col-span-2"
             />
             <Field label="Conflict Details" kh="សូមបញ្ជាក់" wide>
-              <textarea value={form.conflictDetails} onChange={(e) => handleChange("conflictDetails", e.target.value)} className={`${inputClass} min-h-24 resize-y`} disabled={!form.conflictOfInterest} />
+              <Textarea value={form.conflictDetails} onChange={(e) => handleChange("conflictDetails", e.target.value)} className="min-h-24 resize-y" disabled={!form.conflictOfInterest} />
             </Field>
           </motion.div>
         );
@@ -368,13 +345,13 @@ export default function SupplierFormModal({
           <motion.div key="declaration" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <SectionTitle title="8. Final Declaration" kh="ការប្រកាសចុងក្រោយ" />
             <Field label="Supplier Representative Name" kh="ឈ្មោះអ្នកផ្គត់ផ្គង់">
-              <input value={form.supplierDeclarationName} onChange={(e) => handleChange("supplierDeclarationName", e.target.value)} className={inputClass} />
+              <Input value={form.supplierDeclarationName} onChange={(e) => handleChange("supplierDeclarationName", e.target.value)} />
             </Field>
             <Field label="Supplier Declaration Date" kh="ថ្ងៃខែឆ្នាំ">
               <DatePicker value={form.supplierDeclarationDate} onChange={(v) => handleChange("supplierDeclarationDate", v)} />
             </Field>
             <Field label="Buyer Name" kh="ឈ្មោះអ្នកទិញ">
-              <input value={form.buyerCompletedName} onChange={(e) => handleChange("buyerCompletedName", e.target.value)} className={inputClass} />
+              <Input value={form.buyerCompletedName} onChange={(e) => handleChange("buyerCompletedName", e.target.value)} />
             </Field>
             <Field label="Buyer Completion Date" kh="ថ្ងៃខែឆ្នាំ">
               <DatePicker value={form.buyerCompletedDate} onChange={(v) => handleChange("buyerCompletedDate", v)} />
@@ -390,7 +367,7 @@ export default function SupplierFormModal({
               className="md:col-span-2"
             />
             <Field label="Notes" kh="ចំណាំ" wide>
-              <textarea value={form.notes} onChange={(e) => handleChange("notes", e.target.value)} className={`${inputClass} min-h-20 resize-y`} />
+              <Textarea value={form.notes} onChange={(e) => handleChange("notes", e.target.value)} className="min-h-20 resize-y" />
             </Field>
           </motion.div>
         );
@@ -412,78 +389,70 @@ export default function SupplierFormModal({
     <BaseModal
       isOpen={isOpen}
       onClose={onClose}
-      maxWidth="max-w-4xl"
+      size="4xl"
       maxHeight="max-h-[92vh]"
       rounded="rounded-2xl"
       className="flex flex-col flex-1"
     >
-      <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-5 py-4 dark:border-gray-800">
+      <div className="flex shrink-0 items-start border-b border-border px-5 py-4">
         <div>
-          <h2 className="text-sm font-black text-slate-900 dark:text-gray-100">
+          <h2 className="text-sm font-semibold text-foreground">
             {editingSupplier ? "Edit Vendor Registration" : "Vendor Registration Application Form"}
           </h2>
-          <p className="mt-0.5 text-[10px] font-medium text-slate-400 dark:text-gray-500">ទម្រង់ស្នើចុះបញ្ជីអ្នកផ្គត់ផ្គង់</p>
+          <p className="mt-0.5 text-xs font-normal text-muted-foreground">ទម្រង់ស្នើចុះបញ្ជីអ្នកផ្គត់ផ្គង់</p>
         </div>
-        <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 dark:hover:bg-gray-800" title="Close">
-          <X className="h-4 w-4" />
-        </button>
       </div>
 
-      <div className="shrink-0 overflow-x-auto border-b border-slate-100 px-3 py-3 dark:border-gray-800 sm:px-5">
+      <div className="shrink-0 overflow-x-auto border-b border-border px-3 py-3 sm:px-5">
         <div className="flex min-w-max gap-1">
           {STEPS.map((s) => (
-            <button key={s.id} onClick={() => setStep(s.id)} className="flex w-48 min-w-48 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition hover:bg-slate-50 dark:hover:bg-gray-800">
+            <Button key={s.id} variant="ghost" onClick={() => setStep(s.id)} className="w-48 min-w-48 justify-start gap-2 px-2 py-1.5 text-left">
               <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${
-                  s.id === step ? "bg-slate-900 text-white dark:bg-indigo-600" : s.id < step ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-400 dark:bg-gray-800"
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                  s.id === step ? "bg-primary text-primary-foreground" : s.id < step ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
                 }`}
               >
-                {s.id < step ? <Check className="h-3.5 w-3.5" /> : s.id}
+                {s.id < step ? <Check /> : s.id}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-[10px] font-black text-slate-700 dark:text-gray-200">{s.label}</span>
-                <span className="block truncate text-[9px] text-slate-400 dark:text-gray-500">{s.sub}</span>
+                <span className="block truncate text-xs font-medium text-foreground">{s.label}</span>
+                <span className="block truncate text-xs text-muted-foreground">{s.sub}</span>
               </span>
-            </button>
+            </Button>
           ))}
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{renderStep()}</div>
 
-      <div className="flex shrink-0 items-center justify-between border-t border-slate-100 px-5 py-4 dark:border-gray-800">
-        <button
-          type="button"
+      <Separator className="my-4" />
+      <div className="flex shrink-0 items-center justify-between px-5 py-4">
+        <Button
+          variant={step === 1 ? "outline" : "ghost"}
+          size={step === 1 ? "default" : "sm"}
           onClick={step === 1 ? onClose : prevStep}
-          className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-600 transition hover:bg-slate-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
         >
-          <ChevronLeft className="h-3.5 w-3.5" />
+          <ChevronLeft />
           {step === 1 ? "Cancel" : "Back"}
-        </button>
+        </Button>
 
-        <span className="text-[10px] font-bold text-slate-400 dark:text-gray-500">
+        <span className="text-xs font-medium text-muted-foreground">
           Step {step} of {STEPS.length}
         </span>
 
         {step < STEPS.length ? (
-          <button
-            type="button"
-            onClick={nextStep}
-            className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-700"
-          >
+          <Button onClick={nextStep}>
             Next
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+            <ChevronRight />
+          </Button>
         ) : (
-          <button
-            type="button"
+          <Button
             onClick={handleSubmit}
             disabled={submitting || !form.companyName.trim()}
-            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-[10px] font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting && <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />}
             {editingSupplier ? "Save Changes" : "Submit Registration"}
-          </button>
+          </Button>
         )}
       </div>
     </BaseModal>

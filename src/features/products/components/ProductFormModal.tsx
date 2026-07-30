@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  XCircle as CloseCircle,
-  Sparkles as StarsMinimalistic,
   RefreshCw as Refresh,
   CloudUpload,
   Images as Gallery,
@@ -10,6 +8,10 @@ import { Product, ProductInput } from "@/features/shared/types";
 import { useToast } from "@/features/shared/components/Toast";
 import BaseModal from "@/features/shared/components/BaseModal";
 import SelectField from "@/features/shared/components/SelectField";
+import { FormLabel } from "@/features/shared/components/FormLabel";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -272,51 +274,33 @@ export default function ProductFormModal({
     <BaseModal
       isOpen={isOpen}
       onClose={onClose}
-      maxWidth="max-w-xl"
+      size="xl"
+      title={editingProduct ? "Edit Product" : "New Product"}
       maxHeight="max-h-[92vh]"
       rounded="rounded-3xl"
       backdropBlur="backdrop-blur-md"
       className="flex flex-col overflow-hidden"
     >
-      {/* Header */}
-      <div className="p-5 border-b border-slate-100 dark:border-gray-800 flex justify-between items-center shrink-0">
-        <h2 className="text-sm font-bold text-slate-800 dark:text-gray-100 font-sans">
-          {editingProduct ? "Edit Product" : "New Product"}
-        </h2>
-        <button
-          id="btn-close-form"
-          onClick={onClose}
-          className="p-1.5 hover:bg-slate-200 dark:hover:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-200 rounded-full cursor-pointer transition-colors"
-        >
-          <CloseCircle className="w-5 h-5" />
-        </button>
-      </div>
-
       {/* Form Body layout */}
       <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           
           {/* 1. Product Code */}
           <div>
-            <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
-              Product Code <span className="text-rose-500">*</span>
-            </label>
-            <input
+            <FormLabel variant="mono" required>Product Code </FormLabel>
+            <Input
               id="input-productCode"
               type="text"
               required
               value={productCode}
               onChange={(e) => setProductCode(e.target.value)}
               placeholder="e.g. STO-SSD-291"
-              className="w-full h-[38px] px-3 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-805 dark:text-gray-200 font-mono text-xs uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
             />
           </div>
 
           {/* 2. Status Select option */}
           <div>
-            <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
-              Item Status <span className="text-rose-500">*</span>
-            </label>
+            <FormLabel variant="mono" required>Item Status </FormLabel>
             <SelectField
               value={status}
               onChange={(v) => setStatus(v as "Active" | "Inactive")}
@@ -330,25 +314,20 @@ export default function ProductFormModal({
 
           {/* 3. Product Title/Name */}
           <div className="sm:col-span-2">
-            <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
-              Product Title / Name <span className="text-rose-500">*</span>
-            </label>
-            <input
+            <FormLabel variant="mono" required>Product Title / Name </FormLabel>
+            <Input
               id="input-name"
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Quantum Sonic High Fidelity Speaker"
-              className="w-full h-[38px] px-3 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-800 dark:text-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
             />
           </div>
 
           {/* 4. Category selection */}
           <div>
-            <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
-              Category <span className="text-rose-500">*</span>
-            </label>
+            <FormLabel variant="mono" required>Category </FormLabel>
             <SelectField
               value={category}
               onChange={setCategory}
@@ -359,24 +338,19 @@ export default function ProductFormModal({
 
           {/* 5. Subcategory */}
           <div>
-            <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
-              Sub Category
-            </label>
-            <input
+            <FormLabel variant="mono">Sub Category</FormLabel>
+            <Input
               id="input-subCategory"
               type="text"
               value={subCategory}
               onChange={(e) => setSubCategory(e.target.value)}
               placeholder="e.g. Audio Tech"
-              className="w-full h-[38px] px-3 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-slate-800 dark:text-gray-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
             />
           </div>
 
           {/* 6. UOM Options */}
           <div>
-            <label className="block text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">
-              Unit of Measure (UoM) <span className="text-rose-500">*</span>
-            </label>
+            <FormLabel variant="mono" required>Unit of Measure (UoM) </FormLabel>
             <SelectField
               value={mergedUoms.includes(uom) ? uom : "__other__"}
               onChange={(v) => { if (v !== "__other__") setUom(v); }}
@@ -387,12 +361,11 @@ export default function ProductFormModal({
               id="input-uom"
             />
             {!mergedUoms.includes(uom) && (
-              <input
+              <Input
                 type="text"
                 value={uom}
                 onChange={(e) => setUom(e.target.value)}
                 placeholder="Type custom UoM..."
-                className="w-full mt-2 h-[38px] px-3 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-xs dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
               />
             )}
           </div>
@@ -401,28 +374,30 @@ export default function ProductFormModal({
           <div className="sm:col-span-2 space-y-3">
             <div className="flex items-center gap-4">
               {imageUrl ? (
-                <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 dark:border-gray-700 shrink-0 group">
+                <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-border shrink-0 group">
                   <img
                     src={imageUrl}
                     alt="Preview"
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => {
                       if (imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
                       setPendingImageFile(null);
                       setImageUrl("");
                     }}
-                    className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white text-[10px] font-bold"
+                    variant="ghost"
+                    size="xs"
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-medium"
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
               ) : (
-                <div className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 dark:border-gray-700 flex items-center justify-center shrink-0">
-                  <Gallery className="w-6 h-6 text-slate-300 dark:text-gray-600" />
+                <div className="w-20 h-20 rounded-xl border-2 border-dashed border-border flex items-center justify-center shrink-0">
+                  <Gallery className="w-6 h-6 text-muted-foreground" />
                 </div>
               )}
               <div
@@ -431,8 +406,8 @@ export default function ProductFormModal({
                 onDrop={handleDrop}
                 className={`flex-1 p-3 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all min-h-[80px] ${
                   isDragging
-                    ? "border-indigo-500 bg-indigo-50/30 dark:bg-indigo-900/30"
-                    : "border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800"
+                    ? "border-border bg-muted/30"
+                    : "border-border hover:border-border bg-card"
                 }`}
                 onClick={() => document.getElementById("product-image-file-input")?.click()}
               >
@@ -444,23 +419,23 @@ export default function ProductFormModal({
                   className="hidden"
                 />
                 {isUploading ? (
-                  <Refresh className="w-5 h-5 animate-spin text-indigo-500" />
+                  <Refresh className="w-5 h-5 animate-spin text-muted-foreground" />
                 ) : (
                   <>
-                    <CloudUpload className="w-5 h-5 text-slate-400 dark:text-gray-500 mb-1" />
-                    <span className="text-[11px] text-slate-500 dark:text-gray-400 font-medium">Click or drag to upload</span>
+                    <CloudUpload className="w-5 h-5 text-muted-foreground mb-1" />
+                    <span className="text-xs text-muted-foreground font-medium">Click or drag to upload</span>
                   </>
                 )}
               </div>
             </div>
 
             {uploadError && (
-              <div className="p-2.5 bg-rose-50 dark:bg-rose-900/30 border border-rose-100 dark:border-rose-800 rounded-xl text-[11px] text-rose-600 dark:text-rose-400">
+              <div className="p-2.5 bg-destructive/10 border border-destructive/20 rounded-xl text-xs text-destructive">
                 {uploadError}
               </div>
             )}
 
-            <input
+            <Input
               id="input-imageUrl"
               type="text"
               value={imageUrl}
@@ -472,29 +447,20 @@ export default function ProductFormModal({
                 setImageUrl(e.target.value);
               }}
               placeholder="Or paste an image URL..."
-              className="w-full h-[38px] px-3 border border-slate-200 dark:border-gray-700 rounded-xl focus:border-indigo-500 text-xs dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50/50 dark:bg-gray-800"
             />
           </div>
 
         </div>
 
         {/* Actions Footer row */}
-        <div className="border-t border-slate-100 dark:border-gray-800 pt-5 flex justify-end gap-2.5">
-          <button
-            id="btn-cancel-form"
-            type="button"
-            onClick={onClose}
-            className="px-4 h-[38px] inline-flex items-center border border-slate-200 dark:border-gray-700 hover:bg-slate-50 dark:hover:bg-gray-800 text-slate-600 dark:text-gray-400 font-bold text-xs rounded-xl cursor-pointer"
-          >
+        <Separator className="my-4" />
+        <div className="pt-5 flex justify-end gap-2.5">
+          <Button id="btn-cancel-form" type="button" onClick={onClose} variant="outline">
             Cancel
-          </button>
-          <button
-            id="btn-submit-form"
-            type="submit"
-            className="px-5 h-[38px] inline-flex items-center bg-slate-900 dark:bg-indigo-700 hover:bg-indigo-650 dark:hover:bg-indigo-800 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer"
-          >
+          </Button>
+          <Button id="btn-submit-form" type="submit">
             {editingProduct ? "Save Specifications" : "Register Product"}
-          </button>
+          </Button>
         </div>
 
       </form>

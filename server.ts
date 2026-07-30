@@ -9,9 +9,7 @@ import mysql, { type ResultSetHeader, type RowDataPacket } from "mysql2/promise"
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import ExcelJS from "exceljs";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const archiver = require("archiver");
+import { ZipArchive } from "archiver";
 
 dotenv.config();
 
@@ -31,15 +29,6 @@ function getPool(): mysql.Pool | null {
   return pool;
 }
 
-function getDbConfig() {
-  return {
-    host: process.env.DB_HOST || "127.0.0.1",
-    port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER || "root",
-    password: process.env.DB_PASSWORD || "",
-    database: process.env.DB_DATABASE || "product_catalog",
-  };
-}
 
 async function checkDbConnection(): Promise<boolean> {
   if (!pool) return false;
@@ -49,6 +38,16 @@ async function checkDbConnection(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function getDbConfig() {
+  return {
+    host: process.env.DB_HOST || "127.0.0.1",
+    port: Number(process.env.DB_PORT || 3306),
+    user: process.env.DB_USER || "root",
+    password: process.env.DB_PASSWORD || "",
+    database: process.env.DB_DATABASE || "product_catalog",
+  };
 }
 
 async function initDb() {
@@ -199,6 +198,7 @@ async function initDb() {
       startDate DATE NULL,
       endDate DATE NULL,
       sendDate DATE NULL,
+      division VARCHAR(255) NOT NULL DEFAULT '',
       status VARCHAR(50) NOT NULL DEFAULT 'pending',
       debitNoteEmailId VARCHAR(64) NULL,
       createdBy VARCHAR(255) NOT NULL DEFAULT '',
@@ -226,6 +226,58 @@ async function initDb() {
       createdAt VARCHAR(40) NOT NULL,
       INDEX dn_items_debit_note_idx (debitNoteId)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+    try { await pool.query("ALTER TABLE debit_note_items ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER campus"); } catch {}
+    try { await pool.query("ALTER TABLE debit_notes ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER campus"); } catch {}
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS users (
+      id VARCHAR(64) PRIMARY KEY,
+      username VARCHAR(100) NOT NULL UNIQUE,
+      password VARCHAR(255) NOT NULL,
+      role VARCHAR(50) NOT NULL DEFAULT 'User',
+      fullName VARCHAR(255) NOT NULL DEFAULT '',
+      email VARCHAR(255) NOT NULL DEFAULT '',
+      phone VARCHAR(50) NOT NULL DEFAULT '',
+      position VARCHAR(255) NOT NULL DEFAULT '',
+      telegramId VARCHAR(100) NOT NULL DEFAULT '',
+      avatarUrl TEXT NOT NULL,
+      createdAt VARCHAR(40) NOT NULL,
+      updatedAt VARCHAR(40) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+    try { await pool.query("ALTER TABLE users ADD COLUMN position VARCHAR(255) NOT NULL DEFAULT '' AFTER phone"); } catch {}
+    try { await pool.query("ALTER TABLE users ADD COLUMN telegramId VARCHAR(100) NOT NULL DEFAULT '' AFTER position"); } catch {}
+
+    // Seed default users
+    const now = new Date().toISOString();
+    await pool.execute(
+      `INSERT IGNORE INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ["usr-001", "admin", "admin", "Admin", "System Administrator", "", "", "", "", "", now, now]
+    );
+    await pool.execute(
+      `INSERT IGNORE INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ["usr-002", "procurement", "procurement", "Procurement", "Procurement Officer", "", "", "", "", "", now, now]
+    );
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS settings (
+      \`key\` VARCHAR(100) PRIMARY KEY,
+      value TEXT NOT NULL,
+      updatedAt VARCHAR(40) NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    const defaults: [string, string][] = [
+      ["smtp_host", "smtp.gmail.com"],
+      ["smtp_port", "587"],
+      ["smtp_secure", ""],
+      ["smtp_user", ""],
+      ["smtp_pass", ""],
+      ["mail_from_address", ""],
+      ["mail_from_name", "PROCUREMENT"],
+    ];
+    for (const [key, value] of defaults) {
+      await pool.execute(
+        "INSERT IGNORE INTO settings (`key`, value, updatedAt) VALUES (?, ?, ?)",
+        [key, value, now]
+      );
+    }
 
     dbReady = true;
     console.log(`MySQL database '${config.database}' and its tables are ready.`);
@@ -332,9 +384,62 @@ function getGeminiAI() {
 
 // --- API Endpoints ---
 
-// GET: Retrieve all products
+// GET: Retrieve products (paginated or all)
 app.get("/api/products", async (req, res) => {
   try {
+    const { page, pageSize, search, category, status, sort } = req.query;
+    if (page !== undefined || pageSize !== undefined) {
+      const p = getPool();
+      if (!p || !dbReady) return res.json({ data: [], total: 0, categories: [], uoms: [] });
+
+      const conditions: string[] = [];
+      const params: any[] = [];
+      const searchStr = String(search || "");
+      const categoryStr = String(category || "");
+      const statusStr = String(status || "");
+
+      if (searchStr) {
+        conditions.push("(name LIKE ? OR productCode LIKE ? OR category LIKE ? OR subCategory LIKE ?)");
+        const like = `%${searchStr}%`;
+        params.push(like, like, like, like);
+      }
+      if (categoryStr) {
+        conditions.push("category = ?");
+        params.push(categoryStr);
+      }
+      if (statusStr === "active") {
+        conditions.push("status = 'Active'");
+      } else if (statusStr === "inactive") {
+        conditions.push("status = 'Inactive'");
+      }
+
+      const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const orderBy = sort === "code" ? "productCode ASC" : "name ASC";
+
+      const [countRows] = await p.query<RowDataPacket[]>(`SELECT COUNT(*) as total FROM products ${where}`, params);
+      const total = Number((countRows[0] as any).total);
+
+      const pageSizeNum = pageSize !== undefined ? Math.max(0, Number(pageSize)) : 20;
+      let rows: RowDataPacket[];
+      if (pageSizeNum === 0) {
+        [rows] = await p.query<RowDataPacket[]>(`SELECT * FROM products ${where} ORDER BY ${orderBy}`, params);
+      } else {
+        const pageNum = Math.max(1, Number(page) || 1);
+        const offset = (pageNum - 1) * pageSizeNum;
+        [rows] = await p.query<RowDataPacket[]>(
+          `SELECT * FROM products ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
+          [...params, pageSizeNum, offset],
+        );
+      }
+
+      const [catRows] = await p.query<RowDataPacket[]>("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category != '' ORDER BY category ASC");
+      const categories = catRows.map((r: any) => String(r.category));
+
+      const [uomRows] = await p.query<RowDataPacket[]>("SELECT DISTINCT uom FROM products WHERE uom IS NOT NULL AND uom != '' ORDER BY uom ASC");
+      const uoms = uomRows.map((r: any) => String(r.uom));
+
+      return res.json({ data: rows, total, categories, uoms });
+    }
     const products = await getAllProducts();
     res.json(products);
   } catch (err: any) {
@@ -960,8 +1065,8 @@ app.get("/api/stock-issue-items", async (req, res) => {
     const whereSql = whereClauses.length > 0 ? " WHERE " + whereClauses.join(" AND ") : "";
     const orderSql = " ORDER BY transactionDate DESC, createdAt DESC";
 
-    const [countRows] = await p.query<RowDataPacket[]>(`SELECT COUNT(*) as count FROM stock_issue_items${whereSql}`, params);
-    const total = (countRows[0] as any).count;
+    const [countRows] = await p.query<RowDataPacket[]>(`SELECT COUNT(*) as total FROM stock_issue_items${whereSql}`, params);
+    const total = (countRows[0] as any).total || 0;
 
     let rows: RowDataPacket[];
     if (page && pageSize) {
@@ -1134,49 +1239,43 @@ app.post("/api/stock-issue-items/import", async (req, res) => {
     }
 
     const now = new Date().toISOString();
-    const imported: any[] = [];
-
-    for (const item of items) {
-      const id = `sii-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-      const entry = {
-        id,
-        itemCode: String(item.itemCode || item["Code"] || item["ITEM CODE"] || "").trim(),
-        description: String(item.description || item["Description"] || item["DESCRIPTION"] || "").trim(),
-        quantity: parseFloat(item.quantity || item["Qty"] || item["QTY"] || item["Quantity"] || 0),
-        uom: String(item.uom || item["UoM"] || item["UOM"] || item["Unit"] || "Pcs").trim(),
-        unitPrice: parseFloat(item.unitPrice || item["Unit Price"] || item["UNIT PRICE"] || item["unit_price"] || 0),
-        totalPrice: parseFloat(item.totalPrice || item["Total Amount"] || item["TOTAL AMOUNT"] || item["totalPrice"] || item["Amount"] || 0),
-        transactionDate: item.transactionDate || item["Date"] || item["DATE"] || null,
-        warehouse: String(item.warehouse || item["Warehouse"] || item["WAREHOUSE"] || "").trim(),
-        division: String(item.division || item["Division"] || item["DIVISION"] || "").trim(),
-        department: String(item.department || item["Department"] || item["DEPARTMENT"] || "").trim(),
-        campus: String(item.campus || item["Campus"] || item["CAMPUS"] || "").trim(),
-        requesterName: String(item.requesterName || item["Requester"] || item["REQUESTER"] || item["Requested By"] || "").trim(),
-        referenceNo: String(item.referenceNo || item["Ref.No"] || item["REF.NO"] || item["Reference No"] || item["IO Number"] || "").trim(),
-        transactionType: String(item.transactionType || item["Transaction Type"] || item["TRANSACTION TYPE"] || "").trim(),
-        accountCode: String(item.accountCode || item["Account Code"] || item["ACCOUNT CODE"] || "").trim(),
-        remarks: String(item.remarks || item["Description/ Purpose"] || item["DESCRIPTION/ PURPOSE"] || item["Remarks"] || "").trim(),
-        importedAt: now,
-        createdAt: now,
-        updatedAt: now,
-      };
-      imported.push(entry);
+    const conn = await p.getConnection();
+    try {
+      await conn.query("START TRANSACTION");
+      const BATCH_SIZE = 500;
+      let count = 0;
+      for (let i = 0; i < items.length; i += BATCH_SIZE) {
+        const batch = items.slice(i, i + BATCH_SIZE);
+        const placeholders: string[] = [];
+        const params: any[] = [];
+        for (const item of batch) {
+          placeholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+          params.push(
+            crypto.randomUUID(), item.itemCode || "", item.description || "", item.quantity || 0, item.uom || "Pcs",
+            item.unitPrice || 0, item.totalPrice || 0, item.transactionDate || null,
+            item.warehouse || "", item.division || "", item.department || "", item.campus || "",
+            item.requesterName || "", item.referenceNo || "", item.transactionType || "", item.accountCode || "",
+            item.remarks || "", now, now, now
+          );
+        }
+        await conn.query(
+          `INSERT INTO stock_issue_items (id, itemCode, description, quantity, uom, unitPrice, totalPrice, transactionDate, warehouse, division, department, campus, requesterName, referenceNo, transactionType, accountCode, remarks, importedAt, createdAt, updatedAt) VALUES ${placeholders.join(", ")}`,
+          params
+        );
+        count += batch.length;
+      }
+      await conn.query("COMMIT");
+      res.json({ success: true, count });
+    } catch (batchErr) {
+      try { await conn.query("ROLLBACK"); } catch {}
+      throw batchErr;
+    } finally {
+      try { conn.release(); } catch {}
     }
-
-    for (const entry of imported) {
-      await p.execute(
-        `INSERT INTO stock_issue_items (id, itemCode, description, quantity, uom, unitPrice, totalPrice, transactionDate, warehouse, division, department, campus, requesterName, referenceNo, transactionType, accountCode, remarks, importedAt, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [entry.id, entry.itemCode, entry.description, entry.quantity, entry.uom, entry.unitPrice, entry.totalPrice,
-         entry.transactionDate, entry.warehouse, entry.division, entry.department, entry.campus, entry.requesterName,
-         entry.referenceNo, entry.transactionType, entry.accountCode, entry.remarks, entry.importedAt, entry.createdAt, entry.updatedAt]
-      );
-    }
-
-    res.json({ success: true, count: imported.length });
   } catch (err: any) {
-    console.error("Error importing stock issue items:", err);
-    res.status(500).json({ error: "Failed to import stock issue items." });
+    const msg = err?.sqlMessage || err?.message || String(err) || "Unknown error";
+    console.error("[Stock Import]", msg);
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -1332,6 +1431,48 @@ app.delete("/api/debit-note/emails/:id", async (req, res) => {
   }
 });
 
+app.post("/api/debit-note/emails/import", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const items: any[] = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "Expected a non-empty array of email configs." });
+    }
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const item of items) {
+      const warehouse = String(item.warehouse || item["Warehouse"] || "").trim();
+      const department = String(item.department || item["Department"] || "").trim();
+      const campus = String(item.campus || item["Campus"] || "").trim();
+      const receiverName = String(item.receiverName || item["Receiver Name"] || item["Receiver"] || "").trim();
+      if (!warehouse || !department || !campus || !receiverName) continue;
+      const rawSendTo = item.sendToEmail || item["Send To Emails"] || item["Send To"] || "";
+      const rawCcTo = item.ccToEmail || item["CC Emails"] || item["CC"] || "";
+      const splitEmails = (raw: string): string[] =>
+        raw.split(/[;,\n]+/).map((e: string) => e.trim()).filter((e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+      const sendTo = splitEmails(rawSendTo);
+      const ccTo = splitEmails(rawCcTo);
+      if (sendTo.length === 0) continue;
+      const id = `dne-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+      await p.execute(
+        `INSERT INTO debit_note_emails (id, warehouse, department, campus, receiverName, sendToEmail, ccToEmail, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE receiverName = VALUES(receiverName), sendToEmail = VALUES(sendToEmail), ccToEmail = VALUES(ccToEmail), updatedAt = VALUES(updatedAt)`,
+        [id, warehouse, department, campus, receiverName, JSON.stringify(sendTo), JSON.stringify(ccTo), now, now]
+      );
+      count++;
+    }
+    if (count === 0) {
+      return res.status(400).json({ error: "No valid rows found. Each row needs Warehouse, Department, Campus, Receiver Name, and at least one valid email." });
+    }
+    res.json({ success: true, count });
+  } catch (err: any) {
+    console.error("Error importing email configs:", err);
+    res.status(500).json({ error: "Failed to import email configs." });
+  }
+});
+
 // ─── Debit Note Generation ───
 
 function generateDebitNoteNo(warehouse: string, department: string, campus: string): string {
@@ -1417,9 +1558,9 @@ app.post("/api/debit-notes/generate", async (req, res) => {
       } else {
         debitNoteId = `dn-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
         await p.execute(
-          `INSERT INTO debit_notes (id, referenceNumber, warehouse, department, campus, startDate, endDate, status, debitNoteEmailId, createdBy, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
-          [debitNoteId, refNo, grpWarehouse, grpDepartment, grpCampus, startDate, endDate, emailConfig.id, req.body.createdBy || "system", now, now]
+          `INSERT INTO debit_notes (id, referenceNumber, warehouse, division, department, campus, startDate, endDate, status, debitNoteEmailId, createdBy, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+          [debitNoteId, refNo, grpWarehouse, groupItems[0]?.division || "", grpDepartment, grpCampus, startDate, endDate, emailConfig.id, req.body.createdBy || "system", now, now]
         );
       }
 
@@ -1427,11 +1568,11 @@ app.post("/api/debit-notes/generate", async (req, res) => {
       for (const item of groupItems) {
         const itemId = `dni-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
         await p.execute(
-          `INSERT INTO debit_note_items (id, debitNoteId, stockIssueItemId, itemCode, description, quantity, uom, unitPrice, totalPrice, transactionDate, requesterName, campus, department, referenceNo, remarks, createdAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO debit_note_items (id, debitNoteId, stockIssueItemId, itemCode, description, quantity, uom, unitPrice, totalPrice, transactionDate, requesterName, campus, division, department, referenceNo, remarks, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [itemId, debitNoteId, item.id, item.itemCode, item.description, item.quantity, item.uom,
            item.unitPrice, item.totalPrice, item.transactionDate, item.requesterName,
-           item.campus, item.department, item.referenceNo, item.remarks, now]
+           item.campus, item.division || "", item.department, item.referenceNo, item.remarks, now]
         );
       }
 
@@ -1539,6 +1680,22 @@ app.get("/api/debit-notes", async (req, res) => {
   }
 });
 
+// GET: Get email progress
+app.get("/api/debit-notes/email-progress", (req, res) => {
+  const key = `dn_progress_${(req.query.user as string) || "anonymous"}`;
+  const progress = emailProgressMap.get(key) || { status: "No sending in progress.", finished: true };
+  console.log(`[email] progress check: key="${key}", found=${emailProgressMap.has(key)}, status="${progress.status}"`);
+  res.json(progress);
+});
+
+// GET: Debug email progress map
+app.get("/api/debit-notes/email-progress-debug", (req, res) => {
+  res.json({
+    mapSize: emailProgressMap.size,
+    entries: Array.from(emailProgressMap.entries()).map(([k, v]) => ({ key: k, ...v })),
+  });
+});
+
 // GET: Single debit note with items
 app.get("/api/debit-notes/:id", async (req, res) => {
   try {
@@ -1592,13 +1749,6 @@ interface EmailProgress {
 }
 
 const emailProgressMap = new Map<string, EmailProgress>();
-
-// GET: Get email progress
-app.get("/api/debit-notes/email-progress", (req, res) => {
-  const key = `dn_progress_${(req as any).user || "anonymous"}`;
-  const progress = emailProgressMap.get(key) || { status: "No sending in progress.", finished: true };
-  res.json(progress);
-});
 
 // ─── Email Sending ───
 
@@ -1665,19 +1815,27 @@ async function runSendDebitNotesEmail(
       }
     }
 
+    // Load settings from DB (fallback to env vars)
+    const [settingRows] = await p.query<RowDataPacket[]>("SELECT `key`, value FROM settings");
+    const dbSettings: Record<string, string> = {};
+    for (const row of settingRows) dbSettings[row.key] = row.value;
+
+    const getSetting = (key: string, envKey: string, fallback: string): string =>
+      dbSettings[key] || process.env[envKey] || fallback;
+
     // Setup email transporter
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: parseInt(process.env.SMTP_PORT || "587"),
-      secure: process.env.SMTP_SECURE === "true",
+      host: getSetting("smtp_host", "SMTP_HOST", "smtp.gmail.com"),
+      port: parseInt(getSetting("smtp_port", "SMTP_PORT", "587")),
+      secure: getSetting("smtp_secure", "SMTP_SECURE", "") === "true",
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: getSetting("smtp_user", "SMTP_USER", ""),
+        pass: getSetting("smtp_pass", "SMTP_PASS", ""),
       },
     });
 
-    const fromAddress = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@procurement.com";
-    const fromName = process.env.MAIL_FROM_NAME || "PROCUREMENT";
+    const fromAddress = getSetting("mail_from_address", "MAIL_FROM_ADDRESS", "") || getSetting("smtp_user", "SMTP_USER", "") || "noreply@procurement.com";
+    const fromName = getSetting("mail_from_name", "MAIL_FROM_NAME", "PROCUREMENT");
 
     // Group notes by recipient email
     const recipientGroups = new Map<string, { notes: any[], cc: string[] }>();
@@ -1723,80 +1881,30 @@ async function runSendDebitNotesEmail(
         // Generate Excel attachments for each debit note in the group
         const attachments: any[] = [];
         for (const detail of group.notes) {
+          const [userRows] = await p.execute<RowDataPacket[]>("SELECT fullName, position FROM users WHERE username = ?", [detail.createdBy]);
+          const pb = userRows.length > 0 ? { name: userRows[0].fullName, position: userRows[0].position } : undefined;
           const workbook = new ExcelJS.Workbook();
-          const sheet = workbook.addWorksheet("Debit Note");
-
-          // Title
-          sheet.mergeCells("A1:N1");
-          const titleCell = sheet.getCell("A1");
-          titleCell.value = "DEBIT NOTE";
-          titleCell.font = { bold: true, size: 14 };
-          titleCell.alignment = { horizontal: "center" };
-
-          // Subtitle
-          sheet.mergeCells("A2:N2");
-          const subCell = sheet.getCell("A2");
-          subCell.value = `${detail.department} - ${detail.warehouse} (${detail.startDate} - ${detail.endDate})`;
-          subCell.font = { bold: true };
-          subCell.alignment = { horizontal: "center" };
-
-          // Headers
-          const headers = ["No", "Date", "Code", "Item Name", "Qty", "UoM", "U/Price", "Amount", "Requester", "Campus", "Department", "IO Number", "Remarks"];
-          const headerRow = sheet.getRow(4);
-          headers.forEach((h, i) => {
-            const cell = headerRow.getCell(i + 1);
-            cell.value = h;
-            cell.font = { bold: true };
-            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFCCFFCC" } };
-            cell.alignment = { horizontal: "center" };
-          });
-
-          // Data rows
-          let rowIdx = 5;
-          for (const item of detail.items) {
-            const row = sheet.getRow(rowIdx);
-            row.getCell(1).value = rowIdx - 4;
-            row.getCell(2).value = item.transactionDate || "";
-            row.getCell(3).value = item.itemCode || "";
-            row.getCell(4).value = item.description || "";
-            row.getCell(5).value = parseFloat(item.quantity) || 0;
-            row.getCell(6).value = item.uom || "";
-            row.getCell(7).value = parseFloat(item.unitPrice) || 0;
-            row.getCell(8).value = parseFloat(item.totalPrice) || 0;
-            row.getCell(9).value = item.requesterName || "";
-            row.getCell(10).value = item.campus || "";
-            row.getCell(11).value = item.department || "";
-            row.getCell(12).value = item.referenceNo || "";
-            row.getCell(13).value = item.remarks || "";
-            rowIdx++;
-          }
-
-          // Total row
-          const totalRow = sheet.getRow(rowIdx);
-          totalRow.getCell(7).value = "TOTAL:";
-          totalRow.getCell(7).font = { bold: true };
-          const totalCell = totalRow.getCell(8);
-          totalCell.value = { formula: `SUM(H5:H${rowIdx - 1})` };
-          totalCell.font = { bold: true };
-
-          // Column widths
-          sheet.getColumn(1).width = 5;
-          sheet.getColumn(2).width = 12;
-          sheet.getColumn(3).width = 15;
-          sheet.getColumn(4).width = 30;
-          sheet.getColumn(5).width = 10;
-          sheet.getColumn(6).width = 8;
-          sheet.getColumn(7).width = 12;
-          sheet.getColumn(8).width = 15;
-          sheet.getColumn(9).width = 20;
-          sheet.getColumn(10).width = 15;
-          sheet.getColumn(11).width = 15;
-          sheet.getColumn(12).width = 15;
-          sheet.getColumn(13).width = 20;
+          buildDebitNoteSheet(workbook, detail, detail.items, pb);
 
           const buffer = await workbook.xlsx.writeBuffer();
           const fileName = `DebitNote_${detail.department}_${detail.campus}_${detail.referenceNumber}.xlsx`.replace(/[^a-zA-Z0-9_.-]/g, "_");
           attachments.push({ filename: fileName, content: buffer as Buffer });
+        }
+
+        // Get creator info for email footer
+        let creatorName = "Vun Thy";
+        let creatorPosition = "Procurement Officer";
+        let creatorPhone = "+855 96 36 12 146";
+        let creatorEmail = "vun.thy@mjqeducation.edu.kh";
+        const firstNote = group.notes[0];
+        if (firstNote?.createdBy) {
+          const [uRows] = await p.execute<RowDataPacket[]>("SELECT fullName, position, phone, email FROM users WHERE username = ?", [firstNote.createdBy]);
+          if (uRows.length > 0) {
+            creatorName = uRows[0].fullName || creatorName;
+            creatorPosition = uRows[0].position || creatorPosition;
+            creatorPhone = uRows[0].phone || creatorPhone;
+            creatorEmail = uRows[0].email || creatorEmail;
+          }
         }
 
         // Build subject
@@ -1804,44 +1912,124 @@ async function runSendDebitNotesEmail(
         const deptSet = new Set(group.notes.map((n: any) => n.department));
         const campusStr = Array.from(campusSet).join(", ");
         const deptStr = Array.from(deptSet).join(", ");
-        const periodStr = group.notes[0]?.startDate && group.notes[0]?.endDate
-          ? `${group.notes[0].startDate} - ${group.notes[0].endDate}` : "";
+        const fmtDate = (s: any) => {
+          if (!s) return "-";
+          const dt = typeof s === "string" ? new Date(s + "T00:00:00") : new Date(s.getTime());
+          if (isNaN(dt.getTime())) return "-";
+          return dt.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+        };
+
+        const periodStr = fmtDate(group.notes[0]?.startDate) && fmtDate(group.notes[0]?.endDate)
+          ? `${fmtDate(group.notes[0]?.startDate)} - ${fmtDate(group.notes[0]?.endDate)}` : "";
 
         const subject = `Debit Note${group.notes.length > 1 ? "s" : ""}${periodStr ? ` (${periodStr})` : ""} for ${deptStr} - Campus (${campusStr})`;
 
+        const deptNames = [...new Set(group.notes.map((n: any) => n.department).filter(Boolean))];
+        const campusNames = [...new Set(group.notes.map((n: any) => n.campus).filter(Boolean))];
+
         // Build HTML body
-        let htmlBody = `
-          <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
-            <h2 style="color: #1e3a5f;">Debit Note${group.notes.length > 1 ? "s" : ""}</h2>
-            <p>Dear ${recipientEmail},</p>
-            <p>Please find attached the debit note${group.notes.length > 1 ? "s" : ""} for the period <strong>${periodStr}</strong>.</p>
-            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
-              <tr style="background: #f0f4f8;">
-                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Reference</th>
-                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Department</th>
-                <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Campus</th>
-                <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Items</th>
-                <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Total Amount</th>
-              </tr>`;
-
-        for (const detail of group.notes) {
-          const itemTotal = detail.items.reduce((sum: number, item: any) => sum + parseFloat(item.totalPrice || 0), 0);
-          htmlBody += `
-            <tr>
-              <td style="padding: 6px; border: 1px solid #ddd;">${detail.referenceNumber}</td>
-              <td style="padding: 6px; border: 1px solid #ddd;">${detail.department}</td>
-              <td style="padding: 6px; border: 1px solid #ddd;">${detail.campus}</td>
-              <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">${detail.items.length}</td>
-              <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">$${itemTotal.toFixed(2)}</td>
-            </tr>`;
+        const htmlBody = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debit Note Notification</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: #f8f9fa;
+            color: #343a40;
+            line-height: 1.6;
         }
+        .container {
+            background-color: #ffffff;
+            padding: 20px;
+            margin: 20px auto;
+            border-radius: 8px;
+            max-width: 100%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+        .details {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .details th, .details td {
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            text-align: left;
+        }
+        .details th {
+            background-color: #e9ecef;
+        }
+        .footer {
+            font-size: 0.9rem;
+            color: #6c757d;
+            text-align: center;
+            margin-top: 20px;
+            text-align: left;
+        }
+        .footer img {
+            max-width: 150px;
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            display: inline-block;
+            padding: 8px 15px;
+            background-color: #007bff;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Monthly Debit Note</h2>
+            <p>From Warehouse: <strong>${firstNote?.warehouse || "-"}</strong></p>
+        </div>
 
-        htmlBody += `
-            </table>
-            <p style="margin-top: 20px; color: #666; font-size: 12px;">
-              This is an automated email from the PROCUREMENT system. Please do not reply directly.
+        <p>Dear <strong>${group.notes[0]?.emailConfig?.receiverName || recipientEmail}</strong>,</p>
+
+        <p>I hope this message finds you well.</p>
+
+        <p>
+            Please find attached the Monthly Debit Note for
+            <strong>${deptNames.join(", ") || "-"}, Campus (${campusNames.join(", ") || "-"})</strong>
+            for the period from
+            <strong>${fmtDate(firstNote?.startDate)}</strong>
+            to
+            <strong>${fmtDate(firstNote?.endDate)}</strong>.
+            This document details all materials requested from stock during the month for operational usage.
+            The debit note includes quantities, item descriptions, and relevant references to help you verify the records efficiently.
+        </p>
+
+        <p>Kindly review the attached file at your earliest convenience. Should you have any questions, discrepancies, or require additional supporting information, please do not hesitate to contact me. I am happy to provide clarification or any further documentation needed.</p>
+
+        <p>Thank you for your time and attention to this matter. I appreciate your cooperation and prompt review.</p>
+
+        <div class="footer">
+            <p>
+                Best regards,<br>
+
+                ${creatorName}<br>
+                ${creatorPosition}<br>
+                ${creatorPhone}<br>
+                ${creatorEmail}<br>
             </p>
-          </div>`;
+        <img src="https://ci3.googleusercontent.com/mail-sig/AIorK4zsFWN0XTmb1CVNaUS-BqiFPyZpKwge_qnFJ5x7vfn77RaF1FldZ8ebYBrhuszIuQHYxgi8l4BB7ojF" alt="Company Logo" style="max-width: 400px; margin-bottom: 10px;">
+        </div>
+    </div>
+</body>
+</html>`;
 
         await transporter.sendMail({
           from: `"${fromName}" <${fromAddress}>`,
@@ -1882,10 +2070,157 @@ async function runSendDebitNotesEmail(
       failed_count: failedCount,
       failed_notes: failedNotesList.slice(0, 10),
     });
+    console.log(`[email] job complete: key="${progressKey}", success=${successCount}, failed=${failedCount}`);
   } catch (err: any) {
     console.error("Error in debit note email job:", err);
     emailProgressMap.set(progressKey, { status: `Error: ${err.message}`, finished: true, failed_count: 1, failed_notes: [err.message] });
   }
+}
+
+function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items: any[], preparedBy?: { name: string; position: string }) {
+  const sheet = workbook.addWorksheet("Debit Note");
+  const COL_COUNT = 14;
+
+  [5, 14, 16, 45, 8, 7, 14, 16, 18, 12, 14, 14, 16, 40]
+    .forEach((w, i) => sheet.getColumn(i + 1).width = w);
+
+  const thinBorder: Partial<ExcelJS.Borders> = {
+    top: { style: "thin" }, left: { style: "thin" },
+    bottom: { style: "thin" }, right: { style: "thin" },
+  };
+
+  sheet.mergeCells(1, 1, 1, COL_COUNT);
+  const titleCell = sheet.getCell("A1");
+  titleCell.value = "DEBIT NOTE";
+  titleCell.font = { name: "TW CEN MT", bold: true, size: 16, color: { argb: "FF1F4E79" } };
+  titleCell.alignment = { horizontal: "center", vertical: "middle" };
+  sheet.getRow(1).height = 30;
+
+  sheet.mergeCells(2, 1, 2, COL_COUNT);
+  const infoCell = sheet.getCell("A2");
+  const fmtDate = (s: any) => {
+    if (!s) return "";
+    const dt = typeof s === "string" ? new Date(s + "T00:00:00") : new Date(s.getTime());
+    if (isNaN(dt.getTime())) return "";
+    return dt.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+  };
+  infoCell.value = `${note.division || ""} - ${note.department || ""} - ${note.campus || ""}  |  ${fmtDate(note.startDate)} to ${fmtDate(note.endDate)}`;
+  infoCell.font = { name: "TW CEN MT", size: 10, color: { argb: "FF777777" } };
+  infoCell.alignment = { horizontal: "center", vertical: "middle" };
+  sheet.getRow(2).height = 18;
+
+  const headers = ["No", "Date", "Code", "Item Name", "Qty", "UoM", "U/Price", "Amount", "Requester", "Campus", "Division", "Department", "IO Number", "Remarks"];
+  const headerRow = sheet.getRow(4);
+  headerRow.height = 22;
+  headers.forEach((h, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = h;
+    cell.font = { name: "TW CEN MT", bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2E75B6" } };
+    cell.alignment = { horizontal: "center", vertical: "middle" };
+    cell.border = thinBorder;
+  });
+
+  let rowIdx = 5;
+  for (const item of items) {
+    const row = sheet.getRow(rowIdx);
+
+    row.getCell(1).value = rowIdx - 4;
+    row.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+    const d = item.transactionDate;
+    if (d) {
+      const dt = typeof d === "string" ? new Date(d + "T00:00:00") : new Date(d);
+      row.getCell(2).value = dt;
+      row.getCell(2).numFmt = 'mmm dd, yyyy';
+    } else {
+      row.getCell(2).value = "";
+    }
+    row.getCell(2).alignment = { horizontal: "center", vertical: "middle" };
+    row.getCell(3).value = item.itemCode || "";
+    row.getCell(3).alignment = { vertical: "middle" };
+    row.getCell(4).value = item.description || "";
+    row.getCell(4).alignment = { vertical: "middle", wrapText: true };
+    row.getCell(5).value = parseFloat(item.quantity) || 0;
+    row.getCell(5).alignment = { horizontal: "right", vertical: "middle" };
+    row.getCell(5).numFmt = '0.00';
+    row.getCell(6).value = item.uom || "";
+    row.getCell(6).alignment = { horizontal: "center", vertical: "middle" };
+    row.getCell(7).value = parseFloat(item.unitPrice) || 0;
+    row.getCell(7).alignment = { horizontal: "right", vertical: "middle" };
+    row.getCell(7).numFmt = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)';
+    row.getCell(8).value = parseFloat(item.totalPrice) || 0;
+    row.getCell(8).alignment = { horizontal: "right", vertical: "middle" };
+    row.getCell(8).numFmt = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)';
+    row.getCell(9).value = item.requesterName || "";
+    row.getCell(9).alignment = { vertical: "middle" };
+    row.getCell(10).value = item.campus || "";
+    row.getCell(10).alignment = { vertical: "middle" };
+    row.getCell(11).value = item.division || "";
+    row.getCell(11).alignment = { vertical: "middle" };
+    row.getCell(12).value = item.department || "";
+    row.getCell(12).alignment = { vertical: "middle" };
+    row.getCell(13).value = item.referenceNo || "";
+    row.getCell(13).alignment = { vertical: "middle" };
+    row.getCell(14).value = item.remarks || "";
+    row.getCell(14).alignment = { vertical: "middle", wrapText: true };
+
+    for (let c = 1; c <= COL_COUNT; c++) {
+      const cell = row.getCell(c);
+      if (!cell.font?.name) cell.font = { name: "TW CEN MT", size: 10 };
+      cell.border = thinBorder;
+      if (rowIdx % 2 === 0) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F7FB" } };
+      }
+    }
+    rowIdx++;
+  }
+
+  const totalRow = sheet.getRow(rowIdx);
+  totalRow.height = 22;
+  totalRow.getCell(7).value = "TOTAL:";
+  totalRow.getCell(7).font = { name: "TW CEN MT", bold: true, size: 11 };
+  totalRow.getCell(7).alignment = { horizontal: "right", vertical: "middle" };
+  const totalAmtCell = totalRow.getCell(8);
+  totalAmtCell.value = { formula: `SUM(H5:H${rowIdx - 1})` };
+  totalAmtCell.font = { name: "TW CEN MT", bold: true, size: 11 };
+  totalAmtCell.alignment = { horizontal: "right", vertical: "middle" };
+  totalAmtCell.numFmt = '$#,##0.00';
+
+  for (let c = 1; c <= COL_COUNT; c++) {
+    const cell = totalRow.getCell(c);
+    cell.border = {
+      top: { style: "double" }, left: { style: "thin" },
+      bottom: { style: "double" }, right: { style: "thin" },
+    };
+  }
+
+  rowIdx += 2;
+  const endDateStr = fmtDate(note.endDate);
+  const footerData = [
+    ["Prepared by:", preparedBy?.name || note.createdBy || ""],
+    ["Position:", preparedBy?.position || ""],
+    ["Date:", endDateStr],
+  ];
+  footerData.forEach(([label, value]) => {
+    const row = sheet.getRow(rowIdx);
+    sheet.mergeCells(rowIdx, 1, rowIdx, 2);
+    row.getCell(1).value = label;
+    row.getCell(1).font = { name: "TW CEN MT", bold: true, size: 10 };
+    row.getCell(1).alignment = { horizontal: "left", vertical: "middle" };
+    row.getCell(3).value = value;
+    row.getCell(3).font = { name: "TW CEN MT", size: 10 };
+    row.getCell(3).alignment = { vertical: "middle" };
+    row.height = 18;
+    rowIdx++;
+  });
+
+  sheet.pageSetup.orientation = "landscape";
+  sheet.pageSetup.fitToPage = true;
+  sheet.pageSetup.fitToWidth = 1;
+  sheet.pageSetup.margins = {
+    top: 0.5, right: 0.5, bottom: 0.5, left: 0.5,
+    header: 0.3, footer: 0.3,
+  };
 }
 
 // POST: Send debit note emails (bulk)
@@ -1919,6 +2254,7 @@ app.post("/api/debit-notes/send-emails", async (req, res) => {
     }
 
     const progressKey = `dn_progress_${req.body.user || "anonymous"}`;
+    console.log(`[email] send-emails: key="${progressKey}", notes=${noteIds.length}`);
 
     // Check if already in progress
     const existing = emailProgressMap.get(progressKey);
@@ -1929,7 +2265,10 @@ app.post("/api/debit-notes/send-emails", async (req, res) => {
     emailProgressMap.set(progressKey, { status: "Starting...", finished: false });
 
     // Run asynchronously (non-blocking)
-    runSendDebitNotesEmail(noteIds, false, progressKey, req.body.logoPath);
+    runSendDebitNotesEmail(noteIds, false, progressKey, req.body.logoPath).catch((err) => {
+      console.error("Email send error:", err);
+      emailProgressMap.set(progressKey, { status: `Error: ${err.message}`, finished: true });
+    });
 
     res.json({ success: true, message: "Email sending started. Track progress via email-progress endpoint." });
   } catch (err: any) {
@@ -1947,13 +2286,17 @@ app.post("/api/debit-notes/:id/resend", async (req, res) => {
     if (noteRows.length === 0) return res.status(404).json({ error: "Debit note not found." });
 
     const progressKey = `dn_progress_${req.body.user || "anonymous"}`;
+    console.log(`[email] resend: key="${progressKey}", noteId=${req.params.id}`);
     const existing = emailProgressMap.get(progressKey);
     if (existing && !existing.finished) {
       return res.status(409).json({ error: "Email sending is already in progress." });
     }
 
     emailProgressMap.set(progressKey, { status: "Starting...", finished: false });
-    runSendDebitNotesEmail([req.params.id], true, progressKey, req.body.logoPath);
+    runSendDebitNotesEmail([req.params.id], true, progressKey, req.body.logoPath).catch((err) => {
+      console.error("Email resend error:", err);
+      emailProgressMap.set(progressKey, { status: `Error: ${err.message}`, finished: true });
+    });
 
     res.json({ success: true, message: "Resending email." });
   } catch (err: any) {
@@ -1979,76 +2322,9 @@ app.get("/api/debit-notes/:id/export", async (req, res) => {
     );
 
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Debit Note");
-
-    // Title
-    sheet.mergeCells("A1:M1");
-    const titleCell = sheet.getCell("A1");
-    titleCell.value = "DEBIT NOTE";
-    titleCell.font = { bold: true, size: 14 };
-    titleCell.alignment = { horizontal: "center" };
-
-    // Subtitle
-    sheet.mergeCells("A2:M2");
-    const subCell = sheet.getCell("A2");
-    subCell.value = `${note.department} - ${note.warehouse} (${note.startDate} - ${note.endDate})`;
-    subCell.font = { bold: true };
-    subCell.alignment = { horizontal: "center" };
-
-    // Headers
-    const headers = ["No", "Date", "Code", "Item Name", "Qty", "UoM", "U/Price", "Amount", "Requester", "Campus", "Department", "IO Number", "Remarks"];
-    const headerRow = sheet.getRow(4);
-    headers.forEach((h, i) => {
-      const cell = headerRow.getCell(i + 1);
-      cell.value = h;
-      cell.font = { bold: true };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFCCFFCC" } };
-      cell.alignment = { horizontal: "center" };
-    });
-
-    // Data
-    let rowIdx = 5;
-    for (const item of items) {
-      const row = sheet.getRow(rowIdx);
-      row.getCell(1).value = rowIdx - 4;
-      row.getCell(2).value = item.transactionDate || "";
-      row.getCell(3).value = item.itemCode || "";
-      row.getCell(4).value = item.description || "";
-      row.getCell(5).value = parseFloat(item.quantity) || 0;
-      row.getCell(6).value = item.uom || "";
-      row.getCell(7).value = parseFloat(item.unitPrice) || 0;
-      row.getCell(8).value = parseFloat(item.totalPrice) || 0;
-      row.getCell(9).value = item.requesterName || "";
-      row.getCell(10).value = item.campus || "";
-      row.getCell(11).value = item.department || "";
-      row.getCell(12).value = item.referenceNo || "";
-      row.getCell(13).value = item.remarks || "";
-      rowIdx++;
-    }
-
-    // Total
-    const totalRow = sheet.getRow(rowIdx);
-    totalRow.getCell(7).value = "TOTAL:";
-    totalRow.getCell(7).font = { bold: true };
-    const totalCell = totalRow.getCell(8);
-    totalCell.value = { formula: `SUM(H5:H${rowIdx - 1})` };
-    totalCell.font = { bold: true };
-
-    // Column widths
-    sheet.getColumn(1).width = 5;
-    sheet.getColumn(2).width = 12;
-    sheet.getColumn(3).width = 15;
-    sheet.getColumn(4).width = 30;
-    sheet.getColumn(5).width = 10;
-    sheet.getColumn(6).width = 8;
-    sheet.getColumn(7).width = 12;
-    sheet.getColumn(8).width = 15;
-    sheet.getColumn(9).width = 20;
-    sheet.getColumn(10).width = 15;
-    sheet.getColumn(11).width = 15;
-    sheet.getColumn(12).width = 15;
-    sheet.getColumn(13).width = 20;
-
+    const [userRows] = await p.execute<RowDataPacket[]>("SELECT fullName, position FROM users WHERE username = ?", [note.createdBy]);
+    const pb = userRows.length > 0 ? { name: userRows[0].fullName, position: userRows[0].position } : undefined;
+    buildDebitNoteSheet(workbook, note, items, pb);
     const buffer = await workbook.xlsx.writeBuffer();
     const fileName = `DebitNote_${note.referenceNumber}.xlsx`.replace(/[^a-zA-Z0-9_.-]/g, "_");
 
@@ -2095,7 +2371,7 @@ app.post("/api/debit-notes/export-bulk", async (req, res) => {
     }
 
     const output = fs.createWriteStream(zipPath);
-    const archive = archiver("zip", { zlib: { level: 9 } });
+    const archive = new ZipArchive({ zlib: { level: 9 } });
     archive.pipe(output);
 
     for (const noteId of noteIds) {
@@ -2108,68 +2384,11 @@ app.post("/api/debit-notes/export-bulk", async (req, res) => {
         [noteId]
       );
 
+      const [userRows] = await p.execute<RowDataPacket[]>("SELECT fullName, position FROM users WHERE username = ?", [note.createdBy]);
+      const pb = userRows.length > 0 ? { name: userRows[0].fullName, position: userRows[0].position } : undefined;
+
       const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Debit Note");
-
-      sheet.mergeCells("A1:M1");
-      sheet.getCell("A1").value = "DEBIT NOTE";
-      sheet.getCell("A1").font = { bold: true, size: 14 };
-      sheet.getCell("A1").alignment = { horizontal: "center" };
-
-      sheet.mergeCells("A2:M2");
-      sheet.getCell("A2").value = `${note.department} - ${note.warehouse} (${note.startDate} - ${note.endDate})`;
-      sheet.getCell("A2").font = { bold: true };
-      sheet.getCell("A2").alignment = { horizontal: "center" };
-
-      const headers = ["No", "Date", "Code", "Item Name", "Qty", "UoM", "U/Price", "Amount", "Requester", "Campus", "Department", "IO Number", "Remarks"];
-      const headerRow = sheet.getRow(4);
-      headers.forEach((h, i) => {
-        const cell = headerRow.getCell(i + 1);
-        cell.value = h;
-        cell.font = { bold: true };
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFCCFFCC" } };
-        cell.alignment = { horizontal: "center" };
-      });
-
-      let rowIdx = 5;
-      for (const item of items) {
-        const row = sheet.getRow(rowIdx);
-        row.getCell(1).value = rowIdx - 4;
-        row.getCell(2).value = item.transactionDate || "";
-        row.getCell(3).value = item.itemCode || "";
-        row.getCell(4).value = item.description || "";
-        row.getCell(5).value = parseFloat(item.quantity) || 0;
-        row.getCell(6).value = item.uom || "";
-        row.getCell(7).value = parseFloat(item.unitPrice) || 0;
-        row.getCell(8).value = parseFloat(item.totalPrice) || 0;
-        row.getCell(9).value = item.requesterName || "";
-        row.getCell(10).value = item.campus || "";
-        row.getCell(11).value = item.department || "";
-        row.getCell(12).value = item.referenceNo || "";
-        row.getCell(13).value = item.remarks || "";
-        rowIdx++;
-      }
-
-      const totalRow = sheet.getRow(rowIdx);
-      totalRow.getCell(7).value = "TOTAL:";
-      totalRow.getCell(7).font = { bold: true };
-      const totalCell = totalRow.getCell(8);
-      totalCell.value = { formula: `SUM(H5:H${rowIdx - 1})` };
-      totalCell.font = { bold: true };
-
-      sheet.getColumn(1).width = 5;
-      sheet.getColumn(2).width = 12;
-      sheet.getColumn(3).width = 15;
-      sheet.getColumn(4).width = 30;
-      sheet.getColumn(5).width = 10;
-      sheet.getColumn(6).width = 8;
-      sheet.getColumn(7).width = 12;
-      sheet.getColumn(8).width = 15;
-      sheet.getColumn(9).width = 20;
-      sheet.getColumn(10).width = 15;
-      sheet.getColumn(11).width = 15;
-      sheet.getColumn(12).width = 15;
-      sheet.getColumn(13).width = 20;
+      buildDebitNoteSheet(workbook, note, items, pb);
 
       const buffer = await workbook.xlsx.writeBuffer();
       const fileName = `DebitNote_${note.referenceNumber}.xlsx`.replace(/[^a-zA-Z0-9_.-]/g, "_");
@@ -2207,6 +2426,82 @@ app.get("/api/debit-notes/filters/values", async (req, res) => {
   } catch (err: any) {
     console.error("Error fetching filter values:", err);
     res.status(500).json({ error: "Failed to fetch filter values." });
+  }
+});
+
+// ─── Settings ───
+
+// GET: Get all settings
+app.get("/api/settings", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const [rows] = await p.query<RowDataPacket[]>("SELECT `key`, value FROM settings ORDER BY `key`");
+    const settings: Record<string, string> = {};
+    for (const row of rows) settings[row.key] = row.value;
+    res.json(settings);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to fetch settings" });
+  }
+});
+
+// PUT: Update settings (bulk)
+app.put("/api/settings", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const settings: Record<string, string> = req.body;
+    const now = new Date().toISOString();
+    for (const [key, value] of Object.entries(settings)) {
+      await p.execute(
+        "INSERT INTO settings (`key`, value, updatedAt) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE value = ?, updatedAt = ?",
+        [key, value, now, value, now]
+      );
+    }
+    const [rows] = await p.query<RowDataPacket[]>("SELECT `key`, value FROM settings ORDER BY `key`");
+    const result: Record<string, string> = {};
+    for (const row of rows) result[row.key] = row.value;
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update settings" });
+  }
+});
+
+// ─── User Profile ───
+
+// GET: Get current user profile
+app.get("/api/users/profile", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const username = req.query.username as string;
+    if (!username) return res.status(400).json({ error: "username is required" });
+    const [rows] = await p.execute<RowDataPacket[]>("SELECT id, username, role, fullName, email, phone, position, telegramId, avatarUrl FROM users WHERE username = ?", [username]);
+    if (rows.length === 0) return res.status(404).json({ error: "User not found" });
+    res.json(rows[0]);
+  } catch (err: any) {
+    console.error("Error fetching user profile:", err);
+    res.status(500).json({ error: "Failed to fetch user profile" });
+  }
+});
+
+// PUT: Update current user profile
+app.put("/api/users/profile", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const { username, fullName, email, phone, position, telegramId } = req.body;
+    if (!username) return res.status(400).json({ error: "username is required" });
+    const now = new Date().toISOString();
+    await p.execute(
+      "UPDATE users SET fullName = ?, email = ?, phone = ?, position = ?, telegramId = ?, updatedAt = ? WHERE username = ?",
+      [fullName || "", email || "", phone || "", position || "", telegramId || "", now, username]
+    );
+    const [rows] = await p.execute<RowDataPacket[]>("SELECT id, username, role, fullName, email, phone, position, telegramId, avatarUrl FROM users WHERE username = ?", [username]);
+    res.json(rows[0] || { success: true });
+  } catch (err: any) {
+    console.error("Error updating user profile:", err);
+    res.status(500).json({ error: "Failed to update user profile" });
   }
 });
 

@@ -3,12 +3,14 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from "
 interface User {
   username: string;
   role: string;
+  fullName?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => boolean;
   logout: () => void;
+  updateProfile: (data: Partial<User>) => void;
   isAuthenticated: boolean;
 }
 
@@ -33,6 +35,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const user = { username: match.username, role: match.role };
       setUser(user);
       localStorage.setItem("auth_user", JSON.stringify(user));
+      fetch(`/api/users/profile?username=${encodeURIComponent(username)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.fullName) updateProfile({ fullName: data.fullName });
+        })
+        .catch(() => {});
       return true;
     }
     return false;
@@ -43,8 +51,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("auth_user");
   };
 
+  const updateProfile = (data: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...data };
+      localStorage.setItem("auth_user", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, updateProfile, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

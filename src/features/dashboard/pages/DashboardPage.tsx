@@ -1,7 +1,13 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/features/auth/AuthContext";
 import { ShoppingBag, CheckCircle, XCircle, RefreshCw, Layers, Globe, Users, Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import type { CatalogStats } from "@/features/shared/types";
+import { FormLabel } from "@/features/shared/components/FormLabel";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import PageContent from "@/features/shared/components/PageContent";
 
 interface VisitStats {
   liveVisitors: number;
@@ -59,25 +65,25 @@ export default function DashboardPage() {
       label: "Total Products",
       value: stats?.totalProducts ?? 0,
       icon: Layers,
-      color: "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400",
+      color: "bg-muted text-foreground",
     },
     {
       label: "Active",
       value: stats?.activeCount ?? 0,
       icon: CheckCircle,
-      color: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400",
+      color: "bg-muted text-foreground",
     },
     {
       label: "Inactive",
       value: stats?.inactiveCount ?? 0,
       icon: XCircle,
-      color: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400",
+      color: "bg-muted text-muted-foreground",
     },
     {
       label: "Live Visitors",
       value: visitStats?.liveVisitors ?? 0,
       icon: Users,
-      color: "bg-cyan-50 dark:bg-cyan-900/20 text-cyan-600 dark:text-cyan-400",
+      color: "bg-muted text-foreground",
     },
   ];
 
@@ -100,121 +106,123 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-6">
+    <PageContent>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-black text-slate-900 dark:text-gray-100 tracking-tight">
+          <h1 className="text-lg font-bold text-foreground tracking-tight">
             Welcome back, {user?.username}
           </h1>
-          <p className="text-xs text-slate-400 dark:text-gray-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Here's an overview of your product catalog.
           </p>
         </div>
-        <button
+        <Tooltip>
+          <TooltipTrigger render={<Button
+          variant="outline"
+          size="icon"
           onClick={() => { fetchStats(); fetchVisitStats(); }}
-          className="p-2.5 bg-white dark:bg-gray-800 hover:bg-slate-50 dark:hover:bg-gray-700 text-slate-500 dark:text-gray-400 rounded-xl border border-slate-200 dark:border-gray-700 shadow-sm cursor-pointer transition-all"
-          title="Refresh stats"
         >
-          <RefreshCw className={`w-4 h-4 ${loading || visitLoading ? "animate-spin" : ""}`} />
-        </button>
+          <RefreshCw className={loading || visitLoading ? "animate-spin" : ""} />
+        </Button>} />
+          <TooltipContent>Refresh stats</TooltipContent>
+        </Tooltip>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card) => (
-          <div
-            key={card.label}
-            className="bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-2xl p-5 shadow-sm"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className={`p-2 rounded-xl ${card.color}`}>
-                <card.icon className="w-5 h-5" />
+          <Card key={card.label}>
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className={`p-2 rounded-xl ${card.color}`}>
+                  <card.icon className="w-5 h-5" />
+                </div>
               </div>
-            </div>
-            <p className="text-2xl font-black text-slate-900 dark:text-gray-100">
-              {loading ? (
-                <span className="inline-block w-12 h-6 bg-slate-200 dark:bg-gray-700 rounded animate-pulse" />
-              ) : (
-                card.value
-              )}
-            </p>
-            <p className="text-xs font-bold text-slate-400 dark:text-gray-500 mt-1 uppercase tracking-wider">
-              {card.label}
-            </p>
-          </div>
+              <p className="text-2xl font-bold text-foreground">
+                {loading ? (
+                  <span className="inline-block w-12 h-6 bg-muted rounded animate-pulse" />
+                ) : (
+                  card.value
+                )}
+              </p>
+              <p className="text-xs font-medium text-muted-foreground mt-1 uppercase tracking-wider">
+                {card.label}
+              </p>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
       {visitStats && (
-        <div className="bg-white dark:bg-gray-900 border border-slate-100 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <Globe className="w-4 h-4 text-cyan-500" />
-            <h2 className="text-sm font-black text-slate-900 dark:text-gray-100">
-              Live Visitor Activity
-            </h2>
+        <Card>
+          <CardHeader className="flex-row items-center gap-2 space-y-0 pb-2">
+            <Globe className="w-4 h-4 text-foreground shrink-0" />
+            <CardTitle className="text-sm">Live Visitor Activity</CardTitle>
             {visitLoading ? (
-              <RefreshCw className="w-3 h-3 animate-spin text-slate-400 ml-auto" />
+              <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground ml-auto" />
             ) : (
-              <span className="ml-auto text-[10px] font-mono text-slate-400 dark:text-gray-500">
+              <span className="ml-auto text-xs font-mono text-muted-foreground">
                 updates every 15s
               </span>
             )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-slate-50/50 dark:bg-gray-800/30 rounded-xl p-3 text-center">
-              <p className="text-2xl font-black text-slate-900 dark:text-gray-100">{visitStats.liveVisitors}</p>
-              <p className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-wider">Live Now</p>
-            </div>
-            <div className="bg-slate-50/50 dark:bg-gray-800/30 rounded-xl p-3 text-center">
-              <p className="text-2xl font-black text-slate-900 dark:text-gray-100">{visitStats.totalVisits}</p>
-              <p className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase tracking-wider">Visits (5min)</p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-2">Pages Viewed</p>
-            {visitStats.paths.map((p) => (
-              <div key={p.path} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-slate-50/30 dark:bg-gray-800/20">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Eye className="w-3 h-3 text-slate-400 shrink-0" />
-                  <span className="text-xs font-bold text-slate-600 dark:text-gray-300 truncate">{pathLabel(p.path)}</span>
-                </div>
-                <span className="text-xs font-mono font-bold text-slate-900 dark:text-gray-100 ml-2">{p.count}</span>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-muted/50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-foreground">{visitStats.liveVisitors}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Live Now</p>
               </div>
-            ))}
-          </div>
+              <div className="bg-muted/50 rounded-xl p-3 text-center">
+                <p className="text-2xl font-bold text-foreground">{visitStats.totalVisits}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Visits (5min)</p>
+              </div>
+            </div>
 
-          {visitStats.recent.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-gray-800">
-              <p className="text-[10px] font-mono font-bold text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-2">Recent Activity</p>
-              <div className="space-y-1 max-h-36 overflow-y-auto">
-                {visitStats.recent.slice(0, 10).map((r, i) => (
-                  <div key={i} className="flex items-center justify-between py-1 px-2">
-                    <span className="text-[10px] font-mono text-slate-500 dark:text-gray-400">{pathLabel(r.path)}</span>
-                    <span className="text-[10px] font-mono text-slate-400 dark:text-gray-500">{formatTime(r.time)}</span>
+            <div className="space-y-2">
+              <FormLabel variant="mono" className="mb-2">Pages Viewed</FormLabel>
+              {visitStats.paths.map((p) => (
+                <div key={p.path} className="flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Eye className="w-3 h-3 text-muted-foreground shrink-0" />
+                    <span className="text-xs font-bold text-foreground truncate">{pathLabel(p.path)}</span>
                   </div>
-                ))}
-              </div>
+                  <span className="text-xs font-mono font-bold text-foreground ml-2">{p.count}</span>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
+
+            {visitStats.recent.length > 0 && (
+              <><Separator className="my-4" />
+              <div className="pt-3">
+                <FormLabel variant="mono" className="mb-2">Recent Activity</FormLabel>
+                <div className="space-y-1 max-h-36 overflow-y-auto">
+                  {visitStats.recent.slice(0, 10).map((r, i) => (
+                    <div key={i} className="flex items-center justify-between py-1 px-2">
+                      <span className="text-xs font-mono text-muted-foreground">{pathLabel(r.path)}</span>
+                      <span className="text-xs font-mono text-muted-foreground">{formatTime(r.time)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>)}
+          </CardContent>
+        </Card>
       )}
 
-      <div className="bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/30 rounded-2xl p-5">
-        <div className="flex items-start gap-3">
-          <ShoppingBag className="w-5 h-5 text-indigo-500 mt-0.5 shrink-0" />
+      <Card className="bg-muted/50">
+        <CardContent className="flex items-start gap-3 p-5">
+          <ShoppingBag className="w-5 h-5 text-foreground mt-0.5 shrink-0" />
           <div>
-            <h3 className="text-sm font-black text-slate-900 dark:text-gray-100">
-              Quick Navigation
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-gray-400 mt-1 leading-relaxed">
+            <CardTitle className="text-sm mb-1">Quick Navigation</CardTitle>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Use the sidebar to navigate to the <strong>Catalog</strong> module to manage
               products, SKUs, and inventory. Visit <strong>Supplier Docs</strong> to view
               vendor registration and onboarding guidelines.
             </p>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
+    </PageContent>
   );
 }

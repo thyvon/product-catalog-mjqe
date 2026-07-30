@@ -2,11 +2,14 @@ import {StrictMode, lazy, Suspense} from 'react';
 import {createRoot} from 'react-dom/client';
 import {BrowserRouter, Routes, Route, Navigate} from 'react-router-dom';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
+import {ThemeProvider} from 'next-themes';
 import {AuthProvider} from '@/features/auth/AuthContext';
 import {ToastProvider} from '@/features/shared/components/Toast';
+import {TooltipProvider} from '@/components/ui/tooltip';
 import ErrorBoundary from '@/features/shared/components/ErrorBoundary';
 import {RequireAuth} from '@/App';
 import Layout from '@/features/shared/components/Layout';
+import '@fontsource-variable/geist';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -28,15 +31,18 @@ const LandingPage = lazy(() => import('@/features/products/pages/LandingPage'));
 const DebitNoteListPage = lazy(() => import('@/features/debit-notes/pages/DebitNoteListPage'));
 const DebitNoteEmailsPage = lazy(() => import('@/features/debit-notes/pages/DebitNoteEmailsPage'));
 const StockIssueItemsPage = lazy(() => import('@/features/stock/pages/StockIssueItemsPage'));
+const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'));
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <ToastProvider>
+            <TooltipProvider>
             <AuthProvider>
-              <Suspense fallback={<div className="flex items-center justify-center h-screen text-slate-400 text-xs font-mono">Loading...</div>}>
+              <Suspense fallback={<div className="flex items-center justify-center h-screen text-muted-foreground text-xs font-mono">Loading...</div>}>
                 <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/product-list" element={<LandingPage />} />
@@ -55,14 +61,17 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="/debit-notes" element={<DebitNoteListPage />} />
                   <Route path="/debit-note-emails" element={<DebitNoteEmailsPage />} />
                   <Route path="/stock-issue-items" element={<StockIssueItemsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
                 </Route>
                 <Route path="*" element={<Navigate to="/login" replace />} />
               </Routes>
               </Suspense>
             </AuthProvider>
+            </TooltipProvider>
           </ToastProvider>
         </QueryClientProvider>
       </BrowserRouter>
+      </ThemeProvider>
     </ErrorBoundary>
   </StrictMode>,
 );

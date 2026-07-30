@@ -1,9 +1,14 @@
 import { useState, useEffect } from "react";
-import { X, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import BaseModal from "@/features/shared/components/BaseModal";
 import DatePicker from "@/features/shared/components/DatePicker";
 import SelectField from "@/features/shared/components/SelectField";
+import TextField from "@/features/shared/components/TextField";
 import { useToast } from "@/features/shared/components/Toast";
+import { FormLabel } from "@/features/shared/components/FormLabel";
 
 interface StockItemFormData {
   itemCode: string;
@@ -101,108 +106,86 @@ export default function StockItemFormModal({ isOpen, onClose, onSaved, editItem 
   };
 
   return (
-    <BaseModal isOpen={isOpen} onClose={onClose} maxWidth="max-w-3xl" maxHeight="max-h-[90vh]" className="flex flex-col">
-      <div className="p-5 border-b border-slate-100 dark:border-gray-800 flex items-center justify-between shrink-0">
-        <h2 className="text-sm font-black text-slate-900 dark:text-gray-100">
-          {isEdit ? "Edit Stock Issue Item" : "New Stock Issue Item"}
-        </h2>
-        <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-xl cursor-pointer transition-all">
-          <X className="w-4 h-4 text-slate-400" />
-        </button>
-      </div>
+    <BaseModal isOpen={isOpen} onClose={onClose} size="3xl" title={isEdit ? "Edit Stock Issue Item" : "New Stock Issue Item"} maxHeight="max-h-[90vh]" className="flex flex-col">
 
       <div className="p-5 overflow-y-auto flex-1 space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Item Code <span className="text-rose-500">*</span></label>
-            <input type="text" value={form.itemCode} onChange={(e) => update("itemCode", e.target.value)}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel required>Item Code </FormLabel>
+            <TextField type="text" value={form.itemCode} onChange={(e) => update("itemCode", e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Description <span className="text-rose-500">*</span></label>
-            <input type="text" value={form.description} onChange={(e) => update("description", e.target.value)}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel required>Description </FormLabel>
+            <TextField type="text" value={form.description} onChange={(e) => update("description", e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Transaction Date</label>
+            <FormLabel>Transaction Date</FormLabel>
             <DatePicker value={form.transactionDate} onChange={(v) => update("transactionDate", v)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Quantity</label>
-            <input type="number" value={form.quantity} onChange={(e) => update("quantity", Number(e.target.value))}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel>Quantity</FormLabel>
+            <TextField type="number" value={form.quantity} onChange={(e) => update("quantity", Number(e.target.value))} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">UoM</label>
+            <FormLabel>UoM</FormLabel>
             <SelectField value={form.uom} onChange={(v) => update("uom", v)} options={uomOptions} containerClassName="w-full" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Unit Price</label>
-            <input type="number" step="0.01" value={form.unitPrice} onChange={(e) => update("unitPrice", Number(e.target.value))}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel>Unit Price</FormLabel>
+            <TextField type="number" step="any" value={form.unitPrice} onChange={(e) => update("unitPrice", Number(e.target.value))} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Total Amount</label>
-            <input type="number" step="0.01" value={form.totalPrice} onChange={(e) => update("totalPrice", Number(e.target.value))}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel>Total Amount</FormLabel>
+            <TextField type="number" step="any" value={form.totalPrice} onChange={(e) => update("totalPrice", Number(e.target.value))} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Warehouse</label>
-            <input type="text" value={form.warehouse} onChange={(e) => update("warehouse", e.target.value)}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel>Warehouse</FormLabel>
+            <TextField type="text" value={form.warehouse} onChange={(e) => update("warehouse", e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Transaction Type</label>
+            <FormLabel>Transaction Type</FormLabel>
             <SelectField value={form.transactionType} onChange={(v) => update("transactionType", v)} options={transactionTypeOptions} containerClassName="w-full" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Division</label>
-            <input type="text" value={form.division} onChange={(e) => update("division", e.target.value)}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel>Division</FormLabel>
+            <TextField type="text" value={form.division} onChange={(e) => update("division", e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Department</label>
-            <input type="text" value={form.department} onChange={(e) => update("department", e.target.value)}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel>Department</FormLabel>
+            <TextField type="text" value={form.department} onChange={(e) => update("department", e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Campus</label>
-            <input type="text" value={form.campus} onChange={(e) => update("campus", e.target.value)}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel>Campus</FormLabel>
+            <TextField type="text" value={form.campus} onChange={(e) => update("campus", e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Requester</label>
-            <input type="text" value={form.requesterName} onChange={(e) => update("requesterName", e.target.value)}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel>Requester</FormLabel>
+            <TextField type="text" value={form.requesterName} onChange={(e) => update("requesterName", e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Ref.No</label>
-            <input type="text" value={form.referenceNo} onChange={(e) => update("referenceNo", e.target.value)}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel>Ref.No</FormLabel>
+            <TextField type="text" value={form.referenceNo} onChange={(e) => update("referenceNo", e.target.value)} />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Account Code</label>
-            <input type="text" value={form.accountCode} onChange={(e) => update("accountCode", e.target.value)}
-              className="h-[38px] w-full rounded-xl border border-slate-200 bg-white/90 px-3 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel>Account Code</FormLabel>
+            <TextField type="text" value={form.accountCode} onChange={(e) => update("accountCode", e.target.value)} />
           </div>
           <div className="col-span-2 md:col-span-3">
-            <label className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">Description/Purpose</label>
-            <textarea value={form.remarks} onChange={(e) => update("remarks", e.target.value)} rows={2}
-              className="w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-[11px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300" />
+            <FormLabel>Description/Purpose</FormLabel>
+            <Textarea value={form.remarks} onChange={(e) => update("remarks", e.target.value)} rows={2} />
           </div>
         </div>
       </div>
 
-      <div className="p-4 border-t border-slate-100 dark:border-gray-800 flex justify-end gap-3 shrink-0">
-        <button onClick={onClose} disabled={saving}
-          className="px-4 py-2 border border-slate-200 dark:border-gray-700 hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-600 dark:text-gray-400 rounded-xl font-bold text-xs cursor-pointer transition-all">
+      <Separator className="my-4" />
+      <div className="p-4 flex justify-end gap-3 shrink-0">
+        <Button variant="outline" onClick={onClose} disabled={saving}>
           Cancel
-        </button>
-        <button onClick={handleSave} disabled={saving}
-          className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-sm cursor-pointer disabled:opacity-50 transition-all">
-          {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+        </Button>
+        <Button onClick={handleSave} disabled={saving}>
+          {saving && <Loader2 className="animate-spin" />}
           <span>{saving ? "Saving..." : isEdit ? "Update" : "Create"}</span>
-        </button>
+        </Button>
       </div>
     </BaseModal>
   );

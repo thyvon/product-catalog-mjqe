@@ -1,5 +1,6 @@
-import { X } from "lucide-react";
 import BaseModal from "@/features/shared/components/BaseModal";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatAmount } from "@/features/shared/utils/format";
 
 interface DebitNotePreviewModalProps {
   isOpen: boolean;
@@ -13,76 +14,69 @@ export default function DebitNotePreviewModal({ isOpen, onClose, previewNote }: 
   const totalAmount = items.reduce((sum: number, item: any) => sum + parseFloat(item.totalPrice || 0), 0);
 
   return (
-    <BaseModal isOpen={isOpen} onClose={onClose} maxWidth="max-w-4xl" maxHeight="max-h-[80vh]">
+    <BaseModal isOpen={isOpen} onClose={onClose} size="4xl" maxHeight="max-h-[80vh]">
       <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-gray-800">
-          <div>
-            <h2 className="text-sm font-black text-slate-900 dark:text-gray-100">{note.referenceNumber || "Debit Note Preview"}</h2>
-            <p className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5">
-              {note.department || "—"} - {note.warehouse || "—"} | {note.campus || "—"}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-gray-800 rounded-xl cursor-pointer transition-all">
-            <X className="w-4 h-4 text-slate-400" />
-          </button>
+        <div className="p-5 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">{note.referenceNumber || "Debit Note Preview"}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {note.department || "—"} - {note.warehouse || "—"} | {note.campus || "—"}
+          </p>
         </div>
         <div className="flex-1 overflow-y-auto p-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
-            <div className="bg-slate-50 dark:bg-gray-800 rounded-xl p-3">
-              <p className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase">Period</p>
-              <p className="text-xs font-bold text-slate-700 dark:text-gray-300 mt-1">{note.startDate || "—"} - {note.endDate || "—"}</p>
+            <div className="bg-muted rounded-xl p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase">Period</p>
+              <p className="text-xs font-medium text-foreground mt-1">{note.startDate ? new Date(note.startDate).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "—"} - {note.endDate ? new Date(note.endDate).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "—"}</p>
             </div>
-            <div className="bg-slate-50 dark:bg-gray-800 rounded-xl p-3">
-              <p className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase">Status</p>
-              <p className="text-xs font-bold text-slate-700 dark:text-gray-300 mt-1 capitalize">{note.status || "pending"}</p>
+            <div className="bg-muted rounded-xl p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase">Status</p>
+              <p className="text-xs font-medium text-foreground mt-1 capitalize">{note.status || "pending"}</p>
             </div>
-            <div className="bg-slate-50 dark:bg-gray-800 rounded-xl p-3">
-              <p className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase">Total Items</p>
-              <p className="text-xs font-bold text-slate-700 dark:text-gray-300 mt-1">{items.length}</p>
+            <div className="bg-muted rounded-xl p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase">Total Items</p>
+              <p className="text-xs font-medium text-foreground mt-1">{items.length}</p>
             </div>
-            <div className="bg-slate-50 dark:bg-gray-800 rounded-xl p-3">
-              <p className="text-[10px] font-bold text-slate-400 dark:text-gray-500 uppercase">Total Amount</p>
-              <p className="text-xs font-bold text-slate-700 dark:text-gray-300 mt-1">${totalAmount.toFixed(2)}</p>
+            <div className="bg-muted rounded-xl p-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase">Total Amount</p>
+              <p className="text-xs font-medium text-foreground mt-1">{formatAmount(totalAmount)}</p>
             </div>
           </div>
 
           {items.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 dark:border-gray-700 p-8 text-center text-sm text-slate-500 dark:text-gray-400">
+            <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
               No items are available for this debit note yet.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-gray-700">
-                    <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">#</th>
-                    <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">Code</th>
-                    <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">Description</th>
-                    <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">Qty</th>
-                    <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">UoM</th>
-                    <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">U/Price</th>
-                    <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">Total</th>
-                    <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">Date</th>
-                    <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase">Requester</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">#</TableHead>
+                    <TableHead className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Code</TableHead>
+                    <TableHead className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Description</TableHead>
+                    <TableHead className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Qty</TableHead>
+                    <TableHead className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">UoM</TableHead>
+                    <TableHead className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">U/Price</TableHead>
+                    <TableHead className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Total</TableHead>
+                    <TableHead className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Date</TableHead>
+                    <TableHead className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Requester</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {items.map((item: any, i: number) => (
-                    <tr key={item.id || `${item.itemCode}-${i}`} className="border-b border-slate-50 dark:border-gray-800/50">
-                      <td className="px-3 py-2 text-slate-500">{i + 1}</td>
-                      <td className="px-3 py-2 font-mono text-slate-700 dark:text-gray-300">{item.itemCode || "—"}</td>
-                      <td className="px-3 py-2 text-slate-600 dark:text-gray-400 max-w-[200px] truncate">{item.description || "—"}</td>
-                      <td className="px-3 py-2 text-right font-mono text-slate-700 dark:text-gray-300">{item.quantity || 0}</td>
-                      <td className="px-3 py-2 text-slate-500">{item.uom || "—"}</td>
-                      <td className="px-3 py-2 text-right font-mono text-slate-700 dark:text-gray-300">${parseFloat(item.unitPrice || 0).toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right font-mono text-slate-700 dark:text-gray-300">${parseFloat(item.totalPrice || 0).toFixed(2)}</td>
-                      <td className="px-3 py-2 text-slate-500">{item.transactionDate || "—"}</td>
-                      <td className="px-3 py-2 text-slate-500">{item.requesterName || "—"}</td>
-                    </tr>
+                    <TableRow key={item.id || `${item.itemCode}-${i}`}>
+                      <TableCell className="px-3 py-2 text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="px-3 py-2 font-mono text-foreground">{item.itemCode || "—"}</TableCell>
+                      <TableCell className="px-3 py-2 text-muted-foreground max-w-[200px] truncate">{item.description || "—"}</TableCell>
+                      <TableCell className="px-3 py-2 text-right font-mono text-foreground">{item.quantity || 0}</TableCell>
+                      <TableCell className="px-3 py-2 text-muted-foreground">{item.uom || "—"}</TableCell>
+                      <TableCell className="px-3 py-2 text-right font-mono text-foreground">{formatAmount(item.unitPrice)}</TableCell>
+                      <TableCell className="px-3 py-2 text-right font-mono text-foreground">{formatAmount(item.totalPrice)}</TableCell>
+                      <TableCell className="px-3 py-2 text-muted-foreground">{item.transactionDate ? new Date(item.transactionDate).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }) : "—"}</TableCell>
+                      <TableCell className="px-3 py-2 text-muted-foreground">{item.requesterName || "—"}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+              </Table>
           )}
         </div>
       </div>

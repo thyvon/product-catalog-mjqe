@@ -1,86 +1,73 @@
-import { useState, type ReactNode } from "react";
-import { Filter, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 interface ListPageLayoutProps {
   title: string;
   description?: string;
-  actions?: ReactNode;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
-  filters?: ReactNode;
-  children: ReactNode;
+  /** Inline filter controls rendered next to the search bar */
+  filters?: React.ReactNode;
+  /** Show a count badge next to the title */
+  totalCount?: number;
+  className?: string;
 }
 
 export default function ListPageLayout({
   title,
   description,
   actions,
+  children,
   searchValue,
   onSearchChange,
-  searchPlaceholder,
+  searchPlaceholder = "Search...",
   filters,
-  children,
+  totalCount,
 }: ListPageLayoutProps) {
-  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
-
-  const hasFilters = Boolean(filters);
-
   return (
-    <div className="p-4 lg:p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-lg font-black text-slate-900 dark:text-gray-100 tracking-tight">{title}</h1>
-          {description ? (
-            <p className="text-xs text-slate-400 dark:text-gray-500 mt-1">{description}</p>
-          ) : null}
+    <div className="space-y-4">
+      {/* Title row — wraps on small screens so actions never overflow */}
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold truncate">{title}</h1>
+            {totalCount !== undefined && (
+              <Badge variant="secondary" className="font-mono text-xs shrink-0">
+                {totalCount}
+              </Badge>
+            )}
+          </div>
+          {description && (
+            <p className="text-sm text-muted-foreground">{description}</p>
+          )}
         </div>
-        {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+        {actions && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+        )}
       </div>
 
-      {onSearchChange ? (
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchValue ?? ""}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder={searchPlaceholder ?? "Search..."}
-              className="h-[38px] w-full pl-10 pr-20 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl text-sm text-slate-900 dark:text-gray-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-            />
-            {hasFilters ? (
-              <button
-                type="button"
-                onClick={() => setIsFiltersOpen((current) => !current)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex h-[30px] items-center gap-1 rounded-lg px-2.5 text-[11px] font-bold text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-              >
-                <Filter className="w-3.5 h-3.5" />
-                <span>Filters</span>
-              </button>
-            ) : null}
-          </div>
-          {hasFilters && isFiltersOpen ? (
-            <div className="flex flex-wrap items-center gap-2.5">{filters}</div>
-          ) : null}
+      {/* Search + filter bar — always wraps cleanly */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full min-w-[180px] sm:w-auto sm:flex-1">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder={searchPlaceholder}
+            value={searchValue}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="pl-8"
+          />
         </div>
-      ) : (
-        hasFilters ? (
-          <div>
-            <button
-              type="button"
-              onClick={() => setIsFiltersOpen((current) => !current)}
-              className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200 transition-colors"
-            >
-              <Filter className="w-3.5 h-3.5" />
-              <span>Filters</span>
-            </button>
-            {isFiltersOpen ? (
-              <div className="mt-3 flex flex-wrap items-center gap-2.5">{filters}</div>
-            ) : null}
-          </div>
-        ) : null
-      )}
+        {filters && (
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">{filters}</div>
+        )}
+      </div>
+
+      <Separator />
 
       {children}
     </div>

@@ -1,63 +1,91 @@
-import { motion, AnimatePresence } from "motion/react";
-import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+
+const SIZE_MAP: Record<string, string> = {
+  sm: "sm:max-w-sm",
+  md: "sm:max-w-md",
+  lg: "sm:max-w-lg",
+  xl: "sm:max-w-xl",
+  "2xl": "sm:max-w-2xl",
+  "3xl": "sm:max-w-3xl",
+  "4xl": "sm:max-w-4xl",
+  "5xl": "sm:max-w-5xl",
+  // legacy full-class keys (max-w-*) resolved below
+  "max-w-sm": "sm:max-w-sm",
+  "max-w-md": "sm:max-w-md",
+  "max-w-lg": "sm:max-w-lg",
+  "max-w-xl": "sm:max-w-xl",
+  "max-w-2xl": "sm:max-w-2xl",
+  "max-w-3xl": "sm:max-w-3xl",
+  "max-w-4xl": "sm:max-w-4xl",
+  "max-w-5xl": "sm:max-w-5xl",
+};
 
 interface BaseModalProps {
   isOpen: boolean;
   onClose: () => void;
-  children: ReactNode;
+  title?: string;
+  description?: string;
+  children: React.ReactNode;
+  /** Canonical size: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" */
+  size?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl";
+  /** @deprecated Pass a `size` prop instead. Still accepted for backward compat. */
   maxWidth?: string;
   maxHeight?: string;
-  zIndex?: string;
   rounded?: string;
   backdropBlur?: string;
+  className?: string;
   showCloseButton?: boolean;
   closeOnBackdrop?: boolean;
-  className?: string;
 }
 
 export default function BaseModal({
   isOpen,
   onClose,
+  title,
+  description,
   children,
-  maxWidth = "max-w-lg",
-  maxHeight = "",
-  zIndex = "z-50",
-  rounded = "rounded-2xl",
-  backdropBlur = "backdrop-blur-sm",
-  showCloseButton = false,
+  size,
+  maxWidth,
+  maxHeight,
+  rounded,
+  backdropBlur,
+  className,
+  showCloseButton = true,
   closeOnBackdrop = true,
-  className = "",
 }: BaseModalProps) {
+  const widthClass = size
+    ? SIZE_MAP[size]
+    : maxWidth
+      ? SIZE_MAP[maxWidth] ?? maxWidth
+      : undefined;
+
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className={`fixed inset-0 ${zIndex} flex items-center justify-center p-4 overflow-y-auto`}>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeOnBackdrop ? onClose : undefined}
-            className={`fixed inset-0 bg-slate-900/60 ${backdropBlur}`}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 15 }}
-            className={`relative bg-white dark:bg-gray-900 w-full ${maxWidth} ${rounded} shadow-2xl border border-slate-100 dark:border-gray-800 ${maxHeight} overflow-hidden ${className}`}
-          >
-            {showCloseButton && (
-              <button
-                onClick={onClose}
-                className="absolute top-4 right-4 p-1.5 hover:bg-slate-100 dark:hover:bg-gray-800 text-slate-400 dark:text-gray-500 hover:text-slate-700 dark:hover:text-gray-200 rounded-full transition-colors cursor-pointer z-10"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            )}
-            {children}
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      disablePointerDismissal={!closeOnBackdrop}
+    >
+      <DialogContent
+        className={cn(widthClass, maxHeight, rounded, className)}
+        showCloseButton={showCloseButton}
+      >
+        {title && (
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            {description && <DialogDescription>{description}</DialogDescription>}
+          </DialogHeader>
+        )}
+        {children}
+      </DialogContent>
+    </Dialog>
   );
 }

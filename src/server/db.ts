@@ -1,17 +1,8 @@
-import mysql, { type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
+import mysql, { type RowDataPacket } from "mysql2/promise";
+import { getEnv } from "./config.js";
 
 let pool: mysql.Pool | null = null;
 let dbReady = false;
-
-function getDbConfig() {
-  return {
-    host: process.env.DB_HOST || "127.0.0.1",
-    port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER || "root",
-    password: process.env.DB_PASSWORD || "",
-    database: process.env.DB_DATABASE || "product_catalog",
-  };
-}
 
 export function getPool(): mysql.Pool | null {
   return pool;
@@ -36,27 +27,31 @@ export async function checkDbConnection(): Promise<boolean> {
 }
 
 export async function initDb() {
-  const config = getDbConfig();
+  const env = getEnv();
 
-  if (!/^[a-zA-Z0-9_]+$/.test(config.database)) {
+  if (!/^[a-zA-Z0-9_]+$/.test(env.DB_DATABASE)) {
     console.error("DB_DATABASE may contain only letters, numbers, and underscores.");
     return;
   }
 
   try {
     const adminConnection = await mysql.createConnection({
-      host: config.host,
-      port: config.port,
-      user: config.user,
-      password: config.password,
+      host: env.DB_HOST,
+      port: env.DB_PORT,
+      user: env.DB_USER,
+      password: env.DB_PASSWORD,
     });
     await adminConnection.query(
-      `CREATE DATABASE IF NOT EXISTS \`${config.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
+      `CREATE DATABASE IF NOT EXISTS \`${env.DB_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
     );
     await adminConnection.end();
 
     pool = mysql.createPool({
-      ...config,
+      host: env.DB_HOST,
+      port: env.DB_PORT,
+      user: env.DB_USER,
+      password: env.DB_PASSWORD,
+      database: env.DB_DATABASE,
       charset: "utf8mb4",
       waitForConnections: true,
       connectionLimit: 10,
@@ -65,14 +60,15 @@ export async function initDb() {
 
     await createTables(pool);
     await migrateSchema(pool);
+    await seedDefaults(pool);
 
     dbReady = true;
-    console.log(`MySQL database '${config.database}' and its tables are ready.`);
+    console.log(`MySQL database '${env.DB_DATABASE}' and its tables are ready.`);
   } catch (err) {
     pool = null;
     dbReady = false;
     console.error("Failed to initialize MySQL database:", err);
-    console.warn("Start MySQL in XAMPP and verify the DB_* values in .env.");
+    console.warn("Start MySQL and verify DB_* values in .env.");
   }
 }
 
@@ -153,8 +149,8 @@ async function createTables(p: mysql.Pool) {
     description TEXT NOT NULL,
     quantity DECIMAL(15,2) NOT NULL DEFAULT 0,
     uom VARCHAR(50) NOT NULL DEFAULT '',
-    unitPrice DECIMAL(15,2) NOT NULL DEFAULT 0,
-    totalPrice DECIMAL(15,2) NOT NULL DEFAULT 0,
+    unitPrice DECIMAL(25,15) NOT NULL DEFAULT 0,
+    totalPrice DECIMAL(25,15) NOT NULL DEFAULT 0,
     transactionDate DATE NULL,
     warehouse VARCHAR(255) NOT NULL DEFAULT '',
     division VARCHAR(255) NOT NULL DEFAULT '',
@@ -187,6 +183,7 @@ async function createTables(p: mysql.Pool) {
     id VARCHAR(64) PRIMARY KEY,
     referenceNumber VARCHAR(255) NOT NULL,
     warehouse VARCHAR(255) NOT NULL DEFAULT '',
+    division VARCHAR(255) NOT NULL DEFAULT '',
     department VARCHAR(255) NOT NULL DEFAULT '',
     campus VARCHAR(255) NOT NULL DEFAULT '',
     startDate DATE NULL,
@@ -213,11 +210,33 @@ async function createTables(p: mysql.Pool) {
     transactionDate DATE NULL,
     requesterName VARCHAR(255) NOT NULL DEFAULT '',
     campus VARCHAR(255) NOT NULL DEFAULT '',
+    division VARCHAR(255) NOT NULL DEFAULT '',
     department VARCHAR(255) NOT NULL DEFAULT '',
     referenceNo VARCHAR(255) NOT NULL DEFAULT '',
     remarks TEXT NOT NULL,
     createdAt VARCHAR(40) NOT NULL,
     INDEX dn_items_debit_note_idx (debitNoteId)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(64) PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'User',
+    fullName VARCHAR(255) NOT NULL DEFAULT '',
+    email VARCHAR(255) NOT NULL DEFAULT '',
+    phone VARCHAR(50) NOT NULL DEFAULT '',
+    position VARCHAR(255) NOT NULL DEFAULT '',
+    telegramId VARCHAR(100) NOT NULL DEFAULT '',
+    avatarUrl TEXT NOT NULL,
+    createdAt VARCHAR(40) NOT NULL,
+    updatedAt VARCHAR(40) NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS settings (
+    \`key\` VARCHAR(100) PRIMARY KEY,
+    value TEXT NOT NULL,
+    updatedAt VARCHAR(40) NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 }
 
@@ -225,65 +244,41 @@ async function migrateSchema(p: mysql.Pool) {
   try { await p.query("ALTER TABLE stock_issue_items ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER warehouse"); } catch {}
   try { await p.query("ALTER TABLE stock_issue_items ADD COLUMN transactionType VARCHAR(100) NOT NULL DEFAULT '' AFTER referenceNo"); } catch {}
   try { await p.query("ALTER TABLE stock_issue_items ADD COLUMN accountCode VARCHAR(100) NOT NULL DEFAULT '' AFTER transactionType"); } catch {}
+  try { await p.query("ALTER TABLE stock_issue_items MODIFY COLUMN unitPrice DECIMAL(25,15) NOT NULL DEFAULT 0"); } catch {}
+  try { await p.query("ALTER TABLE stock_issue_items MODIFY COLUMN totalPrice DECIMAL(25,15) NOT NULL DEFAULT 0"); } catch {}
+  try { await p.query("ALTER TABLE debit_note_items ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER campus"); } catch {}
+  try { await p.query("ALTER TABLE debit_notes ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER campus"); } catch {}
+  try { await p.query("ALTER TABLE debit_note_items MODIFY COLUMN unitPrice DECIMAL(25,15) NOT NULL DEFAULT 0"); } catch {}
+  try { await p.query("ALTER TABLE debit_note_items MODIFY COLUMN totalPrice DECIMAL(25,15) NOT NULL DEFAULT 0"); } catch {}
+  try { await p.query("ALTER TABLE users ADD COLUMN position VARCHAR(255) NOT NULL DEFAULT '' AFTER phone"); } catch {}
+  try { await p.query("ALTER TABLE users ADD COLUMN telegramId VARCHAR(100) NOT NULL DEFAULT '' AFTER position"); } catch {}
 }
 
-export async function getAllProducts(): Promise<any[]> {
-  const p = getPool();
-  if (!p || !dbReady) return [];
-  const [rows] = await p.query<RowDataPacket[]>("SELECT * FROM products ORDER BY name ASC");
-  return rows;
-}
+async function seedDefaults(p: mysql.Pool) {
+  const now = new Date().toISOString();
 
-export async function getProductById(id: string): Promise<any | null> {
-  const p = getPool();
-  if (!p || !dbReady) return null;
-  const [rows] = await p.execute<RowDataPacket[]>("SELECT * FROM products WHERE id = ?", [id]);
-  return rows[0] || null;
-}
-
-export async function getProductByCode(code: string): Promise<any | null> {
-  const p = getPool();
-  if (!p || !dbReady) return null;
-  const [rows] = await p.execute<RowDataPacket[]>("SELECT * FROM products WHERE productCode = ?", [code]);
-  return rows[0] || null;
-}
-
-export async function upsertProduct(product: any): Promise<void> {
-  assertDb();
-  const p = getPool()!;
   await p.execute(
-    `INSERT INTO products (id, productCode, name, description, uom, category, subCategory, status, price, stock, imageUrl, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       productCode = VALUES(productCode),
-       name = VALUES(name),
-       description = VALUES(description),
-       uom = VALUES(uom),
-       category = VALUES(category),
-       subCategory = VALUES(subCategory),
-       status = VALUES(status),
-       price = VALUES(price),
-       stock = VALUES(stock),
-       imageUrl = VALUES(imageUrl),
-       updatedAt = VALUES(updatedAt)`,
-    [
-      product.id, product.productCode, product.name, product.description || "",
-      product.uom, product.category, product.subCategory || "", product.status || "Active",
-      product.price ?? null, product.stock ?? null, product.imageUrl || "",
-      product.createdAt, product.updatedAt,
-    ]
+    `INSERT IGNORE INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ["usr-001", "admin", "admin", "Admin", "System Administrator", "", "", "", "", "", now, now]
   );
-}
+  await p.execute(
+    `INSERT IGNORE INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ["usr-002", "procurement", "procurement", "Procurement", "Procurement Officer", "", "", "", "", "", now, now]
+  );
 
-export async function deleteProduct(id: string): Promise<boolean> {
-  assertDb();
-  const p = getPool()!;
-  const [result] = await p.execute<ResultSetHeader>("DELETE FROM products WHERE id = ?", [id]);
-  return result.affectedRows > 0;
-}
-
-export async function insertImportBatch(products: any[]): Promise<void> {
-  for (const p of products) {
-    await upsertProduct(p);
+  const defaults: [string, string][] = [
+    ["smtp_host", "smtp.gmail.com"],
+    ["smtp_port", "587"],
+    ["smtp_secure", ""],
+    ["smtp_user", ""],
+    ["smtp_pass", ""],
+    ["mail_from_address", ""],
+    ["mail_from_name", "PROCUREMENT"],
+  ];
+  for (const [key, value] of defaults) {
+    await p.execute(
+      "INSERT IGNORE INTO settings (`key`, value, updatedAt) VALUES (?, ?, ?)",
+      [key, value, now]
+    );
   }
 }
