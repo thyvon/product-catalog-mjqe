@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { ensureDebitNoteLogo, getDebitNoteLogo } from "./logo.js";
 
 export function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items: any[], preparedBy?: { name: string; position: string }) {
   const sheet = workbook.addWorksheet("Debit Note");
@@ -6,6 +7,16 @@ export function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items
 
   [5, 14, 16, 45, 8, 7, 14, 16, 18, 12, 14, 14, 16, 40]
     .forEach((w, i) => sheet.getColumn(i + 1).width = w);
+
+  ensureDebitNoteLogo();
+  const debitNoteLogo = getDebitNoteLogo();
+  if (debitNoteLogo) {
+    const imageId = workbook.addImage({ base64: debitNoteLogo.base64, extension: "png" });
+    sheet.addImage(imageId, {
+      tl: { col: 0, row: 0 },
+      ext: { width: debitNoteLogo.width, height: debitNoteLogo.height },
+    });
+  }
 
   const thinBorder: Partial<ExcelJS.Borders> = {
     top: { style: "thin" }, left: { style: "thin" },

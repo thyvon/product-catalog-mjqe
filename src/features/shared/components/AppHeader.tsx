@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "next-themes";
+import NotificationBell from "@/features/shared/components/NotificationBell";
 
 export default function AppHeader() {
   const { setTheme } = useTheme();
@@ -18,6 +19,7 @@ export default function AppHeader() {
       <SidebarTrigger className="-ml-1 shrink-0" />
       <Separator orientation="vertical" className="data-[orientation=vertical]:h-4 shrink-0" />
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        <NotificationBell />
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
             <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />

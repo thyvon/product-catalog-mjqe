@@ -190,6 +190,7 @@ export default function SupplierRegisterPage() {
       searchValue={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search suppliers by name, contact, email, or phone..."
+      activeFilterCount={[statusFilter, typeFilter].filter(Boolean).length}
       filters={(
         <>
           <SelectField

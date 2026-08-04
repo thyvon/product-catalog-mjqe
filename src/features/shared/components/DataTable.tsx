@@ -178,7 +178,7 @@ export default function DataTable<TData>({
                     {emptyIcon}
                     <p className="text-sm">{emptyMessage || "No data found."}</p>
                     {emptyAction && (
-                      <Button variant="outline" size="sm" onClick={emptyAction.onClick}>
+                      <Button variant="outline" onClick={emptyAction.onClick}>
                         {emptyAction.label}
                       </Button>
                     )}

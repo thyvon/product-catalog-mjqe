@@ -18,6 +18,30 @@ const app = express();
 const BLANK_PLACEHOLDER = "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect fill="#f1f5f9" width="400" height="400"/><text x="50%" y="45%" fill="#94a3b8" font-family="monospace" font-size="16" font-weight="bold" text-anchor="middle" dominant-baseline="middle">NO IMAGE</text><text x="50%" y="55%" fill="#94a3b8" font-family="monospace" font-size="11" text-anchor="middle" dominant-baseline="middle">Click to upload</text></svg>`);
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
+// Debit note Excel logo (fetched from remote URL and cached)
+const DEBIT_NOTE_LOGO_URL = "https://sms.mjqeducation.edu.kh/assets/images/logo/logo-dark.png";
+const DEBIT_NOTE_LOGO_WIDTH = 140;
+const DEBIT_NOTE_LOGO_HEIGHT = 67;
+let debitNoteLogoBase64: string | null = null;
+let debitNoteLogoLoadPromise: Promise<void> | null = null;
+
+async function loadDebitNoteLogo(): Promise<void> {
+  try {
+    const res = await fetch(DEBIT_NOTE_LOGO_URL, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    if (buffer.length === 0) throw new Error("Empty image response");
+    debitNoteLogoBase64 = buffer.toString("base64");
+    console.log(`[logo] Debit note logo loaded (${buffer.length} bytes): ${DEBIT_NOTE_LOGO_URL}`);
+  } catch (err: any) {
+    console.warn(`[logo] Failed to load debit note logo from ${DEBIT_NOTE_LOGO_URL}:`, err?.message || err);
+  }
+}
+
+function ensureDebitNoteLogo(): void {
+  if (!debitNoteLogoLoadPromise) debitNoteLogoLoadPromise = loadDebitNoteLogo();
+}
+
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ limit: "20mb", extended: true }));
 
@@ -181,13 +205,18 @@ async function initDb() {
       warehouse VARCHAR(255) NOT NULL DEFAULT '',
       department VARCHAR(255) NOT NULL DEFAULT '',
       campus VARCHAR(255) NOT NULL DEFAULT '',
+      division VARCHAR(255) NOT NULL DEFAULT '',
       receiverName VARCHAR(255) NOT NULL DEFAULT '',
       sendToEmail JSON NOT NULL,
       ccToEmail JSON NOT NULL,
       createdAt VARCHAR(40) NOT NULL,
       updatedAt VARCHAR(40) NOT NULL,
-      UNIQUE KEY dn_emails_unique (warehouse, department, campus)
+      UNIQUE KEY dn_emails_unique (warehouse, division, department, campus)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    try { await pool.query("ALTER TABLE debit_note_emails ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER campus"); } catch {}
+    try { await pool.query("ALTER TABLE debit_note_emails DROP INDEX dn_emails_unique"); } catch {}
+    try { await pool.query("ALTER TABLE debit_note_emails ADD UNIQUE KEY dn_emails_unique (warehouse, division, department, campus)"); } catch {}
 
     await pool.query(`CREATE TABLE IF NOT EXISTS debit_notes (
       id VARCHAR(64) PRIMARY KEY,
@@ -1086,9 +1115,13 @@ app.get("/api/stock-issue-items/filters/values", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
+    const [warehouses] = await p.query<RowDataPacket[]>("SELECT DISTINCT warehouse FROM stock_issue_items WHERE warehouse != '' ORDER BY warehouse");
+    const [departments] = await p.query<RowDataPacket[]>("SELECT DISTINCT department FROM stock_issue_items WHERE department != '' ORDER BY department");
     const [campuses] = await p.query<RowDataPacket[]>("SELECT DISTINCT campus FROM stock_issue_items WHERE campus != '' ORDER BY campus");
     const [transactionTypes] = await p.query<RowDataPacket[]>("SELECT DISTINCT transactionType FROM stock_issue_items WHERE transactionType != '' ORDER BY transactionType");
     res.json({
+      warehouses: warehouses.map((row: any) => row.warehouse),
+      departments: departments.map((row: any) => row.department),
       campuses: campuses.map((row: any) => row.campus),
       transactionTypes: transactionTypes.map((row: any) => row.transactionType),
     });
@@ -1338,7 +1371,7 @@ app.post("/api/debit-note/emails", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
-    const { warehouse, department, campus, receiverName, sendToEmail, ccToEmail } = req.body;
+    const { warehouse, department, campus, division, receiverName, sendToEmail, ccToEmail } = req.body;
 
     if (!warehouse || !department || !campus || !receiverName) {
       return res.status(400).json({ error: "warehouse, department, campus, and receiverName are required." });
@@ -1366,10 +1399,10 @@ app.post("/api/debit-note/emails", async (req, res) => {
     const id = `dne-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     await p.execute(
-      `INSERT INTO debit_note_emails (id, warehouse, department, campus, receiverName, sendToEmail, ccToEmail, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE receiverName = VALUES(receiverName), sendToEmail = VALUES(sendToEmail), ccToEmail = VALUES(ccToEmail), updatedAt = VALUES(updatedAt)`,
-      [id, warehouse, department, campus, receiverName, JSON.stringify(sendTo), JSON.stringify(ccTo), now, now]
+      `INSERT INTO debit_note_emails (id, warehouse, department, campus, division, receiverName, sendToEmail, ccToEmail, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE division = VALUES(division), receiverName = VALUES(receiverName), sendToEmail = VALUES(sendToEmail), ccToEmail = VALUES(ccToEmail), updatedAt = VALUES(updatedAt)`,
+      [id, warehouse, department, campus, division ?? "", receiverName, JSON.stringify(sendTo), JSON.stringify(ccTo), now, now]
     );
 
     const created = await getDebitNoteEmailById(id);
@@ -1387,7 +1420,7 @@ app.put("/api/debit-note/emails/:id", async (req, res) => {
     const existing = await getDebitNoteEmailById(req.params.id);
     if (!existing) return res.status(404).json({ error: "Email config not found." });
 
-    const { warehouse, department, campus, receiverName, sendToEmail, ccToEmail } = req.body;
+    const { warehouse, department, campus, division, receiverName, sendToEmail, ccToEmail } = req.body;
     const sendTo = Array.isArray(sendToEmail) ? sendToEmail : JSON.parse(existing.sendToEmail || "[]");
     const ccTo = Array.isArray(ccToEmail) ? ccToEmail : JSON.parse(existing.ccToEmail || "[]");
 
@@ -1397,11 +1430,12 @@ app.put("/api/debit-note/emails/:id", async (req, res) => {
 
     const now = new Date().toISOString();
     await p.execute(
-      `UPDATE debit_note_emails SET warehouse = ?, department = ?, campus = ?, receiverName = ?, sendToEmail = ?, ccToEmail = ?, updatedAt = ? WHERE id = ?`,
+      `UPDATE debit_note_emails SET warehouse = ?, department = ?, campus = ?, division = ?, receiverName = ?, sendToEmail = ?, ccToEmail = ?, updatedAt = ? WHERE id = ?`,
       [
         warehouse ?? existing.warehouse,
         department ?? existing.department,
         campus ?? existing.campus,
+        division ?? existing.division,
         receiverName ?? existing.receiverName,
         JSON.stringify(sendTo),
         JSON.stringify(ccTo),
@@ -1415,6 +1449,27 @@ app.put("/api/debit-note/emails/:id", async (req, res) => {
   } catch (err: any) {
     console.error("Error updating email config:", err);
     res.status(500).json({ error: "Failed to update email config." });
+  }
+});
+
+app.post("/api/debit-note/emails/bulk-delete", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const body: { ids?: string[] } = req.body || {};
+    const ids = Array.isArray(body.ids) ? body.ids.map((id) => String(id).trim()).filter(Boolean) : [];
+    if (ids.length === 0) {
+      return res.status(400).json({ error: "No email configs selected to delete." });
+    }
+    if (ids.length > 10000) {
+      return res.status(400).json({ error: "Too many configs to delete at once." });
+    }
+    const placeholders = ids.map(() => "?").join(",");
+    const [result] = await p.execute<ResultSetHeader>(`DELETE FROM debit_note_emails WHERE id IN (${placeholders})`, ids);
+    res.json({ success: true, count: result.affectedRows });
+  } catch (err: any) {
+    console.error("Error bulk deleting email configs:", err);
+    res.status(500).json({ error: "Failed to bulk delete email configs." });
   }
 });
 
@@ -1440,31 +1495,62 @@ app.post("/api/debit-note/emails/import", async (req, res) => {
       return res.status(400).json({ error: "Expected a non-empty array of email configs." });
     }
     const now = new Date().toISOString();
-    let count = 0;
-    for (const item of items) {
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    const splitEmails = (raw: string): string[] =>
+      raw.split(/[;,\n]+/).map((e: string) => e.trim()).filter(Boolean);
+
+    const validationErrors: string[] = [];
+    const prepared: { warehouse: string; department: string; campus: string; division: string; receiverName: string; sendTo: string[]; ccTo: string[] }[] = [];
+
+    items.forEach((item, index) => {
+      const rowNo = index + 2; // spreadsheet header is row 1, data starts at row 2
+      const rowErrors: string[] = [];
+
       const warehouse = String(item.warehouse || item["Warehouse"] || "").trim();
       const department = String(item.department || item["Department"] || "").trim();
       const campus = String(item.campus || item["Campus"] || "").trim();
+      const division = String(item.division || item["Division"] || "").trim();
       const receiverName = String(item.receiverName || item["Receiver Name"] || item["Receiver"] || "").trim();
-      if (!warehouse || !department || !campus || !receiverName) continue;
+
+      if (!warehouse) rowErrors.push("Warehouse");
+      if (!department) rowErrors.push("Department");
+      if (!campus) rowErrors.push("Campus");
+      if (!receiverName) rowErrors.push("Receiver Name");
+
       const rawSendTo = item.sendToEmail || item["Send To Emails"] || item["Send To"] || "";
       const rawCcTo = item.ccToEmail || item["CC Emails"] || item["CC"] || "";
-      const splitEmails = (raw: string): string[] =>
-        raw.split(/[;,\n]+/).map((e: string) => e.trim()).filter((e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
-      const sendTo = splitEmails(rawSendTo);
-      const ccTo = splitEmails(rawCcTo);
-      if (sendTo.length === 0) continue;
+
+      const sendTo = splitEmails(rawSendTo).filter((e: string) => EMAIL_RE.test(e));
+      const ccTo = splitEmails(rawCcTo).filter((e: string) => EMAIL_RE.test(e));
+
+      if (sendTo.length === 0) rowErrors.push("at least one valid 'Send To Email'");
+
+      if (rowErrors.length > 0) {
+        validationErrors.push(`Row ${rowNo}: ${rowErrors.join(", ")}`);
+} else {
+        prepared.push({ warehouse, department, campus, division, receiverName, sendTo, ccTo });
+      }
+    });
+
+    if (validationErrors.length > 0) {
+      const shown = validationErrors.slice(0, 10).join(" | ");
+      const more = validationErrors.length > 10 ? ` | and ${validationErrors.length - 10} more row(s)` : "";
+      return res.status(400).json({
+        error: `Import cancelled: ${validationErrors.length} row(s) failed validation. ${shown}${more}`,
+      });
+    }
+
+    let count = 0;
+    for (const cfg of prepared) {
       const id = `dne-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
       await p.execute(
-        `INSERT INTO debit_note_emails (id, warehouse, department, campus, receiverName, sendToEmail, ccToEmail, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE receiverName = VALUES(receiverName), sendToEmail = VALUES(sendToEmail), ccToEmail = VALUES(ccToEmail), updatedAt = VALUES(updatedAt)`,
-        [id, warehouse, department, campus, receiverName, JSON.stringify(sendTo), JSON.stringify(ccTo), now, now]
+        `INSERT INTO debit_note_emails (id, warehouse, department, campus, division, receiverName, sendToEmail, ccToEmail, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE division = VALUES(division), receiverName = VALUES(receiverName), sendToEmail = VALUES(sendToEmail), ccToEmail = VALUES(ccToEmail), updatedAt = VALUES(updatedAt)`,
+        [id, cfg.warehouse, cfg.department, cfg.campus, cfg.division, cfg.receiverName, JSON.stringify(cfg.sendTo), JSON.stringify(cfg.ccTo), now, now]
       );
       count++;
-    }
-    if (count === 0) {
-      return res.status(400).json({ error: "No valid rows found. Each row needs Warehouse, Department, Campus, Receiver Name, and at least one valid email." });
     }
     res.json({ success: true, count });
   } catch (err: any) {
@@ -1475,14 +1561,25 @@ app.post("/api/debit-note/emails/import", async (req, res) => {
 
 // ─── Debit Note Generation ───
 
-function generateDebitNoteNo(warehouse: string, department: string, campus: string): string {
-  const now = new Date();
-  const yy = now.getFullYear() % 100;
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const w = warehouse.replace(/[^A-Za-z0-9]/g, "").substring(0, 3).toUpperCase() || "WH";
-  const d = department.replace(/[^A-Za-z0-9]/g, "").substring(0, 3).toUpperCase() || "DP";
-  const c = campus.replace(/[^A-Za-z0-9]/g, "").substring(0, 5).toUpperCase() || "CMP";
-  return `DN${yy}${mm}-${w}-${d}-${c}`;
+async function generateDebitNoteNo(p: mysql.Pool, division: string, department: string, campus: string, startDate: string, excludeId?: string): Promise<string> {
+  const v = division.replace(/[^A-Za-z0-9]/g, "");
+  const d = department.replace(/[^A-Za-z0-9]/g, "") || "DP";
+  const c = campus.replace(/[^A-Za-z0-9]/g, "") || "CMP";
+  const mm = String(startDate || "").slice(5, 7) || "00";
+  const yy = String(startDate || "").slice(2, 4) || "00";
+  const base = v ? `${v}-${d}-${c}-${mm}${yy}` : `${d}-${c}-${mm}${yy}`;
+  const [rows] = await p.query<RowDataPacket[]>(
+    `SELECT id, referenceNumber FROM debit_notes WHERE referenceNumber = ? OR referenceNumber LIKE ?`,
+    [base, `${base}-%`]
+  );
+  let maxSuffix = 0;
+  for (const row of rows) {
+    if (excludeId && row.id === excludeId) continue;
+    if (row.referenceNumber === base) { maxSuffix = Math.max(maxSuffix, 1); continue; }
+    const suffix = parseInt(String(row.referenceNumber).slice(base.length + 1), 10);
+    if (!isNaN(suffix)) maxSuffix = Math.max(maxSuffix, suffix);
+  }
+  return maxSuffix === 0 ? base : `${base}-${maxSuffix + 1}`;
 }
 
 // POST: Generate debit notes from stock issue items
@@ -1490,10 +1587,13 @@ app.post("/api/debit-notes/generate", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
-    const { startDate, endDate, warehouse, department, campus } = req.body;
+    const { startDate, endDate, warehouse, department, campus, skipMissingEmailGroups } = req.body;
 
     if (!startDate || !endDate) {
-      return res.status(400).json({ error: "startDate and endDate are required." });
+      return res.status(400).json({ error: "Start date and end date are required." });
+    }
+    if (String(startDate) > String(endDate)) {
+      return res.status(400).json({ error: "Start date cannot be after end date." });
     }
 
     // Build query for stock issue items
@@ -1508,43 +1608,63 @@ app.post("/api/debit-notes/generate", async (req, res) => {
     const [items] = await p.query<RowDataPacket[]>(sql, params);
 
     if (items.length === 0) {
-      return res.status(422).json({ error: "No stock issue items found for the given filters." });
+      return res.status(422).json({ error: "No stock issue items found for the selected date range and filters. Check that the start/end dates are correct and that stock issue records exist for the chosen filters." });
     }
 
-    // Group items by warehouse+department+campus
+    // Group items by warehouse+division+department+campus
     const groups = new Map<string, any[]>();
     for (const item of items) {
-      const key = `${item.warehouse}||${item.department}||${item.campus}`;
+      const key = `${item.warehouse}||${item.division || ""}||${item.department}||${item.campus}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(item);
+    }
+
+    const groupLabel = (w: string, div: string, d: string, c: string) =>
+      div ? `${w} / ${div} / ${d} / ${c}` : `${w} / ${d} / ${c}`;
+
+    const emailConfigByGroup = new Map<string, any>();
+    const missingEmailGroups: string[] = [];
+
+    for (const key of groups.keys()) {
+      const [grpWarehouse, grpDivision, grpDepartment, grpCampus] = key.split("||");
+
+      // Check email config exists
+      const [emailConfigs] = await p.execute<RowDataPacket[]>(
+        "SELECT * FROM debit_note_emails WHERE warehouse = ? AND division = ? AND department = ? AND campus = ? LIMIT 1",
+        [grpWarehouse, grpDivision, grpDepartment, grpCampus]
+      );
+
+      if (emailConfigs.length === 0) {
+        missingEmailGroups.push(groupLabel(grpWarehouse, grpDivision, grpDepartment, grpCampus));
+      } else {
+        emailConfigByGroup.set(key, emailConfigs[0]);
+      }
+    }
+
+    if (missingEmailGroups.length > 0 && !skipMissingEmailGroups) {
+      return res.status(422).json({
+        error: `Generation cancelled: ${missingEmailGroups.length} group(s) have no email configuration (${missingEmailGroups.join(", ")}). Add email configs in "Debit Note Email Configurations" or skip these groups and generate the rest.`,
+        code: "MISSING_EMAIL_CONFIGS",
+        missingGroups: missingEmailGroups,
+      });
     }
 
     const created: any[] = [];
 
     for (const [key, groupItems] of groups.entries()) {
-      const [grpWarehouse, grpDepartment, grpCampus] = key.split("||");
-
-      // Check email config exists
-      const [emailConfigs] = await p.execute<RowDataPacket[]>(
-        "SELECT * FROM debit_note_emails WHERE warehouse = ? AND department = ? AND campus = ? LIMIT 1",
-        [grpWarehouse, grpDepartment, grpCampus]
-      );
-
-      if (emailConfigs.length === 0) {
-        continue;
-      }
-
-      const emailConfig = emailConfigs[0];
+      const [grpWarehouse, grpDivision, grpDepartment, grpCampus] = key.split("||");
+      const emailConfig = emailConfigByGroup.get(key);
+      if (!emailConfig) continue;
 
       // Generate or update debit note
       const now = new Date().toISOString();
-      const refNo = generateDebitNoteNo(grpWarehouse, grpDepartment, grpCampus);
 
       // Use updateOrCreate pattern: find existing by unique key
       const [existingNotes] = await p.execute<RowDataPacket[]>(
-        "SELECT * FROM debit_notes WHERE warehouse = ? AND department = ? AND campus = ? AND startDate = ? AND endDate = ? LIMIT 1",
-        [grpWarehouse, grpDepartment, grpCampus, startDate, endDate]
+        "SELECT * FROM debit_notes WHERE warehouse = ? AND department = ? AND campus = ? AND division = ? AND startDate = ? AND endDate = ? LIMIT 1",
+        [grpWarehouse, grpDepartment, grpCampus, grpDivision, startDate, endDate]
       );
+      const refNo = await generateDebitNoteNo(p, grpDivision, grpDepartment, grpCampus, startDate, existingNotes[0]?.id);
 
       let debitNoteId: string;
       if (existingNotes.length > 0) {
@@ -1560,7 +1680,7 @@ app.post("/api/debit-notes/generate", async (req, res) => {
         await p.execute(
           `INSERT INTO debit_notes (id, referenceNumber, warehouse, division, department, campus, startDate, endDate, status, debitNoteEmailId, createdBy, createdAt, updatedAt)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
-          [debitNoteId, refNo, grpWarehouse, groupItems[0]?.division || "", grpDepartment, grpCampus, startDate, endDate, emailConfig.id, req.body.createdBy || "system", now, now]
+          [debitNoteId, refNo, grpWarehouse, grpDivision, grpDepartment, grpCampus, startDate, endDate, emailConfig.id, req.body.createdBy || "system", now, now]
         );
       }
 
@@ -1581,13 +1701,23 @@ app.post("/api/debit-notes/generate", async (req, res) => {
     }
 
     if (created.length === 0) {
-      return res.status(422).json({ error: "No debit notes generated. Ensure email configurations exist for the warehouse/department/campus combinations." });
+      const skippedDetail = skipMissingEmailGroups && missingEmailGroups.length > 0
+        ? ` All groups were skipped because they have no email configuration.`
+        : "";
+      return res.status(422).json({
+        error: `No debit notes generated.${skippedDetail}`,
+      });
     }
 
-    res.json({ success: true, count: created.length, debitNotes: created });
+    const response: any = { success: true, count: created.length, debitNotes: created };
+    if (skipMissingEmailGroups && missingEmailGroups.length > 0) {
+      response.skipped = missingEmailGroups.length;
+      response.skippedGroups = missingEmailGroups;
+    }
+    res.json(response);
   } catch (err: any) {
     console.error("Error generating debit notes:", err);
-    res.status(500).json({ error: "Failed to generate debit notes." });
+    res.status(500).json({ error: "Failed to generate debit notes. Please try again." });
   }
 });
 
@@ -1723,8 +1853,63 @@ app.get("/api/debit-notes/:id", async (req, res) => {
   }
 });
 
+// DELETE: Bulk delete debit notes by filter (requires at least one filter)
+app.delete("/api/debit-notes/bulk", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const { warehouse, department, campus, status, startDate, endDate, search } = req.query;
+    const whereClauses: string[] = [];
+    const params: any[] = [];
+
+    if (warehouse) { whereClauses.push("warehouse = ?"); params.push(warehouse); }
+    if (department) { whereClauses.push("department = ?"); params.push(department); }
+    if (campus) { whereClauses.push("campus = ?"); params.push(campus); }
+    if (status) { whereClauses.push("status = ?"); params.push(status); }
+    if (startDate) { whereClauses.push("startDate >= ?"); params.push(startDate); }
+    if (endDate) { whereClauses.push("endDate <= ?"); params.push(endDate); }
+    if (search) {
+      const q = `%${search}%`;
+      whereClauses.push("(referenceNumber LIKE ? OR warehouse LIKE ? OR department LIKE ? OR campus LIKE ? OR createdBy LIKE ? OR status LIKE ?)");
+      params.push(q, q, q, q, q, q);
+    }
+
+    if (whereClauses.length === 0) {
+      return res.status(400).json({ error: "At least one filter is required for bulk delete." });
+    }
+
+    const whereSql = " WHERE " + whereClauses.join(" AND ");
+    const conn = await p.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [rows] = await conn.query<RowDataPacket[]>(`SELECT id FROM debit_notes${whereSql}`, params);
+      const ids = rows.map((r) => r.id);
+      let count = 0;
+      if (ids.length > 0) {
+        const placeholders = ids.map(() => "?").join(",");
+        await conn.execute(`DELETE FROM debit_note_items WHERE debitNoteId IN (${placeholders})`, ids);
+        const [result] = await conn.execute<ResultSetHeader>(`DELETE FROM debit_notes WHERE id IN (${placeholders})`, ids);
+        count = result.affectedRows;
+      }
+      await conn.commit();
+      res.json({ success: true, count });
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+  } catch (err: any) {
+    console.error("Error bulk deleting debit notes:", err);
+    res.status(500).json({ error: "Failed to bulk delete debit notes." });
+  }
+});
+
 // DELETE: Delete a debit note
 app.delete("/api/debit-notes/:id", async (req, res) => {
+  if (req.params.id === "bulk") {
+    return res.status(400).json({ error: "Use /bulk endpoint for bulk delete." });
+  }
   try {
     assertDb();
     const p = getPool()!;
@@ -2083,6 +2268,15 @@ function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items: any[]
 
   [5, 14, 16, 45, 8, 7, 14, 16, 18, 12, 14, 14, 16, 40]
     .forEach((w, i) => sheet.getColumn(i + 1).width = w);
+
+  ensureDebitNoteLogo();
+  if (debitNoteLogoBase64) {
+    const imageId = workbook.addImage({ base64: debitNoteLogoBase64, extension: "png" });
+    sheet.addImage(imageId, {
+      tl: { col: 0, row: 0 },
+      ext: { width: DEBIT_NOTE_LOGO_WIDTH, height: DEBIT_NOTE_LOGO_HEIGHT },
+    });
+  }
 
   const thinBorder: Partial<ExcelJS.Borders> = {
     top: { style: "thin" }, left: { style: "thin" },
@@ -2579,6 +2773,8 @@ app.post("/api/ai/copywrite", async (req, res) => {
 // --- Server Delivery Pipelines ---
 async function startServer() {
   await initDb();
+
+  ensureDebitNoteLogo();
 
   const uploadsDir = path.join(process.cwd(), "uploads");
   if (!fs.existsSync(uploadsDir)) {

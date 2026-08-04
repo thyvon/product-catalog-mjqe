@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FormLabel } from "@/features/shared/components/FormLabel";
 
-const IMPORT_COLUMNS = ["Warehouse", "Department", "Campus", "Receiver Name", "Send To Emails", "CC Emails"];
+const IMPORT_COLUMNS = ["Warehouse", "Division", "Department", "Campus", "Receiver Name", "Send To Emails", "CC Emails"];
 
 interface DebitNoteEmailImportModalProps {
   isOpen: boolean;
@@ -25,8 +25,8 @@ export default function DebitNoteEmailImportModal({ isOpen, onClose, onImportCom
   const downloadExcelTemplate = async () => {
     const XLSX = await import("xlsx");
     const sampleRows = [
-      ["Main WH", "IT", "PP", "Vun Thy", "vun.thy@example.com;sokha@example.com", "cc@example.com"],
-      ["Secondary WH", "Finance", "SR", "Sokha", "sokha@example.com", ""],
+      ["Main WH", "IT Support", "IT", "PP", "vun.thy@example.com;sokha@example.com", "cc@example.com"],
+      ["Secondary WH", "", "Finance", "SR", "sokha@example.com", ""],
     ];
     const ws = XLSX.utils.aoa_to_sheet([IMPORT_COLUMNS, ...sampleRows]);
     const wb = XLSX.utils.book_new();
@@ -64,15 +64,13 @@ export default function DebitNoteEmailImportModal({ isOpen, onClose, onImportCom
           warehouse: String(row["Warehouse"] || row["warehouse"] || row["WAREHOUSE"] || "").trim(),
           department: String(row["Department"] || row["department"] || row["DEPARTMENT"] || "").trim(),
           campus: String(row["Campus"] || row["campus"] || row["CAMPUS"] || "").trim(),
+          division: String(row["Division"] || row["division"] || row["DIVISION"] || "").trim(),
           receiverName: String(row["Receiver Name"] || row["receiverName"] || row["RECEIVER NAME"] || row["Receiver"] || "").trim(),
           sendToEmail: String(row["Send To Emails"] || row["sendToEmail"] || row["SEND TO EMAILS"] || row["Send To"] || "").trim(),
           ccToEmail: String(row["CC Emails"] || row["ccToEmail"] || row["CC EMAILS"] || row["CC"] || "").trim(),
         }));
 
-        const valid = formatted.filter((r: any) => r.warehouse && r.department && r.campus && r.receiverName);
-        if (valid.length === 0) throw new Error("No rows with valid 'Warehouse', 'Department', 'Campus', and 'Receiver Name'.");
-
-        setParsedRows(valid);
+        setParsedRows(formatted);
       } catch (err: any) {
         toast.error(err.message || "Failed to parse file.");
         setImportFile(null);
@@ -166,6 +164,7 @@ export default function DebitNoteEmailImportModal({ isOpen, onClose, onImportCom
                 <TableHeader className="font-mono font-bold uppercase sticky top-0">
                   <TableRow>
                     <TableHead className="px-2 py-2 text-left">Warehouse</TableHead>
+                    <TableHead className="px-2 py-2 text-left">Division</TableHead>
                     <TableHead className="px-2 py-2 text-left">Dept</TableHead>
                     <TableHead className="px-2 py-2 text-left">Campus</TableHead>
                     <TableHead className="px-2 py-2 text-left">Receiver</TableHead>
@@ -177,6 +176,7 @@ export default function DebitNoteEmailImportModal({ isOpen, onClose, onImportCom
                   {parsedRows.slice(0, 15).map((r: any, i: number) => (
                     <TableRow key={i}>
                       <TableCell className="px-2 py-1.5 font-mono font-bold text-foreground">{r.warehouse}</TableCell>
+                      <TableCell className="px-2 py-1.5 text-muted-foreground">{r.division || "-"}</TableCell>
                       <TableCell className="px-2 py-1.5 text-muted-foreground">{r.department}</TableCell>
                       <TableCell className="px-2 py-1.5 text-muted-foreground">{r.campus}</TableCell>
                       <TableCell className="px-2 py-1.5 text-muted-foreground">{r.receiverName}</TableCell>

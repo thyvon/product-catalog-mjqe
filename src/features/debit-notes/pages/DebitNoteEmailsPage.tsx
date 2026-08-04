@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { PlusCircle, RefreshCw, Pencil, Trash2, Mail, Upload } from "lucide-react";
+import { PlusCircle, RefreshCw, Pencil, Trash2, Mail, Upload, Download, Copy } from "lucide-react";
 import DataTable from "@/features/shared/components/DataTable";
 import ListPageLayout from "@/features/shared/components/ListPageLayout";
 import PageContent from "@/features/shared/components/PageContent";
@@ -15,12 +15,14 @@ import { useConfirmModal } from "@/features/shared/hooks";
 import DebitNoteEmailImportModal from "@/features/debit-notes/components/DebitNoteEmailImportModal";
 import { FormLabel } from "@/features/shared/components/FormLabel";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 
 interface EmailConfig {
   id: string;
   warehouse: string;
   department: string;
   campus: string;
+  division: string;
   receiverName: string;
   sendToEmail: string;
   ccToEmail: string;
@@ -52,6 +54,7 @@ export default function DebitNoteEmailsPage() {
     warehouse: "",
     department: "",
     campus: "",
+    division: "",
     receiverName: "",
     sendToEmail: "",
     ccToEmail: "",
@@ -78,7 +81,7 @@ export default function DebitNoteEmailsPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setFormData({ warehouse: "", department: "", campus: "", receiverName: "", sendToEmail: "", ccToEmail: "" });
+    setFormData({ warehouse: "", department: "", campus: "", division: "", receiverName: "", sendToEmail: "", ccToEmail: "" });
     setShowForm(true);
   };
 
@@ -88,6 +91,21 @@ export default function DebitNoteEmailsPage() {
       warehouse: config.warehouse,
       department: config.department,
       campus: config.campus,
+      division: config.division || "",
+      receiverName: config.receiverName,
+      sendToEmail: parseEmailList(config.sendToEmail).join("\n"),
+      ccToEmail: parseEmailList(config.ccToEmail).join("\n"),
+    });
+    setShowForm(true);
+  };
+
+  const openDuplicate = (config: EmailConfig) => {
+    setEditing(null);
+    setFormData({
+      warehouse: config.warehouse,
+      department: config.department,
+      campus: config.campus,
+      division: config.division || "",
       receiverName: config.receiverName,
       sendToEmail: parseEmailList(config.sendToEmail).join("\n"),
       ccToEmail: parseEmailList(config.ccToEmail).join("\n"),
@@ -113,6 +131,7 @@ export default function DebitNoteEmailsPage() {
       warehouse: formData.warehouse,
       department: formData.department,
       campus: formData.campus,
+      division: formData.division,
       receiverName: formData.receiverName,
       sendToEmail: sendToEmails,
       ccToEmail: ccToEmails,
@@ -165,14 +184,78 @@ export default function DebitNoteEmailsPage() {
     );
   };
 
+  const hasActiveFilters = Boolean(searchQuery || warehouseFilter || departmentFilter || campusFilter);
+
   const filtered = configs.filter((c) => {
     const q = searchQuery.toLowerCase().trim();
-    const matchesSearch = !q || [c.warehouse, c.department, c.campus, c.receiverName].some((value) => value.toLowerCase().includes(q));
+    const matchesSearch = !q || [c.warehouse, c.department, c.campus, c.division, c.receiverName].some((value) => value.toLowerCase().includes(q));
     const matchesWarehouse = !warehouseFilter || c.warehouse === warehouseFilter;
     const matchesDepartment = !departmentFilter || c.department === departmentFilter;
     const matchesCampus = !campusFilter || c.campus === campusFilter;
     return matchesSearch && matchesWarehouse && matchesDepartment && matchesCampus;
   });
+
+  const handleBulkDelete = useCallback(() => {
+    const ids = filtered.map((c) => c.id);
+    confirm(
+      "Delete All Filtered Email Configs",
+      `Delete all ${ids.length} email config${ids.length !== 1 ? "s" : ""} matching current filters? This cannot be undone.`,
+      async () => {
+        closeConfirm();
+        try {
+          const res = await fetch("/api/debit-note/emails/bulk-delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            toast.success(`Deleted ${data.count} email config${data.count !== 1 ? "s" : ""}.`);
+            setCurrentPage(1);
+            fetchConfigs();
+          } else {
+            const data = await res.json();
+            toast.error(data.error || "Failed to delete email configs.");
+          }
+        } catch {
+          toast.error("Failed to delete email configs.");
+        }
+      },
+      "Delete All",
+    );
+  }, [filtered, confirm, closeConfirm, fetchConfigs, toast]);
+
+  const handleExport = useCallback(async () => {
+    try {
+      const XLSX = await import("xlsx");
+      const columns = ["Warehouse", "Division", "Department", "Campus", "Receiver Name", "Send To Emails", "CC Emails"];
+      const rows = filtered.map((c) => [
+        c.warehouse,
+        c.department,
+        c.campus,
+        c.division,
+        c.receiverName,
+        parseEmailList(c.sendToEmail).join(";"),
+        parseEmailList(c.ccToEmail).join(";"),
+      ]);
+      const ws = XLSX.utils.aoa_to_sheet([columns, ...rows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Email Configs");
+      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const blob = new Blob([buf], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Debit_Note_Email_Configs.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${filtered.length} email config${filtered.length !== 1 ? "s" : ""}.`);
+    } catch {
+      toast.error("Failed to export email configs.");
+    }
+  }, [filtered, toast]);
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -210,9 +293,13 @@ export default function DebitNoteEmailsPage() {
         description={`${filtered.length} email config${filtered.length !== 1 ? "s" : ""} found`}
         actions={(
           <>
-            <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
+            <Button variant="outline" onClick={() => setShowImportModal(true)}>
               <Upload />
               <span>Import</span>
+            </Button>
+            <Button variant="outline" onClick={handleExport}>
+              <Download />
+              <span>Export</span>
             </Button>
             <Tooltip>
               <TooltipTrigger render={<Button variant="outline" size="icon" onClick={fetchConfigs}>
@@ -220,10 +307,15 @@ export default function DebitNoteEmailsPage() {
               </Button>} />
               <TooltipContent>Refresh</TooltipContent>
             </Tooltip>
-            <Button onClick={openCreate} size="sm">
+            <Button onClick={openCreate}>
               <PlusCircle />
               <span>Add Config</span>
             </Button>
+            {filtered.length > 0 && hasActiveFilters && (
+              <Button variant="destructive" onClick={handleBulkDelete}>
+                <Trash2 /><span>Delete Filtered</span>
+              </Button>
+            )}
           </>
         )}
         searchValue={searchQuery}
@@ -283,6 +375,10 @@ export default function DebitNoteEmailsPage() {
                 <TextField type="text" value={formData.warehouse} onChange={(e) => setFormData({ ...formData, warehouse: e.target.value })} placeholder="e.g. Main WH" />
               </div>
               <div>
+                <FormLabel>Division</FormLabel>
+                <TextField type="text" value={formData.division} onChange={(e) => setFormData({ ...formData, division: e.target.value })} placeholder="e.g. IT Support" />
+              </div>
+              <div>
                 <FormLabel>Department</FormLabel>
                 <TextField type="text" value={formData.department} onChange={(e) => setFormData({ ...formData, department: e.target.value })} placeholder="e.g. IT" />
               </div>
@@ -324,6 +420,7 @@ export default function DebitNoteEmailsPage() {
         <DataTable<EmailConfig>
           columns={[
             { accessorKey: "warehouse", header: "Warehouse", meta: { className: "font-bold text-foreground" } },
+            { accessorKey: "division", header: "Division", meta: { className: "text-muted-foreground" } },
             { accessorKey: "department", header: "Department", meta: { className: "text-muted-foreground" } },
             { accessorKey: "campus", header: "Campus", meta: { className: "text-muted-foreground" } },
             { accessorKey: "receiverName", header: "Receiver", meta: { className: "font-medium text-foreground" } },
@@ -331,13 +428,25 @@ export default function DebitNoteEmailsPage() {
               accessorKey: "sendToEmail",
               header: "Send To",
               meta: { className: "text-muted-foreground" },
-              cell: ({ row }) => parseEmailList(row.original.sendToEmail).join(", "),
+              cell: ({ row }) => (
+                <div className="flex flex-wrap gap-1 max-w-[320px]">
+                  {parseEmailList(row.original.sendToEmail).map((email) => (
+                    <Badge key={email} className="border-emerald-200 bg-emerald-50 text-emerald-700 truncate max-w-full dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">{email}</Badge>
+                  ))}
+                </div>
+              ),
             },
             {
               accessorKey: "ccToEmail",
               header: "CC",
               meta: { className: "text-muted-foreground" },
-              cell: ({ row }) => parseEmailList(row.original.ccToEmail).join(", "),
+              cell: ({ row }) => (
+                <div className="flex flex-wrap gap-1 max-w-[320px]">
+                  {parseEmailList(row.original.ccToEmail).map((email) => (
+                    <Badge key={email} className="border-amber-200 bg-amber-50 text-amber-700 truncate max-w-full dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300">{email}</Badge>
+                  ))}
+                </div>
+              ),
             },
             {
               id: "actions",
@@ -350,6 +459,10 @@ export default function DebitNoteEmailsPage() {
                     <Tooltip>
                       <TooltipTrigger render={<Button variant="ghost" size="icon-xs" onClick={() => openEdit(config)}><Pencil /></Button>} />
                       <TooltipContent>Edit</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger render={<Button variant="ghost" size="icon-xs" onClick={() => openDuplicate(config)}><Copy /></Button>} />
+                      <TooltipContent>Duplicate</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger render={<Button variant="ghost" size="icon-xs" onClick={() => handleDelete(config.id)}><Trash2 /></Button>} />

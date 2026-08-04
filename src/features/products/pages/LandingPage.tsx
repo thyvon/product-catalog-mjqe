@@ -136,7 +136,7 @@ export default function LandingPage() {
               </Button>} />
               <TooltipContent>Reload catalog</TooltipContent>
             </Tooltip>
-            <Button onClick={triggerExportCSV} disabled={total === 0} variant="outline" size="sm">
+            <Button onClick={triggerExportCSV} disabled={total === 0} variant="outline">
               <Download /> Export CSV
             </Button>
           </>
@@ -144,6 +144,7 @@ export default function LandingPage() {
         searchValue={searchQuery}
         onSearchChange={(v) => { setSearchQuery(v); resetPage(); }}
         searchPlaceholder="Search by SKU code or name..."
+        activeFilterCount={[selectedCategory, statusFilter !== "active" ? statusFilter : ""].filter(Boolean).length}
         filters={(
           <>
             <Select value={selectedCategory} onValueChange={(v) => { setSelectedCategory(v); resetPage(); }}>
@@ -176,13 +177,15 @@ export default function LandingPage() {
                 <SelectItem value="code">Sort: Product Code</SelectItem>
               </SelectContent>
             </Select>
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "gallery" | "list")}>
-              <TabsList>
-                <TabsTrigger value="gallery"><Widget /></TabsTrigger>
-                <TabsTrigger value="list"><List /></TabsTrigger>
-              </TabsList>
-            </Tabs>
           </>
+        )}
+        filterEnd={(
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "gallery" | "list")}>
+            <TabsList>
+              <TabsTrigger value="gallery"><Widget /></TabsTrigger>
+              <TabsTrigger value="list"><List /></TabsTrigger>
+            </TabsList>
+          </Tabs>
         )}
       >
         {error ? (
@@ -202,7 +205,6 @@ export default function LandingPage() {
             <Button
               onClick={() => { setSearchQuery(""); setSelectedCategory(""); setStatusFilter("active"); }}
               variant="outline"
-              size="sm"
             >
               Reset Filters
             </Button>

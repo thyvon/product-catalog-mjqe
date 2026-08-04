@@ -1,7 +1,10 @@
 import { createServer as createHttpServer } from "http";
 import { createApp } from "./app.js";
+import { ensureDebitNoteLogo } from "./services/logo.js";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
+
+ensureDebitNoteLogo();
 
 const tryListen = (port: number) => {
   createApp().then((app) => {

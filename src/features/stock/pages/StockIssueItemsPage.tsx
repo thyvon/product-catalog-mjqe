@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useConfirmModal } from "@/features/shared/hooks";
-import { RefreshCw, Trash2, Upload, FileText, PlusCircle, Pencil } from "lucide-react";
+import { RefreshCw, Trash2, Upload, FileText, PlusCircle, Pencil, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DataTable from "@/features/shared/components/DataTable";
 import ListPageLayout from "@/features/shared/components/ListPageLayout";
@@ -58,25 +58,38 @@ export default function StockIssueItemsPage() {
 
   const fetchIdRef = useRef(0);
 
+  const [filterValues, setFilterValues] = useState<{ warehouses: string[]; departments: string[]; campuses: string[]; transactionTypes: string[] }>({
+    warehouses: [],
+    departments: [],
+    campuses: [],
+    transactionTypes: [],
+  });
+
   const warehouseOptions = useMemo(() => {
-    const values = [...new Set(items.map((i) => i.warehouse).filter(Boolean))];
-    return [{ value: "", label: "All Warehouses" }, ...values.map((v) => ({ value: v, label: v }))];
-  }, [items]);
+    return [{ value: "", label: "All Warehouses" }, ...filterValues.warehouses.map((v) => ({ value: v, label: v }))];
+  }, [filterValues.warehouses]);
 
   const departmentOptions = useMemo(() => {
-    const values = [...new Set(items.map((i) => i.department).filter(Boolean))];
-    return [{ value: "", label: "All Departments" }, ...values.map((v) => ({ value: v, label: v }))];
-  }, [items]);
+    return [{ value: "", label: "All Departments" }, ...filterValues.departments.map((v) => ({ value: v, label: v }))];
+  }, [filterValues.departments]);
 
   const campusOptions = useMemo(() => {
-    const values = [...new Set(items.map((i) => i.campus).filter(Boolean))];
-    return [{ value: "", label: "All Campuses" }, ...values.map((v) => ({ value: v, label: v }))];
-  }, [items]);
+    return [{ value: "", label: "All Campuses" }, ...filterValues.campuses.map((v) => ({ value: v, label: v }))];
+  }, [filterValues.campuses]);
 
   const transactionTypeOptions = useMemo(() => {
-    const values = [...new Set(items.map((i) => i.transactionType).filter(Boolean))];
-    return [{ value: "", label: "All Types" }, ...values.map((v) => ({ value: v, label: v }))];
-  }, [items]);
+    return [{ value: "", label: "All Types" }, ...filterValues.transactionTypes.map((v) => ({ value: v, label: v }))];
+  }, [filterValues.transactionTypes]);
+
+  useEffect(() => {
+    const fetchFilterValues = async () => {
+      try {
+        const res = await fetch("/api/stock-issue-items/filters/values");
+        if (res.ok) setFilterValues(await res.json());
+      } catch {}
+    };
+    fetchFilterValues();
+  }, []);
 
   const hasActiveFilters = warehouseFilter || departmentFilter || campusFilter || transactionTypeFilter || startDate || endDate || search;
 
@@ -168,6 +181,84 @@ export default function StockIssueItemsPage() {
       },
     );
   }, [hasActiveFilters, total, confirm, closeConfirm, warehouseFilter, departmentFilter, campusFilter, transactionTypeFilter, startDate, endDate, search, fetchItems]);
+
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = useCallback(async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (warehouseFilter) params.set("warehouse", warehouseFilter);
+      if (departmentFilter) params.set("department", departmentFilter);
+      if (campusFilter) params.set("campus", campusFilter);
+      if (transactionTypeFilter) params.set("transactionType", transactionTypeFilter);
+      if (startDate) params.set("startDate", startDate);
+      if (endDate) params.set("endDate", endDate);
+      if (search) params.set("search", search);
+
+      const res = await fetch(`/api/stock-issue-items?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch stock issue items.");
+      const data = await res.json();
+      const rows: any[] = Array.isArray(data) ? data : (data.items || []);
+
+      const XLSX = await import("xlsx");
+      const parseExcelDate = (value: string | null | undefined): Date | null => {
+        if (!value) return null;
+        const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        const d = new Date(value);
+        return isNaN(d.getTime()) ? null : d;
+      };
+      const columns = [
+        "Date", "Code", "Description", "Qty", "UoM", "Unit Price", "Total Amount",
+        "Requester", "Campus", "Division", "Department", "Description/ Purpose",
+        "Ref.No", "Transaction Type", "Account Code", "Warehouse"
+      ];
+      const sheetRows = rows.map((i) => [
+        parseExcelDate(i.transactionDate) ?? "",
+        i.itemCode || "",
+        i.description || "",
+        Number(i.quantity ?? 0) || 0,
+        i.uom || "",
+        Number(i.unitPrice ?? 0) || 0,
+        Number(i.totalPrice ?? 0) || 0,
+        i.requesterName || "",
+        i.campus || "",
+        i.division || "",
+        i.department || "",
+        i.remarks || "",
+        i.referenceNo || "",
+        i.transactionType || "",
+        i.accountCode || "",
+        i.warehouse || "",
+      ]);
+      const ws = XLSX.utils.aoa_to_sheet([columns, ...sheetRows]);
+      if (ws["!ref"]) {
+        const range = XLSX.utils.decode_range(ws["!ref"]);
+        for (let r = 1; r <= range.e.r; r++) {
+          const cell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
+          if (cell && cell.t === "n" && typeof cell.v === "number") cell.z = "yyyy-mm-dd";
+        }
+      }
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Stock Issue Items");
+      const buf = XLSX.write(wb, { bookType: "xlsx", type: "array", cellDates: true });
+      const blob = new Blob([buf], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Stock_Issue_Items.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${rows.length} item${rows.length !== 1 ? "s" : ""}.`);
+    } catch {
+      toast.error("Failed to export stock issue items.");
+    } finally {
+      setExporting(false);
+    }
+  }, [warehouseFilter, departmentFilter, campusFilter, transactionTypeFilter, startDate, endDate, search, toast]);
 
   const columns = useMemo<ColumnDef<StockIssueItem>[]>(() => [
     {
@@ -313,14 +404,17 @@ export default function StockIssueItemsPage() {
               } />
               <TooltipContent>Refresh</TooltipContent>
             </Tooltip>
-            <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+            <Button variant="outline" onClick={() => setShowImport(true)}>
               <Upload /><span>Import</span>
             </Button>
-            <Button size="sm" onClick={() => { setEditItem(null); setShowForm(true); }}>
+            <Button variant="outline" onClick={handleExport} disabled={exporting}>
+              <Download /><span>{exporting ? "Exporting..." : "Export"}</span>
+            </Button>
+            <Button onClick={() => { setEditItem(null); setShowForm(true); }}>
               <PlusCircle /><span>Add Item</span>
             </Button>
             {total > 0 && hasActiveFilters && (
-              <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+              <Button variant="destructive" onClick={handleBulkDelete}>
                 <Trash2 /><span>Delete Filtered</span>
               </Button>
             )}
@@ -329,53 +423,54 @@ export default function StockIssueItemsPage() {
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search by code, description, requester, or reference..."
+        activeFilterCount={[warehouseFilter, departmentFilter, campusFilter, transactionTypeFilter, startDate, endDate].filter(Boolean).length}
         filters={(
           <>
-            {/* Row 1: dropdown filters */}
             <SelectField
               value={warehouseFilter}
               onChange={setWarehouseFilter}
               options={warehouseOptions}
-              containerClassName="min-w-[130px]"
+              placeholder="All Warehouses"
+              containerClassName="min-w-[140px]"
             />
             <SelectField
               value={departmentFilter}
               onChange={setDepartmentFilter}
               options={departmentOptions}
-              containerClassName="min-w-[130px]"
+              placeholder="All Departments"
+              containerClassName="min-w-[140px]"
             />
             <SelectField
               value={campusFilter}
               onChange={setCampusFilter}
               options={campusOptions}
-              containerClassName="min-w-[120px]"
+              placeholder="All Campuses"
+              containerClassName="min-w-[130px]"
             />
             <SelectField
               value={transactionTypeFilter}
               onChange={setTransactionTypeFilter}
               options={transactionTypeOptions}
-              containerClassName="min-w-[110px]"
+              placeholder="All Types"
+              containerClassName="min-w-[120px]"
             />
-            {/* Row 2: date range — forced to new line via w-full wrapper */}
-            <div className="w-full flex flex-wrap items-center gap-2">
-              <DatePicker
-                label="From"
-                value={startDate}
-                onChange={setStartDate}
-                containerClassName="min-w-[150px]"
-              />
-              <DatePicker
-                label="To"
-                value={endDate}
-                onChange={setEndDate}
-                containerClassName="min-w-[150px]"
-              />
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  Clear all
-                </Button>
-              )}
+          </>
+        )}
+        subFilters={(
+          <>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">From</span>
+              <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" containerClassName="w-36" />
             </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">To</span>
+              <DatePicker value={endDate} onChange={setEndDate} placeholder="End date" containerClassName="w-36" />
+            </div>
+            {hasActiveFilters && (
+              <Button variant="ghost" onClick={clearFilters}>
+                Clear all
+              </Button>
+            )}
           </>
         )}
       >

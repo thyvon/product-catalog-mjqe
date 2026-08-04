@@ -26,6 +26,7 @@ interface DebitNote {
   warehouse: string;
   department: string;
   campus: string;
+  division: string;
   startDate: string;
   endDate: string;
   sendDate: string | null;
@@ -279,6 +280,49 @@ export default function DebitNoteListPage() {
     );
   }, [fetchNotes, toast, confirm, closeConfirm]);
 
+  const hasActiveFilters = useMemo(
+    () => Boolean(warehouse || department || campus || statusFilter || startDate || endDate || searchQuery),
+    [warehouse, department, campus, statusFilter, startDate, endDate, searchQuery],
+  );
+
+  const handleBulkDelete = useCallback(() => {
+    if (!hasActiveFilters) {
+      toast.error("Apply at least one filter before deleting debit notes.");
+      return;
+    }
+    confirm(
+      "Delete All Filtered Debit Notes",
+      `Delete all ${total} debit note${total !== 1 ? "s" : ""} matching current filters? This cannot be undone.`,
+      async () => {
+        closeConfirm();
+        try {
+          const params = new URLSearchParams();
+          if (warehouse) params.set("warehouse", warehouse);
+          if (department) params.set("department", department);
+          if (campus) params.set("campus", campus);
+          if (statusFilter) params.set("status", statusFilter);
+          if (startDate) params.set("startDate", startDate);
+          if (endDate) params.set("endDate", endDate);
+          if (searchQuery) params.set("search", searchQuery);
+          const res = await fetch(`/api/debit-notes/bulk?${params}`, { method: "DELETE" });
+          if (res.ok) {
+            const data = await res.json();
+            const deleted = data.count ?? total;
+            toast.success(`Deleted ${deleted} debit note${deleted !== 1 ? "s" : ""}.`);
+            setCurrentPage(1);
+            fetchNotes();
+          } else {
+            const data = await res.json();
+            toast.error(data.error || "Failed to delete debit notes.");
+          }
+        } catch {
+          toast.error("Failed to delete debit notes.");
+        }
+      },
+      "Delete All",
+    );
+  }, [hasActiveFilters, total, confirm, closeConfirm, warehouse, department, campus, statusFilter, startDate, endDate, searchQuery, fetchNotes, toast]);
+
   const handlePreview = useCallback(async (id: string) => {
     try {
       const res = await fetch(`/api/debit-notes/${id}`);
@@ -320,6 +364,7 @@ export default function DebitNoteListPage() {
     { accessorKey: "warehouse", header: "Warehouse", meta: { className: "text-muted-foreground" } },
     { accessorKey: "department", header: "Department", meta: { className: "text-muted-foreground" } },
     { accessorKey: "campus", header: "Campus", meta: { className: "text-muted-foreground" } },
+    { accessorKey: "division", header: "Division", meta: { className: "text-muted-foreground" } },
     {
       id: "period",
       header: "Period",
@@ -425,11 +470,17 @@ export default function DebitNoteListPage() {
             <PlusCircle />
             <span>Generate</span>
           </Button>
+          {total > 0 && hasActiveFilters && (
+            <Button variant="destructive" onClick={handleBulkDelete}>
+              <Trash2 /><span>Delete Filtered</span>
+            </Button>
+          )}
         </>
       )}
       searchValue={searchQuery}
       onSearchChange={setSearchQuery}
       searchPlaceholder="Search by reference, warehouse, department, or status..."
+      activeFilterCount={[warehouse, department, campus, statusFilter, startDate, endDate].filter(Boolean).length}
       filters={(
         <>
           <SelectField
@@ -463,27 +514,21 @@ export default function DebitNoteListPage() {
               ...filterValues.statuses.map((value) => ({ value, label: value.charAt(0).toUpperCase() + value.slice(1) })),
             ]}
           />
-          <DatePicker
-            value={startDate}
-            onChange={setStartDate}
-            className="min-w-[140px] py-2 text-xs font-medium"
-            containerClassName="min-w-[140px]"
-          />
-          <DatePicker
-            value={endDate}
-            onChange={setEndDate}
-            className="min-w-[140px] py-2 text-xs font-medium"
-            containerClassName="min-w-[140px]"
-          />
           {(warehouse || department || campus || statusFilter || startDate || endDate || searchQuery) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearFilters}
-            >
-              Clear all
-            </Button>
+            <Button variant="ghost" onClick={clearFilters}>Clear all</Button>
           )}
+        </>
+      )}
+      subFilters={(
+        <>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">From</span>
+            <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" containerClassName="w-36" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">To</span>
+            <DatePicker value={endDate} onChange={setEndDate} placeholder="End date" containerClassName="w-36" />
+          </div>
         </>
       )}
     >

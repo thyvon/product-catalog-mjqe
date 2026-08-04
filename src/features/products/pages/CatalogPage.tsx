@@ -218,7 +218,7 @@ export default function CatalogPage() {
               </Button>} />
               <TooltipContent>Reload catalog</TooltipContent>
             </Tooltip>
-            <Button onClick={triggerExportCSV} disabled={total === 0} variant="outline" size="sm">
+            <Button onClick={triggerExportCSV} disabled={total === 0} variant="outline">
               <Download /> Export CSV
             </Button>
             {isAdmin && (
@@ -236,6 +236,7 @@ export default function CatalogPage() {
         searchValue={searchQuery}
         onSearchChange={handleSearchChange}
         searchPlaceholder="Search products by SKU Code or name specifications..."
+        activeFilterCount={[selectedCategory, statusFilter !== "active" ? statusFilter : ""].filter(Boolean).length}
         filters={(
           <>
             <Select value={selectedCategory} onValueChange={(v) => { setSelectedCategory(v); resetPage(); }}>
@@ -270,14 +271,15 @@ export default function CatalogPage() {
                 <SelectItem value="code">Sort: Product Code</SelectItem>
               </SelectContent>
             </Select>
-
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "gallery" | "list")}>
-              <TabsList>
-                <TabsTrigger value="gallery"><Widget /> Gallery</TabsTrigger>
-                <TabsTrigger value="list"><List /> Table</TabsTrigger>
-              </TabsList>
-            </Tabs>
           </>
+        )}
+        filterEnd={(
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "gallery" | "list")}>
+            <TabsList>
+              <TabsTrigger value="gallery"><Widget /> Gallery</TabsTrigger>
+              <TabsTrigger value="list"><List /> Table</TabsTrigger>
+            </TabsList>
+          </Tabs>
         )}
       >
         {error ? (
@@ -285,7 +287,7 @@ export default function CatalogPage() {
             <DangerCircle className="w-10 h-10 text-destructive mx-auto animate-bounce" />
             <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-destructive">Connection Interrupted</h3>
             <p className="text-xs text-destructive leading-relaxed font-medium">{error}</p>
-            <Button onClick={() => fetchCatalog()} variant="outline" size="sm">Retry</Button>
+            <Button onClick={() => fetchCatalog()} variant="outline">Retry</Button>
           </div>
         ) : !loading && total === 0 ? (
           <div className="text-center py-20 bg-card border border-border rounded-3xl max-w-xl mx-auto mt-8 p-8 space-y-4 shadow-sm">
@@ -300,7 +302,6 @@ export default function CatalogPage() {
               <Button
                 onClick={() => { setSearchQuery(""); setSelectedCategory(""); setStatusFilter("all"); }}
                 variant="outline"
-                size="sm"
               >
                 Reset Search Filters
               </Button>

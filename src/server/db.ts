@@ -171,13 +171,18 @@ async function createTables(p: mysql.Pool) {
     warehouse VARCHAR(255) NOT NULL DEFAULT '',
     department VARCHAR(255) NOT NULL DEFAULT '',
     campus VARCHAR(255) NOT NULL DEFAULT '',
+    division VARCHAR(255) NOT NULL DEFAULT '',
     receiverName VARCHAR(255) NOT NULL DEFAULT '',
     sendToEmail JSON NOT NULL,
     ccToEmail JSON NOT NULL,
     createdAt VARCHAR(40) NOT NULL,
     updatedAt VARCHAR(40) NOT NULL,
-    UNIQUE KEY dn_emails_unique (warehouse, department, campus)
+    UNIQUE KEY dn_emails_unique (warehouse, division, department, campus)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  try { await p.query("ALTER TABLE debit_note_emails ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER campus"); } catch {}
+  try { await p.query("ALTER TABLE debit_note_emails DROP INDEX dn_emails_unique"); } catch {}
+  try { await p.query("ALTER TABLE debit_note_emails ADD UNIQUE KEY dn_emails_unique (warehouse, division, department, campus)"); } catch {}
 
   await p.query(`CREATE TABLE IF NOT EXISTS debit_notes (
     id VARCHAR(64) PRIMARY KEY,
