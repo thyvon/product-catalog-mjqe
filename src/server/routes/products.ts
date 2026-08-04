@@ -3,6 +3,7 @@ import crypto from "crypto";
 import path from "path";
 import fs from "fs";
 import { assertDb } from "../db.js";
+import { isMinioEnabled, saveObject, getLocalUploadsDir } from "../services/storage.js";
 import {
   getAllProducts, getProductById, getProductByCode,
   upsertProduct, deleteProduct, insertImportBatch, getProductsPaginated,
@@ -33,7 +34,7 @@ router.get("/api/products", async (req, res) => {
   }
 });
 
-router.post("/api/products/upload-image", (req, res) => {
+router.post("/api/products/upload-image", async (req, res) => {
   try {
     const { image, filename } = req.body;
     if (!image) return res.status(400).json({ error: "Missing image data" });
@@ -42,8 +43,18 @@ router.post("/api/products/upload-image", (req, res) => {
     const ext = matches[1].split("/")[1].replace("jpeg", "jpg");
     const safeName = (filename || "product").replace(/[^a-zA-Z0-9]/g, "_").toLowerCase().substring(0, 30);
     const uniqueName = `${safeName}_${Date.now()}_${crypto.randomBytes(4).toString("hex")}.${ext}`;
-    const filePath = path.join(process.cwd(), "uploads", uniqueName);
     const buffer = Buffer.from(matches[2], "base64");
+
+    if (isMinioEnabled()) {
+      try {
+        await saveObject(uniqueName, buffer, matches[1]);
+        return res.json({ imageUrl: `/uploads/${uniqueName}` });
+      } catch (err: any) {
+        console.warn("[storage] MinIO upload failed, falling back to local disk:", err?.message || err);
+      }
+    }
+
+    const filePath = path.join(getLocalUploadsDir(), uniqueName);
     fs.writeFileSync(filePath, buffer);
     res.json({ imageUrl: `/uploads/${uniqueName}` });
   } catch (err: any) {

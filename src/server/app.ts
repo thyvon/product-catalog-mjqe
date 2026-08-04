@@ -1,9 +1,9 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { initDb, checkDbConnection } from "./db.js";
+import { isMinioEnabled, getObject, getLocalUploadsDir } from "./services/storage.js";
 import productsRouter from "./routes/products.js";
 import suppliersRouter from "./routes/suppliers.js";
 import stockRouter from "./routes/stock.js";
@@ -56,10 +56,25 @@ export async function createApp() {
     res.json({ liveVisitors: uniqueIps.size, totalVisits: live.length, paths, recent });
   });
 
-  // Uploads directory
-  const uploadsDir = path.join(process.cwd(), "uploads");
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-  app.use("/uploads", express.static(uploadsDir));
+  // Uploads: served from MinIO when configured, otherwise local disk
+  const uploadsDir = getLocalUploadsDir();
+  if (isMinioEnabled()) {
+    app.use("/uploads", async (req, res, next) => {
+      const key = decodeURIComponent(req.path.replace(/^\/+/, ""));
+      if (!key) return next();
+      try {
+        const obj = await getObject(key);
+        if (!obj) return next();
+        res.setHeader("Content-Type", obj.contentType);
+        res.setHeader("Content-Length", obj.size);
+        obj.stream.pipe(res);
+      } catch {
+        next();
+      }
+    });
+  } else {
+    app.use("/uploads", express.static(uploadsDir));
+  }
 
   // Register routes
   app.use(productsRouter);

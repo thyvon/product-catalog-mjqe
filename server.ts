@@ -10,6 +10,7 @@ import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import ExcelJS from "exceljs";
 import { ZipArchive } from "archiver";
+import { isMinioEnabled, saveObject, getObject, getLocalUploadsDir } from "./src/server/services/storage.js";
 
 dotenv.config();
 
@@ -477,8 +478,8 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-// POST: Upload custom product images to local storage
-app.post("/api/products/upload-image", (req, res) => {
+// POST: Upload custom product images to MinIO (fallback: local storage)
+app.post("/api/products/upload-image", async (req, res) => {
   try {
     const { image, filename } = req.body;
     if (!image) {
@@ -496,9 +497,18 @@ app.post("/api/products/upload-image", (req, res) => {
       .toLowerCase()
       .substring(0, 30);
     const uniqueName = `${safeName}_${Date.now()}_${crypto.randomBytes(4).toString("hex")}.${ext}`;
-    const filePath = path.join(process.cwd(), "uploads", uniqueName);
     const buffer = Buffer.from(matches[2], "base64");
 
+    if (isMinioEnabled()) {
+      try {
+        await saveObject(uniqueName, buffer, matches[1]);
+        return res.json({ imageUrl: `/uploads/${uniqueName}` });
+      } catch (err: any) {
+        console.warn("[storage] MinIO upload failed, falling back to local disk:", err?.message || err);
+      }
+    }
+
+    const filePath = path.join(getLocalUploadsDir(), uniqueName);
     fs.writeFileSync(filePath, buffer);
     res.json({ imageUrl: `/uploads/${uniqueName}` });
   } catch (err: any) {
@@ -2776,11 +2786,24 @@ async function startServer() {
 
   ensureDebitNoteLogo();
 
-  const uploadsDir = path.join(process.cwd(), "uploads");
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+  const uploadsDir = getLocalUploadsDir();
+  if (isMinioEnabled()) {
+    app.use("/uploads", async (req, res, next) => {
+      const key = decodeURIComponent(req.path.replace(/^\/+/, ""));
+      if (!key) return next();
+      try {
+        const obj = await getObject(key);
+        if (!obj) return next();
+        res.setHeader("Content-Type", obj.contentType);
+        res.setHeader("Content-Length", obj.size);
+        obj.stream.pipe(res);
+      } catch {
+        next();
+      }
+    });
+  } else {
+    app.use("/uploads", express.static(uploadsDir));
   }
-  app.use("/uploads", express.static(uploadsDir));
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

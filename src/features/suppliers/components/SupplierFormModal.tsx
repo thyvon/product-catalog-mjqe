@@ -390,18 +390,11 @@ export default function SupplierFormModal({
       isOpen={isOpen}
       onClose={onClose}
       size="4xl"
-      maxHeight="max-h-[92vh]"
-      rounded="rounded-2xl"
-      className="flex flex-col flex-1"
+      title={editingSupplier ? "Edit Vendor Registration" : "Vendor Registration Application Form"}
+      description="ទម្រង់ស្នើចុះបញ្ជីអ្នកផ្គត់ផ្គង់"
+      maxHeight="max-h-[90vh]"
+      className="flex flex-col"
     >
-      <div className="flex shrink-0 items-start border-b border-border px-5 py-4">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">
-            {editingSupplier ? "Edit Vendor Registration" : "Vendor Registration Application Form"}
-          </h2>
-          <p className="mt-0.5 text-xs font-normal text-muted-foreground">ទម្រង់ស្នើចុះបញ្ជីអ្នកផ្គត់ផ្គង់</p>
-        </div>
-      </div>
 
       <div className="shrink-0 overflow-x-auto border-b border-border px-3 py-3 sm:px-5">
         <div className="flex min-w-max gap-1">
@@ -426,7 +419,7 @@ export default function SupplierFormModal({
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{renderStep()}</div>
 
       <Separator className="my-4" />
-      <div className="flex shrink-0 items-center justify-between px-5 py-4">
+      <div className="flex shrink-0 items-center justify-between p-4">
         <Button
           variant={step === 1 ? "outline" : "ghost"}
           size={step === 1 ? "default" : "sm"}

@@ -8,6 +8,7 @@ import { Product, ProductInput } from "@/features/shared/types";
 import { useToast } from "@/features/shared/components/Toast";
 import BaseModal from "@/features/shared/components/BaseModal";
 import SelectField from "@/features/shared/components/SelectField";
+import CreatableCombobox from "@/features/shared/components/CreatableCombobox";
 import { FormLabel } from "@/features/shared/components/FormLabel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,9 +49,10 @@ export default function ProductFormModal({
     return Array.from(set);
   }, [allCategories]);
 
-  const mergedUoms = useMemo(() => {
-    const set = new Set([...DEFAULT_UOMS, ...allUoms]);
-    return Array.from(set);
+  const dbUoms = useMemo(() => {
+    const set = new Set<string>();
+    allUoms.forEach((u) => u && set.add(u.trim()));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [allUoms]);
   // Core state fields
   const [productCode, setProductCode] = useState("");
@@ -277,17 +279,29 @@ export default function ProductFormModal({
       size="xl"
       title={editingProduct ? "Edit Product" : "New Product"}
       maxHeight="max-h-[92vh]"
-      rounded="rounded-3xl"
-      backdropBlur="backdrop-blur-md"
-      className="flex flex-col overflow-hidden"
+      className="flex flex-col"
     >
       {/* Form Body layout */}
-      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           
-          {/* 1. Product Code */}
+          {/* 1. Product Title/Name */}
+          <div className="sm:col-span-2">
+            <FormLabel required>Product Title / Name </FormLabel>
+            <Input
+              id="input-name"
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Quantum Sonic High Fidelity Speaker"
+            />
+          </div>
+
+          {/* 2. Product Code */}
           <div>
-            <FormLabel variant="mono" required>Product Code </FormLabel>
+            <FormLabel required>Product Code </FormLabel>
             <Input
               id="input-productCode"
               type="text"
@@ -298,9 +312,9 @@ export default function ProductFormModal({
             />
           </div>
 
-          {/* 2. Status Select option */}
+          {/* 3. Status Select option */}
           <div>
-            <FormLabel variant="mono" required>Item Status </FormLabel>
+            <FormLabel required>Item Status </FormLabel>
             <SelectField
               value={status}
               onChange={(v) => setStatus(v as "Active" | "Inactive")}
@@ -312,22 +326,9 @@ export default function ProductFormModal({
             />
           </div>
 
-          {/* 3. Product Title/Name */}
-          <div className="sm:col-span-2">
-            <FormLabel variant="mono" required>Product Title / Name </FormLabel>
-            <Input
-              id="input-name"
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Quantum Sonic High Fidelity Speaker"
-            />
-          </div>
-
           {/* 4. Category selection */}
           <div>
-            <FormLabel variant="mono" required>Category </FormLabel>
+            <FormLabel required>Category </FormLabel>
             <SelectField
               value={category}
               onChange={setCategory}
@@ -338,7 +339,7 @@ export default function ProductFormModal({
 
           {/* 5. Subcategory */}
           <div>
-            <FormLabel variant="mono">Sub Category</FormLabel>
+            <FormLabel>Sub Category</FormLabel>
             <Input
               id="input-subCategory"
               type="text"
@@ -350,27 +351,35 @@ export default function ProductFormModal({
 
           {/* 6. UOM Options */}
           <div>
-            <FormLabel variant="mono" required>Unit of Measure (UoM) </FormLabel>
-            <SelectField
-              value={mergedUoms.includes(uom) ? uom : "__other__"}
-              onChange={(v) => { if (v !== "__other__") setUom(v); }}
-              options={[
-                ...mergedUoms.map((opt) => ({ value: opt, label: opt })),
-                { value: "__other__", label: "Other..." },
-              ]}
+            <FormLabel required>Unit of Measure (UoM) </FormLabel>
+            <CreatableCombobox
               id="input-uom"
+              value={uom}
+              onChange={setUom}
+              options={dbUoms}
+              placeholder="Search or type to add a UoM..."
             />
-            {!mergedUoms.includes(uom) && (
-              <Input
-                type="text"
-                value={uom}
-                onChange={(e) => setUom(e.target.value)}
-                placeholder="Type custom UoM..."
-              />
-            )}
           </div>
 
-          {/* Product Image */}
+          {/* 7. Image URL */}
+          <div>
+            <FormLabel>Image URL</FormLabel>
+            <Input
+              id="input-imageUrl"
+              type="text"
+              value={imageUrl}
+              onChange={(e) => {
+                if (pendingImageFile) {
+                  if (imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
+                  setPendingImageFile(null);
+                }
+                setImageUrl(e.target.value);
+              }}
+              placeholder="Or paste an image URL..."
+            />
+          </div>
+
+          {/* 8. Product Image */}
           <div className="sm:col-span-2 space-y-3">
             <div className="flex items-center gap-4">
               {imageUrl ? (
@@ -434,27 +443,14 @@ export default function ProductFormModal({
                 {uploadError}
               </div>
             )}
-
-            <Input
-              id="input-imageUrl"
-              type="text"
-              value={imageUrl}
-              onChange={(e) => {
-                if (pendingImageFile) {
-                  if (imageUrl.startsWith("blob:")) URL.revokeObjectURL(imageUrl);
-                  setPendingImageFile(null);
-                }
-                setImageUrl(e.target.value);
-              }}
-              placeholder="Or paste an image URL..."
-            />
           </div>
 
+        </div>
         </div>
 
         {/* Actions Footer row */}
         <Separator className="my-4" />
-        <div className="pt-5 flex justify-end gap-2.5">
+        <div className="flex shrink-0 justify-end gap-3 p-4">
           <Button id="btn-cancel-form" type="button" onClick={onClose} variant="outline">
             Cancel
           </Button>

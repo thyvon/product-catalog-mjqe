@@ -305,6 +305,7 @@ export default function SupplierRegisterPage() {
       />
 
       <BaseModal isOpen={isViewOpen} onClose={() => setIsViewOpen(false)} title="Supplier Details" size="lg">
+        {viewingSupplier && (
         <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-semibold text-foreground">{viewingSupplier.companyName}</h3>
@@ -384,6 +385,7 @@ export default function SupplierRegisterPage() {
                 <DetailRow label="Code of Conduct" value={viewingSupplier.codeOfConductAck ? "Acknowledged" : "Not Acknowledged"} />
               </div>
         </div>
+        )}
       </BaseModal>
 
       <ConfirmModal
