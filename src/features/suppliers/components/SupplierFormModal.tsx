@@ -43,6 +43,7 @@ const emptyForm: SupplierInput = {
   companyNameKhmer: "",
   registrationType: "vat",
   foreignTradeOperator: false,
+  countryOfOrigin: "",
   contactPerson: "",
   position: "",
   email: "",
@@ -130,7 +131,9 @@ export default function SupplierFormModal({
         status: editingSupplier.status || "Pending",
       });
     } else {
-      setForm(emptyForm);
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      setForm({ ...emptyForm, supplierDeclarationDate: todayStr });
     }
     setStep(1);
   }, [editingSupplier, isOpen]);
@@ -218,6 +221,9 @@ export default function SupplierFormModal({
               description="International suppliers only."
               className="md:col-span-2"
             />
+            <Field label="Country of Origin" kh="ប្រទេសប្រភពដើម" wide>
+              <Input value={form.countryOfOrigin} onChange={(e) => handleChange("countryOfOrigin", e.target.value)} placeholder="Example: Cambodia, Vietnam, Thailand..." />
+            </Field>
           </motion.div>
         );
 

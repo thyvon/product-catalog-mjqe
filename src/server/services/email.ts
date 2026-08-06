@@ -166,9 +166,10 @@ export async function runSendDebitNotesEmail(
 
         const fmtDate = (s: any) => {
           if (!s) return "-";
-          const dt = typeof s === "string" ? new Date(s + "T00:00:00") : new Date(s.getTime());
+          const dt = typeof s === "string" ? new Date(s + "T00:00:00") : new Date(s);
           if (isNaN(dt.getTime())) return "-";
-          return dt.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+          const utc = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+          return utc.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "2-digit", year: "numeric" });
         };
 
         const periodStr = fmtDate(group.notes[0]?.startDate) && fmtDate(group.notes[0]?.endDate)

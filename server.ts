@@ -128,6 +128,7 @@ async function initDb() {
       companyNameKhmer VARCHAR(255) NOT NULL DEFAULT '',
       registrationType VARCHAR(30) NOT NULL DEFAULT 'vat',
       foreignTradeOperator BOOLEAN NOT NULL DEFAULT FALSE,
+      countryOfOrigin VARCHAR(150) NOT NULL DEFAULT '',
       contactPerson VARCHAR(255) NOT NULL DEFAULT '',
       position VARCHAR(150) NOT NULL DEFAULT '',
       email VARCHAR(255) NOT NULL DEFAULT '',
@@ -200,6 +201,15 @@ async function initDb() {
     try { await pool.query("ALTER TABLE stock_issue_items ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER warehouse"); } catch {}
     try { await pool.query("ALTER TABLE stock_issue_items ADD COLUMN transactionType VARCHAR(100) NOT NULL DEFAULT '' AFTER referenceNo"); } catch {}
     try { await pool.query("ALTER TABLE stock_issue_items ADD COLUMN accountCode VARCHAR(100) NOT NULL DEFAULT '' AFTER transactionType"); } catch {}
+
+    // Indexes for large-dataset analytics (date-range + type filters)
+    try { await pool.query("ALTER TABLE stock_issue_items ADD INDEX ssi_date_idx (transactionDate)"); } catch {}
+    try { await pool.query("ALTER TABLE stock_issue_items ADD INDEX ssi_type_date_idx (transactionType, transactionDate)"); } catch {}
+    try { await pool.query("ALTER TABLE stock_issue_items ADD INDEX ssi_item_idx (itemCode)"); } catch {}
+    try { await pool.query("ALTER TABLE stock_issue_items ADD INDEX ssi_campus_idx (campus)"); } catch {}
+    try { await pool.query("ALTER TABLE stock_issue_items ADD INDEX ssi_department_idx (department)"); } catch {}
+    try { await pool.query("ALTER TABLE stock_issue_items ADD INDEX ssi_division_idx (division)"); } catch {}
+    try { await pool.query("ALTER TABLE stock_issue_items ADD INDEX ssi_warehouse_idx (warehouse)"); } catch {}
 
     await pool.query(`CREATE TABLE IF NOT EXISTS debit_note_emails (
       id VARCHAR(64) PRIMARY KEY,
@@ -275,6 +285,7 @@ async function initDb() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
     try { await pool.query("ALTER TABLE users ADD COLUMN position VARCHAR(255) NOT NULL DEFAULT '' AFTER phone"); } catch {}
     try { await pool.query("ALTER TABLE users ADD COLUMN telegramId VARCHAR(100) NOT NULL DEFAULT '' AFTER position"); } catch {}
+    try { await pool.query("ALTER TABLE suppliers ADD COLUMN countryOfOrigin VARCHAR(150) NOT NULL DEFAULT '' AFTER foreignTradeOperator"); } catch {}
 
     // Seed default users
     const now = new Date().toISOString();
@@ -285,6 +296,32 @@ async function initDb() {
     await pool.execute(
       `INSERT IGNORE INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ["usr-002", "procurement", "procurement", "Procurement", "Procurement Officer", "", "", "", "", "", now, now]
+    );
+    await pool.execute(
+      `INSERT IGNORE INTO suppliers (
+        id, applicationType, oldSupplierCode, companyName, companyNameKhmer, registrationType,
+        foreignTradeOperator, countryOfOrigin, contactPerson, position, email, phone, mobile, website,
+        address, addressKhmer, cityProvince, districtKhan, businessLicense, commercialRegistration,
+        taxRegistration, vatCertificate, patentTaxCertificate, nationalId, establishedYear, businessActivity,
+        productServiceType, otherDocuments, bankName, bankBranch, bankAccount, accountHolderName, swiftCode,
+        iban, checkAuthorization, paymentMethod, paymentMethodOther, paymentTerm, paymentTermOther,
+        conflictOfInterest, conflictDetails, supplierDeclarationName, supplierDeclarationDate,
+        buyerCompletedName, buyerCompletedDate, companyProfile, codeOfConductAck, status, notes,
+        createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ["sup-seed-001", "new", "", "Acme Trading Co., Ltd.", "ក្រុមហ៊ុន អេកមី ប្រូឌូឃ្មង", "vat", true, "Cambodia",
+        "Sopheap Chan", "Managing Director", "sopheap@acmetrading.com", "+855 12 345 678", "+855 88 123 4567",
+        "https://acmetrading.com", "123 Russian Federation Blvd, Phnom Penh", "ផ្លូវ 123 មហាវិថី ភ្នំពេញ",
+        "Phnom Penh", "Khan Toul Kork", "LIC-00112233", "MRC-2021-000456",
+        "Tax-000-889", "VAT-213-332", "PT-2025-778", "NID-004-112233",
+        "2023", "General trading, office supplies, stationery", "Office products, paper, ink",
+        "BODIUM", "ACLEDA Bank", "Main Branch", "001234567", "Acme Trading Co., Ltd.",
+        "ACLBKHPP", "KH", true, "bank-transfer", "", "one-month", "",
+        false, "", "Sara Chan", "2025-12-15",
+        "Dara Vong", "2025-12-16", "Wholesale & retail supplier of office consumables.", true,
+        "Pending", "Test seed supplier",
+        now, now
+      ]
     );
 
     await pool.query(`CREATE TABLE IF NOT EXISTS settings (
@@ -603,11 +640,39 @@ app.get("/api/visit/stats", (req, res) => {
     time: v.timestamp,
   }));
 
+  // Timeline: bucket visits by 30s over the live window
+  const TIMELINE_STEP_MS = 30 * 1000;
+  const now = Date.now();
+  const buckets: { start: number; visits: number; visitors: Set<string> }[] = [];
+  for (let t = cutoff; t <= now; t += TIMELINE_STEP_MS) {
+    buckets.push({ start: t, visits: 0, visitors: new Set() });
+  }
+  live.forEach((v) => {
+    const idx = Math.min(
+      buckets.length - 1,
+      Math.floor((v.timestamp - cutoff) / TIMELINE_STEP_MS)
+    );
+    if (idx >= 0) {
+      buckets[idx].visits += 1;
+      buckets[idx].visitors.add(v.ip);
+    }
+  });
+  const timeline = buckets.map((b) => ({
+    time: new Date(b.start).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }),
+    visits: b.visits,
+    visitors: b.visitors.size,
+  }));
+
   res.json({
     liveVisitors: uniqueIps.size,
     totalVisits: live.length,
     paths,
     recent,
+    timeline,
   });
 });
 
@@ -804,6 +869,7 @@ async function upsertSupplier(supplier: any): Promise<void> {
     "\"companyNameKhmer\"",
     "\"registrationType\"",
     "\"foreignTradeOperator\"",
+    "\"countryOfOrigin\"",
     "\"contactPerson\"",
     "position",
     "email",
@@ -856,6 +922,7 @@ async function upsertSupplier(supplier: any): Promise<void> {
     supplier.companyNameKhmer || "",
     supplier.registrationType || "vat",
     supplier.foreignTradeOperator ?? false,
+    supplier.countryOfOrigin || "",
     supplier.contactPerson || "",
     supplier.position || "",
     supplier.email || "",
@@ -936,14 +1003,16 @@ app.get("/api/suppliers/filters/values", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
-    const [statuses] = await p.query<RowDataPacket[]>("SELECT DISTINCT status FROM suppliers WHERE status != '' ORDER BY status");
-    const [applicationTypes] = await p.query<RowDataPacket[]>("SELECT DISTINCT applicationType FROM suppliers WHERE applicationType != '' ORDER BY applicationType");
+    const [statusRows] = await p.query<RowDataPacket[]>("SELECT DISTINCT status FROM suppliers WHERE status != '' ORDER BY status");
+    const [applicationTypeRows] = await p.query<RowDataPacket[]>("SELECT DISTINCT applicationType FROM suppliers WHERE applicationType != '' ORDER BY applicationType");
+    const canonicalStatuses = ["Pending", "Approved", "Rejected", "Suspended"];
+    const canonicalApplicationTypes = ["new", "update"];
     const registrationTypes = ["vat", "non-vat"];
     const paymentMethods = ["bank-transfer", "cheque", "cash", "other"];
     const paymentTerms = ["no-credit", "one-week", "two-weeks", "one-month", "other"];
     res.json({
-      statuses: statuses.map((row: any) => row.status),
-      applicationTypes: applicationTypes.map((row: any) => row.applicationType),
+      statuses: Array.from(new Set([...statusRows.map((row: any) => row.status), ...canonicalStatuses])),
+      applicationTypes: Array.from(new Set([...applicationTypeRows.map((row: any) => row.applicationType), ...canonicalApplicationTypes])),
       registrationTypes,
       paymentMethods,
       paymentTerms,
@@ -981,6 +1050,7 @@ function supplierPayload(input: any, existing: any = {}) {
     companyNameKhmer: input.companyNameKhmer !== undefined ? cleanText(input, "companyNameKhmer") : existing.companyNameKhmer || "",
     registrationType: input.registrationType !== undefined && ["vat", "non-vat"].includes(input.registrationType) ? input.registrationType : existing.registrationType || "vat",
     foreignTradeOperator: input.foreignTradeOperator !== undefined ? !!input.foreignTradeOperator : existing.foreignTradeOperator ?? false,
+    countryOfOrigin: input.countryOfOrigin !== undefined ? cleanText(input, "countryOfOrigin") : existing.countryOfOrigin || "",
     contactPerson: input.contactPerson !== undefined ? cleanText(input, "contactPerson") : existing.contactPerson || "",
     position: input.position !== undefined ? cleanText(input, "position") : existing.position || "",
     email: input.email !== undefined ? cleanText(input, "email") : existing.email || "",
@@ -1128,16 +1198,180 @@ app.get("/api/stock-issue-items/filters/values", async (req, res) => {
     const [warehouses] = await p.query<RowDataPacket[]>("SELECT DISTINCT warehouse FROM stock_issue_items WHERE warehouse != '' ORDER BY warehouse");
     const [departments] = await p.query<RowDataPacket[]>("SELECT DISTINCT department FROM stock_issue_items WHERE department != '' ORDER BY department");
     const [campuses] = await p.query<RowDataPacket[]>("SELECT DISTINCT campus FROM stock_issue_items WHERE campus != '' ORDER BY campus");
+    const [divisions] = await p.query<RowDataPacket[]>("SELECT DISTINCT division FROM stock_issue_items WHERE division != '' ORDER BY division");
     const [transactionTypes] = await p.query<RowDataPacket[]>("SELECT DISTINCT transactionType FROM stock_issue_items WHERE transactionType != '' ORDER BY transactionType");
     res.json({
       warehouses: warehouses.map((row: any) => row.warehouse),
       departments: departments.map((row: any) => row.department),
       campuses: campuses.map((row: any) => row.campus),
+      divisions: divisions.map((row: any) => row.division),
       transactionTypes: transactionTypes.map((row: any) => row.transactionType),
     });
   } catch (err: any) {
     console.error("Error fetching stock issue item filter values:", err);
     res.status(500).json({ error: "Failed to fetch stock issue item filter values." });
+  }
+});
+
+// GET: Stock issue spend analytics
+app.get("/api/stock-issue-items/analytics", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const { startDate, endDate, warehouse, division, department, campus, transactionType } = req.query as Record<string, string | undefined>;
+    const top = Math.max(1, Math.min(100, Number(req.query.top) || 10));
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required." });
+    }
+    if (String(startDate) > String(endDate)) {
+      return res.status(400).json({ error: "startDate cannot be after endDate." });
+    }
+
+    const whereClauses: string[] = ["transactionDate >= ?", "transactionDate <= ?"];
+    const params: any[] = [startDate, endDate];
+    if (warehouse) { whereClauses.push("warehouse = ?"); params.push(warehouse); }
+    if (division) { whereClauses.push("division = ?"); params.push(division); }
+    if (department) { whereClauses.push("department = ?"); params.push(department); }
+    if (campus) { whereClauses.push("campus = ?"); params.push(campus); }
+    if (transactionType) { whereClauses.push("transactionType = ?"); params.push(transactionType); }
+
+    const whereSql = " WHERE " + whereClauses.join(" AND ");
+
+    const [summaryRows] = await p.query<RowDataPacket[]>(
+      `SELECT COUNT(*) as totalItems, COALESCE(SUM(quantity),0) as totalQuantity, COALESCE(SUM(totalPrice),0) as totalAmount FROM stock_issue_items${whereSql}`,
+      params
+    );
+
+    // Monthly trend over the selected window
+    const [trendRows] = await p.query<RowDataPacket[]>(
+      `SELECT DATE_FORMAT(transactionDate, '%Y-%m') as month, COUNT(*) as \`count\`, COALESCE(SUM(quantity),0) as quantity, COALESCE(SUM(totalPrice),0) as amount
+       FROM stock_issue_items${whereSql} GROUP BY month ORDER BY month ASC`,
+      params
+    );
+    const trend = trendRows.map((r: any) => ({
+      month: r.month,
+      count: r.count,
+      quantity: r.quantity,
+      amount: r.amount,
+    }));
+
+    // Previous equivalent window for growth comparison
+    const dayMs = 86400000;
+    const daysDiff = Math.max(1, Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / dayMs) + 1);
+    const prevEnd = new Date(new Date(startDate).getTime() - dayMs);
+    const prevStart = new Date(new Date(startDate).getTime() - daysDiff * dayMs);
+    const fmtDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const prevStartStr = fmtDate(prevStart);
+    const prevEndStr = fmtDate(prevEnd);
+    const prevWhereClauses: string[] = ["transactionDate >= ?", "transactionDate <= ?"];
+    const prevParams: any[] = [prevStartStr, prevEndStr];
+    if (warehouse) { prevWhereClauses.push("warehouse = ?"); prevParams.push(warehouse); }
+    if (division) { prevWhereClauses.push("division = ?"); prevParams.push(division); }
+    if (department) { prevWhereClauses.push("department = ?"); prevParams.push(department); }
+    if (campus) { prevWhereClauses.push("campus = ?"); prevParams.push(campus); }
+    if (transactionType) { prevWhereClauses.push("transactionType = ?"); prevParams.push(transactionType); }
+    const [prevSummaryRows] = await p.query<RowDataPacket[]>(
+      `SELECT COUNT(*) as totalItems, COALESCE(SUM(quantity),0) as totalQuantity, COALESCE(SUM(totalPrice),0) as totalAmount
+       FROM stock_issue_items WHERE ${prevWhereClauses.join(" AND ")}`,
+      prevParams
+    );
+    const previousSummary = { ...prevSummaryRows[0], startDate: prevStartStr, endDate: prevEndStr };
+
+    // Year-over-year monthly comparison (this year's months vs same month last year)
+    const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const [curYoYRows] = await p.query<RowDataPacket[]>(
+      `SELECT YEAR(transactionDate) as yr, MONTH(transactionDate) as mo, COALESCE(SUM(totalPrice),0) as amount
+       FROM stock_issue_items${whereSql} GROUP BY yr, mo ORDER BY yr, mo`,
+      params
+    );
+    const curStartD = new Date(startDate);
+    const curEndD = new Date(endDate);
+    const prevStartD = new Date(curStartD);
+    prevStartD.setFullYear(curStartD.getFullYear() - 1);
+    const prevEndD = new Date(curEndD);
+    prevEndD.setFullYear(curEndD.getFullYear() - 1);
+    const prevYoStartStr = fmtDate(prevStartD);
+    const prevYoEndStr = fmtDate(prevEndD);
+    const prevYoWhereClauses: string[] = ["transactionDate >= ?", "transactionDate <= ?"];
+    const prevYoParams: any[] = [prevYoStartStr, prevYoEndStr];
+    if (warehouse) { prevYoWhereClauses.push("warehouse = ?"); prevYoParams.push(warehouse); }
+    if (division) { prevYoWhereClauses.push("division = ?"); prevYoParams.push(division); }
+    if (department) { prevYoWhereClauses.push("department = ?"); prevYoParams.push(department); }
+    if (campus) { prevYoWhereClauses.push("campus = ?"); prevYoParams.push(campus); }
+    if (transactionType) { prevYoWhereClauses.push("transactionType = ?"); prevYoParams.push(transactionType); }
+    const [prevYoYRows] = await p.query<RowDataPacket[]>(
+      `SELECT YEAR(transactionDate) as yr, MONTH(transactionDate) as mo, COALESCE(SUM(totalPrice),0) as amount
+       FROM stock_issue_items WHERE ${prevYoWhereClauses.join(" AND ")} GROUP BY yr, mo ORDER BY yr, mo`,
+      prevYoParams
+    );
+    const prevYoYMap = new Map<string, number>();
+    prevYoYRows.forEach((r: any) => { prevYoYMap.set(`${r.yr}-${r.mo}`, r.amount); });
+    const yoyCompare = curYoYRows.map((r: any) => {
+      const prevKey = `${r.yr - 1}-${r.mo}`;
+      const previous = prevYoYMap.get(prevKey) || 0;
+      return {
+        label: `${MONTH_NAMES[r.mo - 1]} ${r.yr}`,
+        current: r.amount,
+        previous,
+        gap: r.amount - previous,
+      };
+    });
+
+    const dims = ["campus", "department", "division", "warehouse"] as const;
+    const agg: Record<string, any[]> = {};
+    for (const dim of dims) {
+      const [rows] = await p.query<RowDataPacket[]>(
+        `SELECT ${dim} as \`key\`, COUNT(*) as \`count\`, COALESCE(SUM(quantity),0) as quantity, COALESCE(SUM(totalPrice),0) as amount
+         FROM stock_issue_items${whereSql} GROUP BY ${dim} ORDER BY amount DESC`,
+        params
+      );
+      agg[dim] = rows.map((r: any) => ({ key: r.key || "(Unknown)", count: r.count, quantity: r.quantity, amount: r.amount }));
+    }
+
+    const [byRequesterRows] = await p.query<RowDataPacket[]>(
+      `SELECT requesterName as \`key\`, COUNT(*) as \`count\`, COALESCE(SUM(quantity),0) as quantity, COALESCE(SUM(totalPrice),0) as amount
+       FROM stock_issue_items${whereSql} GROUP BY requesterName ORDER BY amount DESC`,
+      params
+    );
+    const byRequester = byRequesterRows.map((r: any) => ({ key: r.key || "(Unknown)", count: r.count, quantity: r.quantity, amount: r.amount }));
+
+    const [byTypeRows] = await p.query<RowDataPacket[]>(
+      `SELECT transactionType as \`key\`, COUNT(*) as \`count\`, COALESCE(SUM(quantity),0) as quantity, COALESCE(SUM(totalPrice),0) as amount
+       FROM stock_issue_items${whereSql} GROUP BY transactionType ORDER BY amount DESC`,
+      params
+    );
+    const byType = byTypeRows.map((r: any) => ({ key: r.key || "(Unknown)", count: r.count, quantity: r.quantity, amount: r.amount }));
+
+    const topGroupBy = " FROM stock_issue_items" + whereSql + " GROUP BY itemCode, description, uom ";
+    const [topCountRows] = await p.query<RowDataPacket[]>(
+      `SELECT itemCode, MAX(description) as description, MAX(uom) as uom, COUNT(*) as \`count\`, COALESCE(SUM(quantity),0) as quantity, COALESCE(SUM(totalPrice),0) as amount
+       ${topGroupBy}ORDER BY \`count\` DESC, amount DESC LIMIT ?`,
+      [...params, top]
+    );
+    const [topAmountRows] = await p.query<RowDataPacket[]>(
+      `SELECT itemCode, MAX(description) as description, MAX(uom) as uom, COUNT(*) as \`count\`, COALESCE(SUM(quantity),0) as quantity, COALESCE(SUM(totalPrice),0) as amount
+       ${topGroupBy}ORDER BY amount DESC, \`count\` DESC LIMIT ?`,
+      [...params, top]
+    );
+
+    res.json({
+      summary: summaryRows[0],
+      previousSummary,
+      trend,
+      yoyCompare,
+      byCampus: agg.campus,
+      byDepartment: agg.department,
+      byDivision: agg.division,
+      byWarehouse: agg.warehouse,
+      byRequester,
+      byType,
+      topByCount: topCountRows,
+      topByAmount: topAmountRows,
+    });
+  } catch (err: any) {
+    console.error("Error computing stock issue analytics:", err);
+    res.status(500).json({ error: "Failed to compute stock issue analytics." });
   }
 });
 
@@ -1734,6 +1968,15 @@ app.post("/api/debit-notes/generate", async (req, res) => {
 // ─── Debit Note List & Detail ───
 
 // GET: List debit notes with filters
+function dateOnlyStr(v: any): string | null {
+  if (v === null || v === undefined || v === "") return null;
+  if (v instanceof Date && !isNaN(v.getTime())) {
+    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}`;
+  }
+  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : String(v);
+}
+
 app.get("/api/debit-notes", async (req, res) => {
   try {
     assertDb();
@@ -1807,6 +2050,9 @@ app.get("/api/debit-notes", async (req, res) => {
       const itemData = itemCountMap.get(row.id) || { count: 0, totalAmount: 0 };
       return {
         ...row,
+        startDate: dateOnlyStr(row.startDate),
+        endDate: dateOnlyStr(row.endDate),
+        sendDate: dateOnlyStr(row.sendDate),
         itemCount: itemData.count,
         totalAmount: itemData.totalAmount,
         debitNoteEmail: row.debitNoteEmailId ? emailMap.get(row.debitNoteEmailId) || null : null,
@@ -1856,7 +2102,15 @@ app.get("/api/debit-notes/:id", async (req, res) => {
       emailConfig = emailRows[0] || null;
     }
 
-    res.json({ ...note, items, debitNoteEmail: emailConfig });
+    res.json({
+      ...note,
+      startDate: dateOnlyStr(note.startDate),
+      endDate: dateOnlyStr(note.endDate),
+      sendDate: dateOnlyStr(note.sendDate),
+      totalAmount: items.reduce((s, i) => s + (parseFloat(i.totalPrice) || 0), 0),
+      items: items.map((i) => ({ ...i, transactionDate: dateOnlyStr(i.transactionDate) })),
+      debitNoteEmail: emailConfig,
+    });
   } catch (err: any) {
     console.error("Error fetching debit note:", err);
     res.status(500).json({ error: "Failed to fetch debit note." });
@@ -2109,9 +2363,10 @@ async function runSendDebitNotesEmail(
         const deptStr = Array.from(deptSet).join(", ");
         const fmtDate = (s: any) => {
           if (!s) return "-";
-          const dt = typeof s === "string" ? new Date(s + "T00:00:00") : new Date(s.getTime());
+          const dt = typeof s === "string" ? new Date(s + "T00:00:00") : new Date(s);
           if (isNaN(dt.getTime())) return "-";
-          return dt.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+          const utc = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+          return utc.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "2-digit", year: "numeric" });
         };
 
         const periodStr = fmtDate(group.notes[0]?.startDate) && fmtDate(group.notes[0]?.endDate)
@@ -2293,6 +2548,13 @@ function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items: any[]
     bottom: { style: "thin" }, right: { style: "thin" },
   };
 
+  const toDateOnly = (s: any) => {
+    if (!s) return null;
+    const dt = typeof s === "string" ? new Date(s + "T00:00:00") : new Date(s);
+    if (isNaN(dt.getTime())) return null;
+    return new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+  };
+
   sheet.mergeCells(1, 1, 1, COL_COUNT);
   const titleCell = sheet.getCell("A1");
   titleCell.value = "DEBIT NOTE";
@@ -2303,10 +2565,9 @@ function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items: any[]
   sheet.mergeCells(2, 1, 2, COL_COUNT);
   const infoCell = sheet.getCell("A2");
   const fmtDate = (s: any) => {
-    if (!s) return "";
-    const dt = typeof s === "string" ? new Date(s + "T00:00:00") : new Date(s.getTime());
-    if (isNaN(dt.getTime())) return "";
-    return dt.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+    const dt = toDateOnly(s);
+    if (!dt) return "";
+    return dt.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "2-digit", year: "numeric" });
   };
   infoCell.value = `${note.division || ""} - ${note.department || ""} - ${note.campus || ""}  |  ${fmtDate(note.startDate)} to ${fmtDate(note.endDate)}`;
   infoCell.font = { name: "TW CEN MT", size: 10, color: { argb: "FF777777" } };
@@ -2333,8 +2594,8 @@ function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items: any[]
     row.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
     const d = item.transactionDate;
     if (d) {
-      const dt = typeof d === "string" ? new Date(d + "T00:00:00") : new Date(d);
-      row.getCell(2).value = dt;
+      const dt = toDateOnly(d);
+      row.getCell(2).value = dt ?? "";
       row.getCell(2).numFmt = 'mmm dd, yyyy';
     } else {
       row.getCell(2).value = "";

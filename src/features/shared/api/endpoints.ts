@@ -56,6 +56,8 @@ export const stockApi = {
     api.delete<{ success: boolean }>(`/api/stock-issue-items/${id}`),
   bulkDelete: (params: Record<string, string>) =>
     api.delete<{ success: boolean }>(`/api/stock-issue-items/bulk?${new URLSearchParams(params)}`),
+  analytics: (params: Record<string, string>) =>
+    api.get<Record<string, unknown>>(`/api/stock-issue-items/analytics`, params),
 };
 
 export const debitNotesApi = {

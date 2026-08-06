@@ -17,7 +17,7 @@ import DataTable from "@/features/shared/components/DataTable";
 import DatePicker from "@/features/shared/components/DatePicker";
 import SelectField from "@/features/shared/components/SelectField";
 import ConfirmModal from "@/features/shared/components/ConfirmModal";
-import { formatAmount } from "@/features/shared/utils/format";
+import { formatAmount, formatDisplayDate } from "@/features/shared/utils/format";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface DebitNote {
@@ -371,7 +371,7 @@ export default function DebitNoteListPage() {
       meta: { className: "text-xs text-muted-foreground font-mono" },
       cell: ({ row }) => {
         const n = row.original;
-        return <>{new Date(n.startDate).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })} – {new Date(n.endDate).toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })}</>;
+        return <>{formatDisplayDate(n.startDate)} – {formatDisplayDate(n.endDate)}</>;
       },
     },
     {

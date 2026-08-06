@@ -43,6 +43,7 @@ export interface Supplier {
   companyNameKhmer: string;
   registrationType: "vat" | "non-vat";
   foreignTradeOperator: boolean;
+  countryOfOrigin: string;
   contactPerson: string;
   position: string;
   email: string;

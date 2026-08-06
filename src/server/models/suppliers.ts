@@ -20,7 +20,7 @@ export async function upsertSupplier(supplier: any): Promise<void> {
   const p = getPool()!;
   const columns = [
     "id", "applicationType", "oldSupplierCode", "companyName", "companyNameKhmer",
-    "registrationType", "foreignTradeOperator", "contactPerson", "position", "email",
+    "registrationType", "foreignTradeOperator", "countryOfOrigin", "contactPerson", "position", "email",
     "phone", "mobile", "website", "address", "addressKhmer", "cityProvince", "districtKhan",
     "businessLicense", "commercialRegistration", "taxRegistration", "vatCertificate",
     "patentTaxCertificate", "nationalId", "establishedYear", "businessActivity",
@@ -35,7 +35,7 @@ export async function upsertSupplier(supplier: any): Promise<void> {
     supplier.id, supplier.applicationType || "new", supplier.oldSupplierCode || "",
     supplier.companyName, supplier.companyNameKhmer || "",
     supplier.registrationType || "vat", supplier.foreignTradeOperator ?? false,
-    supplier.contactPerson || "", supplier.position || "", supplier.email || "",
+    supplier.countryOfOrigin || "", supplier.contactPerson || "", supplier.position || "", supplier.email || "",
     supplier.phone || "", supplier.mobile || "", supplier.website || "",
     supplier.address || "", supplier.addressKhmer || "", supplier.cityProvince || "",
     supplier.districtKhan || "", supplier.businessLicense || "",

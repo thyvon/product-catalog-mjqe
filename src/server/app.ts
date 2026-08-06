@@ -53,7 +53,25 @@ export async function createApp() {
     live.forEach((v) => { pathCounts[v.path] = (pathCounts[v.path] || 0) + 1; });
     const paths = Object.entries(pathCounts).map(([path, count]) => ({ path, count })).sort((a, b) => b.count - a.count);
     const recent = live.slice(-50).reverse().map((v) => ({ path: v.path, time: v.timestamp }));
-    res.json({ liveVisitors: uniqueIps.size, totalVisits: live.length, paths, recent });
+    const TIMELINE_STEP_MS = 30 * 1000;
+    const now = Date.now();
+    const buckets: { start: number; visits: number; visitors: Set<string> }[] = [];
+    for (let t = cutoff; t <= now; t += TIMELINE_STEP_MS) {
+      buckets.push({ start: t, visits: 0, visitors: new Set() });
+    }
+    live.forEach((v) => {
+      const idx = Math.min(buckets.length - 1, Math.floor((v.timestamp - cutoff) / TIMELINE_STEP_MS));
+      if (idx >= 0) {
+        buckets[idx].visits += 1;
+        buckets[idx].visitors.add(v.ip);
+      }
+    });
+    const timeline = buckets.map((b) => ({
+      time: new Date(b.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      visits: b.visits,
+      visitors: b.visitors.size,
+    }));
+    res.json({ liveVisitors: uniqueIps.size, totalVisits: live.length, paths, recent, timeline });
   });
 
   // Uploads: served from MinIO when configured, otherwise local disk

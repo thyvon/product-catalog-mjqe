@@ -11,6 +11,15 @@ import { runSendDebitNotesEmail, emailProgressMap } from "../services/email.js";
 
 const router = Router();
 
+function dateOnlyStr(v: any): string | null {
+  if (v === null || v === undefined || v === "") return null;
+  if (v instanceof Date && !isNaN(v.getTime())) {
+    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}`;
+  }
+  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : String(v);
+}
+
 async function generateDebitNoteNo(p: Pool, division: string, department: string, campus: string, startDate: string, excludeId?: string): Promise<string> {
   const v = division.replace(/[^A-Za-z0-9]/g, "");
   const d = department.replace(/[^A-Za-z0-9]/g, "") || "DP";
@@ -403,7 +412,15 @@ router.get("/api/debit-notes", async (req, res) => {
 
     const result = rows.map((row) => {
       const itemData = itemCountMap.get(row.id) || { count: 0, totalAmount: 0 };
-      return { ...row, itemCount: itemData.count, totalAmount: itemData.totalAmount, debitNoteEmail: row.debitNoteEmailId ? emailMap.get(row.debitNoteEmailId) || null : null };
+      return {
+        ...row,
+        startDate: dateOnlyStr(row.startDate),
+        endDate: dateOnlyStr(row.endDate),
+        sendDate: dateOnlyStr(row.sendDate),
+        itemCount: itemData.count,
+        totalAmount: itemData.totalAmount,
+        debitNoteEmail: row.debitNoteEmailId ? emailMap.get(row.debitNoteEmailId) || null : null,
+      };
     });
     res.json({ data: result, total });
   } catch (err: any) {
@@ -434,7 +451,15 @@ router.get("/api/debit-notes/:id", async (req, res) => {
       const [emailRows] = await p.execute<RowDataPacket[]>("SELECT * FROM debit_note_emails WHERE id = ?", [note.debitNoteEmailId]);
       emailConfig = emailRows[0] || null;
     }
-    res.json({ ...note, items, debitNoteEmail: emailConfig });
+    res.json({
+      ...note,
+      startDate: dateOnlyStr(note.startDate),
+      endDate: dateOnlyStr(note.endDate),
+      sendDate: dateOnlyStr(note.sendDate),
+      totalAmount: items.reduce((s, i) => s + (parseFloat(i.totalPrice) || 0), 0),
+      items: items.map((i) => ({ ...i, transactionDate: dateOnlyStr(i.transactionDate) })),
+      debitNoteEmail: emailConfig,
+    });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch debit note." });
   }

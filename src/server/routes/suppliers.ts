@@ -21,6 +21,7 @@ function supplierPayload(input: any, existing: any = {}) {
     companyNameKhmer: input.companyNameKhmer !== undefined ? cleanText(input, "companyNameKhmer") : existing.companyNameKhmer || "",
     registrationType: input.registrationType !== undefined && ["vat", "non-vat"].includes(input.registrationType) ? input.registrationType : existing.registrationType || "vat",
     foreignTradeOperator: input.foreignTradeOperator !== undefined ? !!input.foreignTradeOperator : existing.foreignTradeOperator ?? false,
+    countryOfOrigin: input.countryOfOrigin !== undefined ? cleanText(input, "countryOfOrigin") : existing.countryOfOrigin || "",
     contactPerson: input.contactPerson !== undefined ? cleanText(input, "contactPerson") : existing.contactPerson || "",
     position: input.position !== undefined ? cleanText(input, "position") : existing.position || "",
     email: input.email !== undefined ? cleanText(input, "email") : existing.email || "",
@@ -78,11 +79,13 @@ router.get("/api/suppliers/filters/values", async (_req, res) => {
   try {
     assertDb();
     const p = getPool()!;
-    const [statuses] = await p.query<RowDataPacket[]>("SELECT DISTINCT status FROM suppliers WHERE status != '' ORDER BY status");
-    const [applicationTypes] = await p.query<RowDataPacket[]>("SELECT DISTINCT applicationType FROM suppliers WHERE applicationType != '' ORDER BY applicationType");
+    const [statusRows] = await p.query<RowDataPacket[]>("SELECT DISTINCT status FROM suppliers WHERE status != '' ORDER BY status");
+    const [applicationTypeRows] = await p.query<RowDataPacket[]>("SELECT DISTINCT applicationType FROM suppliers WHERE applicationType != '' ORDER BY applicationType");
+    const canonicalStatuses = ["Pending", "Approved", "Rejected", "Suspended"];
+    const canonicalApplicationTypes = ["new", "update"];
     res.json({
-      statuses: statuses.map((row: any) => row.status),
-      applicationTypes: applicationTypes.map((row: any) => row.applicationType),
+      statuses: Array.from(new Set([...statusRows.map((row: any) => row.status), ...canonicalStatuses])),
+      applicationTypes: Array.from(new Set([...applicationTypeRows.map((row: any) => row.applicationType), ...canonicalApplicationTypes])),
       registrationTypes: ["vat", "non-vat"],
       paymentMethods: ["bank-transfer", "cheque", "cash", "other"],
       paymentTerms: ["no-credit", "one-week", "two-weeks", "one-month", "other"],

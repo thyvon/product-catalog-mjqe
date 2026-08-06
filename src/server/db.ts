@@ -98,6 +98,7 @@ async function createTables(p: mysql.Pool) {
     companyNameKhmer VARCHAR(255) NOT NULL DEFAULT '',
     registrationType VARCHAR(30) NOT NULL DEFAULT 'vat',
     foreignTradeOperator BOOLEAN NOT NULL DEFAULT FALSE,
+    countryOfOrigin VARCHAR(150) NOT NULL DEFAULT '',
     contactPerson VARCHAR(255) NOT NULL DEFAULT '',
     position VARCHAR(150) NOT NULL DEFAULT '',
     email VARCHAR(255) NOT NULL DEFAULT '',
@@ -251,12 +252,20 @@ async function migrateSchema(p: mysql.Pool) {
   try { await p.query("ALTER TABLE stock_issue_items ADD COLUMN accountCode VARCHAR(100) NOT NULL DEFAULT '' AFTER transactionType"); } catch {}
   try { await p.query("ALTER TABLE stock_issue_items MODIFY COLUMN unitPrice DECIMAL(25,15) NOT NULL DEFAULT 0"); } catch {}
   try { await p.query("ALTER TABLE stock_issue_items MODIFY COLUMN totalPrice DECIMAL(25,15) NOT NULL DEFAULT 0"); } catch {}
+  try { await p.query("ALTER TABLE stock_issue_items ADD INDEX ssi_date_idx (transactionDate)"); } catch {}
+  try { await p.query("ALTER TABLE stock_issue_items ADD INDEX ssi_type_date_idx (transactionType, transactionDate)"); } catch {}
+  try { await p.query("ALTER TABLE stock_issue_items ADD INDEX ssi_item_idx (itemCode)"); } catch {}
+  try { await p.query("ALTER TABLE stock_issue_items ADD INDEX ssi_campus_idx (campus)"); } catch {}
+  try { await p.query("ALTER TABLE stock_issue_items ADD INDEX ssi_department_idx (department)"); } catch {}
+  try { await p.query("ALTER TABLE stock_issue_items ADD INDEX ssi_division_idx (division)"); } catch {}
+  try { await p.query("ALTER TABLE stock_issue_items ADD INDEX ssi_warehouse_idx (warehouse)"); } catch {}
   try { await p.query("ALTER TABLE debit_note_items ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER campus"); } catch {}
   try { await p.query("ALTER TABLE debit_notes ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER campus"); } catch {}
   try { await p.query("ALTER TABLE debit_note_items MODIFY COLUMN unitPrice DECIMAL(25,15) NOT NULL DEFAULT 0"); } catch {}
   try { await p.query("ALTER TABLE debit_note_items MODIFY COLUMN totalPrice DECIMAL(25,15) NOT NULL DEFAULT 0"); } catch {}
   try { await p.query("ALTER TABLE users ADD COLUMN position VARCHAR(255) NOT NULL DEFAULT '' AFTER phone"); } catch {}
   try { await p.query("ALTER TABLE users ADD COLUMN telegramId VARCHAR(100) NOT NULL DEFAULT '' AFTER position"); } catch {}
+  try { await p.query("ALTER TABLE suppliers ADD COLUMN countryOfOrigin VARCHAR(150) NOT NULL DEFAULT '' AFTER foreignTradeOperator"); } catch {}
 }
 
 async function seedDefaults(p: mysql.Pool) {
@@ -269,6 +278,33 @@ async function seedDefaults(p: mysql.Pool) {
   await p.execute(
     `INSERT IGNORE INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ["usr-002", "procurement", "procurement", "Procurement", "Procurement Officer", "", "", "", "", "", now, now]
+  );
+
+  await p.execute(
+    `INSERT IGNORE INTO suppliers (
+      id, applicationType, oldSupplierCode, companyName, companyNameKhmer, registrationType,
+      foreignTradeOperator, countryOfOrigin, contactPerson, position, email, phone, mobile, website,
+      address, addressKhmer, cityProvince, districtKhan, businessLicense, commercialRegistration,
+      taxRegistration, vatCertificate, patentTaxCertificate, nationalId, establishedYear, businessActivity,
+      productServiceType, otherDocuments, bankName, bankBranch, bankAccount, accountHolderName, swiftCode,
+      iban, checkAuthorization, paymentMethod, paymentMethodOther, paymentTerm, paymentTermOther,
+      conflictOfInterest, conflictDetails, supplierDeclarationName, supplierDeclarationDate,
+      buyerCompletedName, buyerCompletedDate, companyProfile, codeOfConductAck, status, notes,
+      createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ["sup-seed-001", "new", "", "Acme Trading Co., Ltd.", "ក្រុមហ៊ុន អេកមី ប្រូឌូឃ្មង", "vat", true, "Cambodia",
+      "Sopheap Chan", "Managing Director", "sopheap@acmetrading.com", "+855 12 345 678", "+855 88 123 4567",
+      "https://acmetrading.com", "123 Russian Federation Blvd, Phnom Penh", "ផ្លូវ 123 មហាវិថី ភ្នំពេញ",
+      "Phnom Penh", "Khan Toul Kork", "LIC-00112233", "MRC-2021-000456",
+      "Tax-000-889", "VAT-213-332", "PT-2025-778", "NID-004-112233",
+      "2023", "General trading, office supplies, stationery", "Office products, paper, ink",
+      "BODIUM", "ACLEDA Bank", "Main Branch", "001234567", "Acme Trading Co., Ltd.",
+      "ACLBKHPP", "KH", true, "bank-transfer", "", "one-month", "",
+      false, "", "Sara Chan", "2025-12-15",
+      "Dara Vong", "2025-12-16", "Wholesale & retail supplier of office consumables.", true,
+      "Pending", "Test seed supplier",
+      now, now
+    ]
   );
 
   const defaults: [string, string][] = [

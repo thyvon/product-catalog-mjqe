@@ -1,6 +1,13 @@
 import ExcelJS from "exceljs";
 import { ensureDebitNoteLogo, getDebitNoteLogo } from "./logo.js";
 
+function toDateOnly(s: any): Date | null {
+  if (!s) return null;
+  const dt = typeof s === "string" ? new Date(s + "T00:00:00") : new Date(s);
+  if (isNaN(dt.getTime())) return null;
+  return new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+}
+
 export function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items: any[], preparedBy?: { name: string; position: string }) {
   const sheet = workbook.addWorksheet("Debit Note");
   const COL_COUNT = 14;
@@ -33,10 +40,9 @@ export function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items
   sheet.mergeCells(2, 1, 2, COL_COUNT);
   const infoCell = sheet.getCell("A2");
   const fmtDate = (s: any) => {
-    if (!s) return "";
-    const dt = typeof s === "string" ? new Date(s + "T00:00:00") : new Date(s.getTime());
-    if (isNaN(dt.getTime())) return "";
-    return dt.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+    const dt = toDateOnly(s);
+    if (!dt) return "";
+    return dt.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "2-digit", year: "numeric" });
   };
   infoCell.value = `${note.division || ""} - ${note.department || ""} - ${note.campus || ""}  |  ${fmtDate(note.startDate)} to ${fmtDate(note.endDate)}`;
   infoCell.font = { name: "TW CEN MT", size: 10, color: { argb: "FF777777" } };
@@ -63,8 +69,8 @@ export function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items
 
     const d = item.transactionDate;
     if (d) {
-      const dt = typeof d === "string" ? new Date(d + "T00:00:00") : new Date(d);
-      row.getCell(2).value = dt;
+      const dt = toDateOnly(d);
+      row.getCell(2).value = dt ?? "";
       row.getCell(2).numFmt = 'mmm dd, yyyy';
     } else {
       row.getCell(2).value = "";
