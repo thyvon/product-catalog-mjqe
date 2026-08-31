@@ -128,7 +128,7 @@ export default function DataTable<TData>({
   return (
     <div className="space-y-3">
       <div className="rounded-lg border overflow-x-auto">
-        <Table className="w-full min-w-max">
+        <Table className="w-full table-fixed min-w-[640px]">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -194,10 +194,11 @@ export default function DataTable<TData>({
                 >
                   {row.getVisibleCells().map((cell) => {
                     const meta = cell.column.columnDef.meta;
+                    const wantsTruncate = !!meta?.className?.includes("truncate");
                     return (
                       <TableCell
                         key={cell.id}
-                        className={meta?.className}
+                        className={`${wantsTruncate ? "" : "whitespace-normal break-words"} align-top${meta?.className ? ` ${meta.className}` : ""}`}
                         style={{ textAlign: meta?.align || "left", width: meta?.width }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

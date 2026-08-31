@@ -32,6 +32,6 @@ describe('Checkbox', () => {
 
   it('disables checkbox when disabled is true', () => {
     render(<Checkbox checked={false} onChange={vi.fn()} label="Test" disabled={true} />);
-    expect(screen.getByRole('checkbox')).toBeDisabled();
+    expect(screen.getByRole('checkbox')).toHaveAttribute('aria-disabled', 'true');
   });
 });

@@ -47,7 +47,7 @@ describe('BaseModal', () => {
         <p>Modal content</p>
       </BaseModal>
     );
-    const backdrop = document.querySelector('[class*="bg-slate-900/60"]');
+    const backdrop = document.querySelector('[data-slot="dialog-overlay"]');
     expect(backdrop).toBeInTheDocument();
     if (backdrop) fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledOnce();
@@ -60,7 +60,7 @@ describe('BaseModal', () => {
         <p>Modal content</p>
       </BaseModal>
     );
-    const backdrop = document.querySelector('[class*="bg-slate-900/60"]');
+    const backdrop = document.querySelector('[data-slot="dialog-overlay"]');
     if (backdrop) fireEvent.click(backdrop);
     expect(onClose).not.toHaveBeenCalled();
   });

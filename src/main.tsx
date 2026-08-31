@@ -31,6 +31,8 @@ const LandingPage = lazy(() => import('@/features/products/pages/LandingPage'));
 const DebitNoteListPage = lazy(() => import('@/features/debit-notes/pages/DebitNoteListPage'));
 const DebitNoteEmailsPage = lazy(() => import('@/features/debit-notes/pages/DebitNoteEmailsPage'));
 const StockIssueItemsPage = lazy(() => import('@/features/stock/pages/StockIssueItemsPage'));
+const ProductManagementPage = lazy(() => import('@/features/product-management/pages/ProductManagementPage'));
+const PmProductFormPage = lazy(() => import('@/features/product-management/pages/PmProductFormPage'));
 const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'));
 
 createRoot(document.getElementById('root')!).render(
@@ -56,6 +58,9 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/dashboard" element={<Navigate to="/" replace />} />
                   <Route path="/catalog" element={<CatalogPage />} />
+                  <Route path="/product-management" element={<ProductManagementPage />} />
+                  <Route path="/product-management/products/new" element={<PmProductFormPage />} />
+                  <Route path="/product-management/products/:id/edit" element={<PmProductFormPage />} />
                   <Route path="/supplier-register" element={<SupplierRegisterPage />} />
                   <Route path="/supplier-docs" element={<SupplierDocsPage />} />
                   <Route path="/debit-notes" element={<DebitNoteListPage />} />

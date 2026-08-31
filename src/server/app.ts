@@ -11,6 +11,7 @@ import debitNotesRouter from "./routes/debitNotes.js";
 import settingsRouter from "./routes/settings.js";
 import usersRouter from "./routes/users.js";
 import aiRouter from "./routes/ai.js";
+import productManagementRouter from "./routes/productManagement.js";
 
 dotenv.config();
 
@@ -102,6 +103,7 @@ export async function createApp() {
   app.use(settingsRouter);
   app.use(usersRouter);
   app.use(aiRouter);
+  app.use(productManagementRouter);
 
   // SPA fallback
   if (process.env.NODE_ENV === "production") {

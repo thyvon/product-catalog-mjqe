@@ -244,6 +244,217 @@ async function createTables(p: mysql.Pool) {
     value TEXT NOT NULL,
     updatedAt VARCHAR(40) NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  // ─── Product Management module (pm_*) ───
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_categories (
+    id VARCHAR(64) PRIMARY KEY,
+    parent_id VARCHAR(64) NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    UNIQUE KEY pm_categories_code_unique (code),
+    INDEX pm_categories_parent_idx (parent_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_product_groups (
+    id VARCHAR(64) PRIMARY KEY,
+    category_id VARCHAR(64) NOT NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    UNIQUE KEY pm_product_groups_code_unique (code),
+    INDEX pm_product_groups_category_idx (category_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_brands (
+    id VARCHAR(64) PRIMARY KEY,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    UNIQUE KEY pm_brands_code_unique (code)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_uoms (
+    id VARCHAR(64) PRIMARY KEY,
+    code VARCHAR(50) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(50) NOT NULL DEFAULT 'unit',
+    decimal_places INT NOT NULL DEFAULT 0,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    UNIQUE KEY pm_uoms_code_unique (code)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_sub_units (
+    id VARCHAR(64) PRIMARY KEY,
+    parent_uom_id VARCHAR(64) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    short_name VARCHAR(50) NOT NULL,
+    conversion_factor DECIMAL(10,4) NOT NULL DEFAULT 1,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    UNIQUE KEY pm_sub_units_name_unique (parent_uom_id, name),
+    INDEX pm_sub_units_uom_idx (parent_uom_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_products (
+    id VARCHAR(64) PRIMARY KEY,
+    product_group_id VARCHAR(64) NULL,
+    category_id VARCHAR(64) NULL,
+    brand_id VARCHAR(64) NULL,
+    uom_id VARCHAR(64) NULL,
+    sub_unit_id VARCHAR(64) NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    product_type VARCHAR(50) NOT NULL DEFAULT 'single',
+    is_variable BOOLEAN NOT NULL DEFAULT FALSE,
+    purchase_price DECIMAL(15,2) NULL,
+    sub_unit_purchase_price DECIMAL(15,2) NULL,
+    image_url TEXT NULL,
+    description TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    UNIQUE KEY pm_products_code_unique (code),
+    INDEX pm_products_group_idx (product_group_id),
+    INDEX pm_products_brand_idx (brand_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_product_variants (
+    id VARCHAR(64) PRIMARY KEY,
+    product_id VARCHAR(64) NOT NULL,
+    sku VARCHAR(150) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    variation_value_ids JSON NULL,
+    sub_unit_id VARCHAR(64) NULL,
+    purchase_price DECIMAL(15,2) NULL,
+    sub_unit_purchase_price DECIMAL(15,2) NULL,
+    image_url TEXT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    UNIQUE KEY pm_product_variants_sku_unique (sku),
+    INDEX pm_product_variants_product_idx (product_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_product_standards (
+    id VARCHAR(64) PRIMARY KEY,
+    product_group_id VARCHAR(64) NOT NULL,
+    code VARCHAR(100) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    UNIQUE KEY pm_product_standards_code_unique (code),
+    INDEX pm_product_standards_group_idx (product_group_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_product_standard_items (
+    id VARCHAR(64) PRIMARY KEY,
+    product_standard_id VARCHAR(64) NOT NULL,
+    product_variant_id VARCHAR(64) NOT NULL,
+    is_preferred BOOLEAN NOT NULL DEFAULT FALSE,
+    effective_from DATE NULL,
+    effective_to DATE NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    INDEX pm_standard_items_standard_idx (product_standard_id),
+    INDEX pm_standard_items_variant_idx (product_variant_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_product_variant_uoms (
+    id VARCHAR(64) PRIMARY KEY,
+    product_variant_id VARCHAR(64) NOT NULL,
+    uom_id VARCHAR(64) NOT NULL,
+    conversion_factor DECIMAL(15,6) NOT NULL DEFAULT 1,
+    is_base BOOLEAN NOT NULL DEFAULT FALSE,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    INDEX pm_variant_uoms_variant_idx (product_variant_id),
+    INDEX pm_variant_uoms_uom_idx (uom_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_variation_templates (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    UNIQUE KEY pm_variation_templates_name_unique (name)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_variation_template_values (
+    id VARCHAR(64) PRIMARY KEY,
+    variation_template_id VARCHAR(64) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    INDEX pm_variation_values_template_idx (variation_template_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_product_variation_templates (
+    product_id VARCHAR(64) NOT NULL,
+    variation_template_id VARCHAR(64) NOT NULL,
+    PRIMARY KEY (product_id, variation_template_id),
+    INDEX pm_prod_vt_product_idx (product_id),
+    INDEX pm_prod_vt_template_idx (variation_template_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_product_combo_items (
+    id VARCHAR(64) PRIMARY KEY,
+    product_id VARCHAR(64) NOT NULL,
+    child_product_id VARCHAR(64) NOT NULL,
+    child_variation_id VARCHAR(64) NULL,
+    quantity DECIMAL(15,2) NOT NULL DEFAULT 1,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    INDEX pm_combo_items_product_idx (product_id),
+    INDEX pm_combo_items_child_idx (child_product_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_custom_fields (
+    id VARCHAR(64) PRIMARY KEY,
+    module VARCHAR(20) NOT NULL DEFAULT 'product',
+    field_name VARCHAR(150) NOT NULL,
+    field_label VARCHAR(255) NOT NULL,
+    field_type VARCHAR(30) NOT NULL DEFAULT 'text',
+    options JSON NULL,
+    is_required BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order INT NOT NULL DEFAULT 0,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    UNIQUE KEY pm_custom_fields_name_unique (field_name)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS pm_product_custom_fields (
+    product_id VARCHAR(64) NOT NULL,
+    field_name VARCHAR(150) NOT NULL,
+    field_value JSON NULL,
+    created_at VARCHAR(40) NOT NULL,
+    updated_at VARCHAR(40) NOT NULL,
+    PRIMARY KEY (product_id, field_name)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 }
 
 async function migrateSchema(p: mysql.Pool) {
@@ -266,6 +477,40 @@ async function migrateSchema(p: mysql.Pool) {
   try { await p.query("ALTER TABLE users ADD COLUMN position VARCHAR(255) NOT NULL DEFAULT '' AFTER phone"); } catch {}
   try { await p.query("ALTER TABLE users ADD COLUMN telegramId VARCHAR(100) NOT NULL DEFAULT '' AFTER position"); } catch {}
   try { await p.query("ALTER TABLE suppliers ADD COLUMN countryOfOrigin VARCHAR(150) NOT NULL DEFAULT '' AFTER foreignTradeOperator"); } catch {}
+
+  // Product Management module migrations
+  try { await p.query("ALTER TABLE pm_products ADD COLUMN uom_id VARCHAR(64) NULL AFTER brand_id"); } catch {}
+  try { await p.query("ALTER TABLE pm_products ADD COLUMN sub_unit_id VARCHAR(64) NULL AFTER uom_id"); } catch {}
+  try { await p.query("ALTER TABLE pm_products ADD COLUMN category_id VARCHAR(64) NULL AFTER product_group_id"); } catch {}
+  try { await p.query("ALTER TABLE pm_products MODIFY COLUMN product_group_id VARCHAR(64) NULL"); } catch {}
+  try { await p.query("ALTER TABLE pm_products ADD COLUMN purchase_price DECIMAL(15,2) NULL AFTER is_variable"); } catch {}
+  try { await p.query("ALTER TABLE pm_products ADD COLUMN sub_unit_purchase_price DECIMAL(15,2) NULL AFTER purchase_price"); } catch {}
+  try { await p.query("ALTER TABLE pm_products ADD COLUMN image_url TEXT NULL AFTER sub_unit_purchase_price"); } catch {}
+  try { await p.query("ALTER TABLE pm_product_variants ADD COLUMN variation_value_ids JSON NULL AFTER description"); } catch {}
+  try { await p.query("ALTER TABLE pm_product_variants ADD COLUMN sub_unit_id VARCHAR(64) NULL AFTER variation_value_ids"); } catch {}
+  try { await p.query("ALTER TABLE pm_product_variants ADD COLUMN purchase_price DECIMAL(15,2) NULL AFTER sub_unit_id"); } catch {}
+  try { await p.query("ALTER TABLE pm_product_variants ADD COLUMN sub_unit_purchase_price DECIMAL(15,2) NULL AFTER purchase_price"); } catch {}
+  try { await p.query("ALTER TABLE pm_product_variants ADD COLUMN image_url TEXT NULL AFTER sub_unit_purchase_price"); } catch {}
+  try { await p.query("ALTER TABLE pm_product_variants ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE AFTER image_url"); } catch {}
+  try { await p.query("ALTER TABLE pm_custom_fields ADD COLUMN module VARCHAR(20) NOT NULL DEFAULT 'product' AFTER field_name"); } catch {}
+  try { await p.query("ALTER TABLE pm_categories ADD COLUMN short_code VARCHAR(10) NULL AFTER name"); } catch {}
+  try { await p.query("ALTER TABLE pm_categories ADD COLUMN image_url VARCHAR(500) NULL AFTER short_code"); } catch {}
+  try { await p.query("ALTER TABLE pm_brands ADD COLUMN image_url VARCHAR(500) NULL AFTER description"); } catch {}
+
+  // Drop deprecated stock/selling/barcode columns (catalog-only schema)
+  for (const col of ["barcode_type", "stock_tracking", "tax_type", "selling_price",
+    "sub_unit_selling_price", "minimum_selling_price", "profit_margin",
+    "track_inventory", "alert_quantity", "max_stock_level", "weight", "has_expiry", "is_for_selling"]) {
+    try { await p.query(`ALTER TABLE pm_products DROP COLUMN ${col}`); } catch {}
+  }
+  for (const col of ["barcode", "selling_price", "sub_unit_selling_price",
+    "minimum_selling_price", "profit_margin"]) {
+    try { await p.query(`ALTER TABLE pm_product_variants DROP COLUMN ${col}`); } catch {}
+  }
+  try { await p.query("ALTER TABLE pm_product_combo_items DROP COLUMN unit_price"); } catch {}
+  for (const col of ["can_purchase", "can_stock", "can_issue", "can_sell"]) {
+    try { await p.query(`ALTER TABLE pm_product_variant_uoms DROP COLUMN ${col}`); } catch {}
+  }
 }
 
 async function seedDefaults(p: mysql.Pool) {

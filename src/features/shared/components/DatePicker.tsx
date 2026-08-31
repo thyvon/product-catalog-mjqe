@@ -12,6 +12,7 @@ interface DatePickerProps {
   placeholder?: string;
   label?: string;
   required?: boolean;
+  disabled?: boolean;
   className?: string;
   containerClassName?: string;
 }
@@ -22,6 +23,7 @@ export default function DatePicker({
   placeholder = "Pick a date",
   label: labelText,
   required,
+  disabled,
   className,
   containerClassName,
 }: DatePickerProps) {
@@ -44,13 +46,14 @@ export default function DatePicker({
 
   const picker = (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button variant="outline" className={cn("w-full justify-start font-normal", !date && "text-muted-foreground", className)} />}>
+      <PopoverTrigger render={<Button variant="outline" disabled={disabled} className={cn("w-full justify-start font-normal", !date && "text-muted-foreground", className)} />}>
         {date ? format(date, "MMM dd, yyyy") : <span>{placeholder}</span>}
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="single"
           selected={date}
+          defaultMonth={date}
           onSelect={handleSelect}
         />
       </PopoverContent>

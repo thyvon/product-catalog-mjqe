@@ -5,10 +5,10 @@ type ToastType = "success" | "error" | "info" | "warning";
 
 interface ToastContextType {
   toast: {
-    success: (msg: string) => void;
-    error: (msg: string) => void;
-    info: (msg: string) => void;
-    warning: (msg: string) => void;
+    success: (msg: string, title?: string) => void;
+    error: (msg: string, title?: string) => void;
+    info: (msg: string, title?: string) => void;
+    warning: (msg: string, title?: string) => void;
   };
 }
 
@@ -22,12 +22,13 @@ export function useToast() {
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const toast = useCallback(
-    (message: string, type: ToastType = "info") => {
+    (message: string, type: ToastType = "info", title?: string) => {
+      const options = title ? { description: title } : undefined;
       switch (type) {
-        case "success": sonnerToast.success(message); break;
-        case "error": sonnerToast.error(message); break;
-        case "warning": sonnerToast.warning(message); break;
-        default: sonnerToast(message);
+        case "success": sonnerToast.success(message, options); break;
+        case "error": sonnerToast.error(message, options); break;
+        case "warning": sonnerToast.warning(message, options); break;
+        default: sonnerToast(message, options);
       }
     },
     []
@@ -35,10 +36,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const value: ToastContextType = {
     toast: {
-      success: (msg: string) => toast(msg, "success"),
-      error: (msg: string) => toast(msg, "error"),
-      info: (msg: string) => toast(msg, "info"),
-      warning: (msg: string) => toast(msg, "warning"),
+      success: (msg: string, title?: string) => toast(msg, "success", title),
+      error: (msg: string, title?: string) => toast(msg, "error", title),
+      info: (msg: string, title?: string) => toast(msg, "info", title),
+      warning: (msg: string, title?: string) => toast(msg, "warning", title),
     },
   };
 

@@ -7,6 +7,7 @@ import {
   Receipt,
   Mail,
   Settings,
+  PackageSearch,
 } from "lucide-react";
 
 export interface NavItem {
@@ -18,6 +19,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/catalog", label: "Catalog", icon: ShoppingBag },
+  { to: "/product-management", label: "Product Management", icon: PackageSearch },
   { to: "/supplier-register", label: "Supplier Register", icon: Building2 },
   { to: "/supplier-docs", label: "Supplier Docs", icon: FileText },
   { to: "/stock-issue-items", label: "Stock Issue Items", icon: ClipboardList },

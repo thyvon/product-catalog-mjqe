@@ -4,30 +4,27 @@ import DatePicker from '@/features/shared/components/DatePicker';
 describe('DatePicker', () => {
   it('renders with placeholder', () => {
     render(<DatePicker value="" onChange={vi.fn()} placeholder="Choose date" />);
-    expect(screen.getByPlaceholderText('Choose date')).toBeInTheDocument();
+    expect(screen.getByText('Choose date')).toBeInTheDocument();
   });
 
   it('shows formatted selected date', () => {
     render(<DatePicker value="2024-03-15" onChange={vi.fn()} />);
-    expect(screen.getByDisplayValue('Mar 15, 2024')).toBeInTheDocument();
+    expect(screen.getByText('Mar 15, 2024')).toBeInTheDocument();
   });
 
   it('opens calendar on click', () => {
     render(<DatePicker value="2024-03-15" onChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole('textbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Mar 15, 2024' }));
     expect(screen.getByText('March 2024')).toBeInTheDocument();
   });
 
   it('calls onChange when a day is clicked', () => {
     const onChange = vi.fn();
     render(<DatePicker value="" onChange={onChange} />);
-    fireEvent.click(screen.getByRole('textbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Pick a date' }));
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const dayBtns = document.querySelectorAll('[class*="flex h-8 items-center justify-center rounded-full"]');
-    const todayBtn = Array.from(dayBtns).find(
-      (btn) => btn.textContent === String(today.getDate()) && !btn.classList.contains('text-slate-300')
-    );
+    const todayBtn = document.querySelector(`[data-day="${today.toLocaleDateString()}"]`);
     if (todayBtn) fireEvent.click(todayBtn);
     expect(onChange).toHaveBeenCalledWith(todayStr);
   });
@@ -44,6 +41,6 @@ describe('DatePicker', () => {
 
   it('disables input when disabled is true', () => {
     render(<DatePicker value="" onChange={vi.fn()} disabled={true} />);
-    expect(screen.getByRole('textbox')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Pick a date' })).toBeDisabled();
   });
 });

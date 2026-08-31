@@ -23,27 +23,31 @@ describe('Toast', () => {
     expect(screen.getByText('App content')).toBeInTheDocument();
   });
 
-  it('shows success toast', () => {
+  it('shows success toast', async () => {
     render(
       <ToastProvider>
         <TestConsumer />
       </ToastProvider>
     );
     fireEvent.click(screen.getByText('Show success'));
-    expect(screen.getByText('Success!')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Success!')).toBeInTheDocument();
+    });
   });
 
-  it('shows error toast', () => {
+  it('shows error toast', async () => {
     render(
       <ToastProvider>
         <TestConsumer />
       </ToastProvider>
     );
     fireEvent.click(screen.getByText('Show error'));
-    expect(screen.getByText('Error!')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Error!')).toBeInTheDocument();
+    });
   });
 
-  it('shows toast title when provided', () => {
+  it('shows toast title when provided', async () => {
     function TestTitle() {
       const { toast } = useToast();
       return <button onClick={() => toast.success('Body', 'Title text')}>Show</button>;
@@ -54,8 +58,10 @@ describe('Toast', () => {
       </ToastProvider>
     );
     fireEvent.click(screen.getByText('Show'));
-    expect(screen.getByText('Title text')).toBeInTheDocument();
-    expect(screen.getByText('Body')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Title text')).toBeInTheDocument();
+      expect(screen.getByText('Body')).toBeInTheDocument();
+    });
   });
 
   it('removes toast when close button is clicked', async () => {
@@ -65,7 +71,9 @@ describe('Toast', () => {
       </ToastProvider>
     );
     fireEvent.click(screen.getByText('Show success'));
-    expect(screen.getByText('Success!')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Success!')).toBeInTheDocument();
+    });
 
     const allBtns = screen.getAllByRole('button');
     const toastClose = allBtns.find(

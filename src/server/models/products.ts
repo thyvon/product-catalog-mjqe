@@ -83,24 +83,22 @@ export async function upsertProduct(product: any): Promise<void> {
   assertDb();
   const p = getPool()!;
   await p.execute(
-    `INSERT INTO products (id, productCode, name, description, uom, category, subCategory, status, price, stock, imageUrl, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       productCode = VALUES(productCode),
-       name = VALUES(name),
-       description = VALUES(description),
-       uom = VALUES(uom),
-       category = VALUES(category),
-       subCategory = VALUES(subCategory),
-       status = VALUES(status),
-       price = VALUES(price),
-       stock = VALUES(stock),
-       imageUrl = VALUES(imageUrl),
-       updatedAt = VALUES(updatedAt)`,
+    `INSERT INTO products (id, productCode, name, description, uom, category, subCategory, status, imageUrl, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        productCode = VALUES(productCode),
+        name = VALUES(name),
+        description = VALUES(description),
+        uom = VALUES(uom),
+        category = VALUES(category),
+        subCategory = VALUES(subCategory),
+        status = VALUES(status),
+        imageUrl = VALUES(imageUrl),
+        updatedAt = VALUES(updatedAt)`,
     [
       product.id, product.productCode, product.name, product.description || "",
       product.uom, product.category, product.subCategory || "", product.status || "Active",
-      product.price ?? null, product.stock ?? null, product.imageUrl || "",
+      product.imageUrl || "",
       product.createdAt, product.updatedAt,
     ]
   );

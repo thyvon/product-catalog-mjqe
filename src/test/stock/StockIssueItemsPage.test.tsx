@@ -13,6 +13,13 @@ const mockItems = [
   { id: '3', itemCode: 'ITEM-003', description: 'Keyboard', quantity: 10, uom: 'Pcs', unitPrice: 25, totalPrice: 250, transactionDate: '2026-06-03', warehouse: 'WH-A', division: 'Admin', department: 'HR', campus: 'PP', requesterName: 'Charlie', referenceNo: 'IO-003', transactionType: 'Issue', accountCode: 'ACC-001', remarks: 'HR request' },
 ];
 
+const filterValues = {
+  warehouses: ['WH-A', 'WH-B'],
+  departments: ['IT', 'Accounting', 'HR'],
+  campuses: ['PP', 'SR'],
+  transactionTypes: ['Issue', 'Transfer'],
+};
+
 function createFetchMock(overrides?: { items?: typeof mockItems; total?: number }) {
   const items = overrides?.items ?? mockItems;
   const total = overrides?.total ?? mockItems.length;
@@ -20,11 +27,30 @@ function createFetchMock(overrides?: { items?: typeof mockItems; total?: number 
     if (options?.method === 'DELETE') {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, count: total }) });
     }
+    if (String(url).includes('/filters/values')) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(filterValues) });
+    }
     return Promise.resolve({
       ok: true,
       json: () => Promise.resolve({ items, total }),
     });
   });
+}
+
+async function selectWarehouseWhA() {
+  fireEvent.click(screen.getByText('Filters'));
+  await waitFor(() => {
+    expect(screen.getAllByRole('combobox').length).toBeGreaterThan(0);
+  });
+  const combobox = screen.getAllByRole('combobox')[0];
+  fireEvent.pointerDown(combobox);
+  fireEvent.mouseDown(combobox);
+  await waitFor(() => {
+    expect(screen.getByRole('option', { name: 'WH-A' })).toBeInTheDocument();
+  });
+  const option = screen.getByRole('option', { name: 'WH-A' });
+  fireEvent.pointerDown(option);
+  fireEvent.click(option);
 }
 
 describe('StockIssueItemsPage', () => {
@@ -59,10 +85,10 @@ describe('StockIssueItemsPage', () => {
     });
     fireEvent.click(screen.getByText('Filters'));
     await waitFor(() => {
-      expect(screen.getAllByText('All Warehouses').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('All Departments').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('All Campuses').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('All Transaction Types').length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText('All Warehouses').length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText('All Departments').length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText('All Campuses').length).toBeGreaterThan(0);
+      expect(screen.getAllByPlaceholderText('All Types').length).toBeGreaterThan(0);
     });
   });
 
@@ -79,19 +105,11 @@ describe('StockIssueItemsPage', () => {
     const fetch = createFetchMock();
     vi.stubGlobal('fetch', fetch);
     renderWithToast(<StockIssueItemsPage />);
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 
     fetch.mockClear();
 
-    fireEvent.click(screen.getByText('Filters'));
-    await waitFor(() => {
-      const warehouseBtn = screen.getAllByText('All Warehouses')[0].closest('button');
-      if (warehouseBtn) fireEvent.click(warehouseBtn);
-    });
-    await waitFor(() => {
-      const option = screen.getByRole('button', { name: 'WH-A' });
-      if (option) fireEvent.click(option);
-    });
+    await selectWarehouseWhA();
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(expect.stringContaining('warehouse=WH-A'));
     });
@@ -101,7 +119,7 @@ describe('StockIssueItemsPage', () => {
     const fetch = createFetchMock();
     vi.stubGlobal('fetch', fetch);
     renderWithToast(<StockIssueItemsPage />);
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 
     fetch.mockClear();
     const searchInput = screen.getByPlaceholderText(/Search by code/);
@@ -112,41 +130,25 @@ describe('StockIssueItemsPage', () => {
     });
   });
 
-  it('renders Delete All button when items exist', async () => {
+  it('renders Delete Filtered button when items exist and a filter is active', async () => {
     vi.stubGlobal('fetch', createFetchMock());
     renderWithToast(<StockIssueItemsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Delete All')).toBeInTheDocument();
+      expect(screen.getByText('Laptop')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Delete Filtered')).not.toBeInTheDocument();
+    await selectWarehouseWhA();
+    await waitFor(() => {
+      expect(screen.getByText('Delete Filtered')).toBeInTheDocument();
     });
   });
 
-  it('shows error toast when Delete All clicked without active filters', async () => {
+  it('opens confirm modal on Delete Filtered click when filter is active', async () => {
     vi.stubGlobal('fetch', createFetchMock());
     renderWithToast(<StockIssueItemsPage />);
+    await selectWarehouseWhA();
     await waitFor(() => {
-      expect(screen.getByText('Delete All')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByText('Delete All'));
-    await waitFor(() => {
-      expect(screen.getByText('Please apply at least one filter before deleting all items.')).toBeInTheDocument();
-    });
-  });
-
-  it('opens confirm modal on Delete All click when filter is active', async () => {
-    vi.stubGlobal('fetch', createFetchMock());
-    renderWithToast(<StockIssueItemsPage />);
-    await waitFor(() => expect(screen.getByText('Delete All')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('Filters'));
-    await waitFor(() => {
-      const btn = screen.getAllByText('All Warehouses')[0].closest('button');
-      if (btn) fireEvent.click(btn);
-    });
-    await waitFor(() => {
-      const opt = screen.getByRole('button', { name: 'WH-A' });
-      if (opt) fireEvent.click(opt);
-    });
-    await waitFor(() => {
-      fireEvent.click(screen.getByText('Delete All'));
+      fireEvent.click(screen.getByText('Delete Filtered'));
     });
     await waitFor(() => {
       expect(screen.getByText('Delete All Filtered Items')).toBeInTheDocument();
@@ -158,18 +160,9 @@ describe('StockIssueItemsPage', () => {
     const fetch = createFetchMock();
     vi.stubGlobal('fetch', fetch);
     renderWithToast(<StockIssueItemsPage />);
-    await waitFor(() => expect(screen.getByText('Delete All')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('Filters'));
+    await selectWarehouseWhA();
     await waitFor(() => {
-      const btn = screen.getAllByText('All Warehouses')[0].closest('button');
-      if (btn) fireEvent.click(btn);
-    });
-    await waitFor(() => {
-      const opt = screen.getByRole('button', { name: 'WH-A' });
-      if (opt) fireEvent.click(opt);
-    });
-    await waitFor(() => {
-      fireEvent.click(screen.getByText('Delete All'));
+      fireEvent.click(screen.getByText('Delete Filtered'));
     });
     await waitFor(() => {
       fireEvent.click(screen.getByText('Delete'));
@@ -182,18 +175,9 @@ describe('StockIssueItemsPage', () => {
   it('shows success toast after bulk delete', async () => {
     vi.stubGlobal('fetch', createFetchMock());
     renderWithToast(<StockIssueItemsPage />);
-    await waitFor(() => expect(screen.getByText('Delete All')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('Filters'));
+    await selectWarehouseWhA();
     await waitFor(() => {
-      const btn = screen.getAllByText('All Warehouses')[0].closest('button');
-      if (btn) fireEvent.click(btn);
-    });
-    await waitFor(() => {
-      const opt = screen.getByRole('button', { name: 'WH-A' });
-      if (opt) fireEvent.click(opt);
-    });
-    await waitFor(() => {
-      fireEvent.click(screen.getByText('Delete All'));
+      fireEvent.click(screen.getByText('Delete Filtered'));
     });
     await waitFor(() => {
       fireEvent.click(screen.getByText('Delete'));
@@ -207,18 +191,10 @@ describe('StockIssueItemsPage', () => {
     const fetch = createFetchMock();
     vi.stubGlobal('fetch', fetch);
     renderWithToast(<StockIssueItemsPage />);
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
 
     fetch.mockClear();
-    fireEvent.click(screen.getByText('Filters'));
-    await waitFor(() => {
-      const warehouseBtn = screen.getAllByText('All Warehouses')[0].closest('button');
-      if (warehouseBtn) fireEvent.click(warehouseBtn);
-    });
-    await waitFor(() => {
-      const option = screen.getByRole('button', { name: 'WH-A' });
-      if (option) fireEvent.click(option);
-    });
+    await selectWarehouseWhA();
     await waitFor(() => {
       expect(screen.getByText('Clear all')).toBeInTheDocument();
     });
@@ -228,12 +204,12 @@ describe('StockIssueItemsPage', () => {
     });
   });
 
-  it('does not show Delete All when items is empty', async () => {
+  it('does not show Delete Filtered when items is empty', async () => {
     const fetch = createFetchMock({ items: [], total: 0 });
     vi.stubGlobal('fetch', fetch);
     renderWithToast(<StockIssueItemsPage />);
     await waitFor(() => {
-      expect(screen.queryByText('Delete All')).not.toBeInTheDocument();
+      expect(screen.queryByText('Delete Filtered')).not.toBeInTheDocument();
     });
   });
 
@@ -270,7 +246,7 @@ describe('StockIssueItemsPage', () => {
     vi.stubGlobal('fetch', fetch);
     renderWithToast(<StockIssueItemsPage />);
     await waitFor(() => {
-      expect(screen.getByText('25 items')).toBeInTheDocument();
+      expect(screen.getByText('25 items found')).toBeInTheDocument();
     });
   });
 });

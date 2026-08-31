@@ -101,9 +101,7 @@ describe('DataTable', () => {
         }}
       />
     );
-    const allBtns = screen.getAllByRole('link');
-    const nextBtn = allBtns.find((b) => b.querySelector('.lucide-chevron-right'));
-    if (nextBtn) fireEvent.click(nextBtn);
+    fireEvent.click(screen.getByLabelText('Go to next page'));
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 

@@ -104,8 +104,6 @@ router.post("/api/products", async (req, res) => {
       category: String(input.category).trim(),
       subCategory: String(input.subCategory || "General").trim(),
       status: ["Active", "Inactive"].includes(input.status) ? input.status : "Active",
-      price: input.price !== undefined ? Math.max(0, parseFloat(input.price)) : null,
-      stock: input.stock !== undefined ? Math.max(0, parseInt(input.stock, 10)) : null,
       imageUrl: String(input.imageUrl || BLANK_PLACEHOLDER).trim(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -138,8 +136,6 @@ router.post("/api/products/import", async (req, res) => {
       const rawStatus = item.status || item["Status"] || "Active";
       let norStatus = "Active";
       if (String(rawStatus).toLowerCase().includes("inactive") || String(rawStatus).toLowerCase() === "i") norStatus = "Inactive";
-      const itemPrice = item.price || item["Price"] || item["Rate"];
-      const itemStock = item.stock || item["Stock"] || item["Qty"] || item["Quantity"];
       if (codeStr && nameStr) {
         const normalizedCode = String(codeStr).toUpperCase().trim();
         const existing = existingByCode.get(normalizedCode);
@@ -153,8 +149,6 @@ router.post("/api/products/import", async (req, res) => {
           category: String(catStr).trim(),
           subCategory: String(subCatStr).trim(),
           status: norStatus,
-          price: itemPrice !== undefined ? Math.max(0, parseFloat(itemPrice)) : null,
-          stock: itemStock !== undefined ? Math.max(0, parseInt(itemStock, 10)) : null,
           imageUrl: String(imgStr || BLANK_PLACEHOLDER).trim(),
           createdAt: existing ? existing.createdAt : now,
           updatedAt: now,
@@ -188,8 +182,6 @@ router.put("/api/products/:id", async (req, res) => {
       category: input.category !== undefined ? String(input.category).trim() : existing.category,
       subCategory: input.subCategory !== undefined ? String(input.subCategory).trim() : existing.subCategory,
       status: ["Active", "Inactive"].includes(input.status) ? input.status : existing.status,
-      price: input.price !== undefined ? Math.max(0, parseFloat(input.price)) : existing.price,
-      stock: input.stock !== undefined ? Math.max(0, parseInt(input.stock, 10)) : existing.stock,
       imageUrl: input.imageUrl !== undefined ? String(input.imageUrl).trim() : existing.imageUrl,
       updatedAt: new Date().toISOString(),
     };

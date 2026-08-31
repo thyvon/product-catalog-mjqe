@@ -330,6 +330,134 @@ async function initDb() {
       updatedAt VARCHAR(40) NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
+    // ─── Product Management module (pm_*) ───
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS pm_categories (
+      id VARCHAR(64) PRIMARY KEY,
+      parent_id VARCHAR(64) NULL,
+      code VARCHAR(100) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      sort_order INT NOT NULL DEFAULT 0,
+      status VARCHAR(20) NOT NULL DEFAULT 'Active',
+      created_at VARCHAR(40) NOT NULL,
+      updated_at VARCHAR(40) NOT NULL,
+      UNIQUE KEY pm_categories_code_unique (code),
+      INDEX pm_categories_parent_idx (parent_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS pm_product_groups (
+      id VARCHAR(64) PRIMARY KEY,
+      category_id VARCHAR(64) NOT NULL,
+      code VARCHAR(100) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'Active',
+      created_at VARCHAR(40) NOT NULL,
+      updated_at VARCHAR(40) NOT NULL,
+      UNIQUE KEY pm_product_groups_code_unique (code),
+      INDEX pm_product_groups_category_idx (category_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS pm_brands (
+      id VARCHAR(64) PRIMARY KEY,
+      code VARCHAR(100) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'Active',
+      created_at VARCHAR(40) NOT NULL,
+      updated_at VARCHAR(40) NOT NULL,
+      UNIQUE KEY pm_brands_code_unique (code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS pm_uoms (
+      id VARCHAR(64) PRIMARY KEY,
+      code VARCHAR(50) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      type VARCHAR(50) NOT NULL DEFAULT 'unit',
+      decimal_places INT NOT NULL DEFAULT 0,
+      status VARCHAR(20) NOT NULL DEFAULT 'Active',
+      created_at VARCHAR(40) NOT NULL,
+      updated_at VARCHAR(40) NOT NULL,
+      UNIQUE KEY pm_uoms_code_unique (code)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS pm_products (
+      id VARCHAR(64) PRIMARY KEY,
+      product_group_id VARCHAR(64) NOT NULL,
+      brand_id VARCHAR(64) NULL,
+      code VARCHAR(100) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      product_type VARCHAR(50) NOT NULL DEFAULT 'goods',
+      is_variable BOOLEAN NOT NULL DEFAULT FALSE,
+      description TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'Active',
+      created_at VARCHAR(40) NOT NULL,
+      updated_at VARCHAR(40) NOT NULL,
+      UNIQUE KEY pm_products_code_unique (code),
+      INDEX pm_products_group_idx (product_group_id),
+      INDEX pm_products_brand_idx (brand_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS pm_product_variants (
+      id VARCHAR(64) PRIMARY KEY,
+      product_id VARCHAR(64) NOT NULL,
+      sku VARCHAR(150) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      barcode VARCHAR(150) NULL,
+      description TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'Active',
+      created_at VARCHAR(40) NOT NULL,
+      updated_at VARCHAR(40) NOT NULL,
+      UNIQUE KEY pm_product_variants_sku_unique (sku),
+      UNIQUE KEY pm_product_variants_barcode_unique (barcode),
+      INDEX pm_product_variants_product_idx (product_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS pm_product_standards (
+      id VARCHAR(64) PRIMARY KEY,
+      product_group_id VARCHAR(64) NOT NULL,
+      code VARCHAR(100) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'Active',
+      created_at VARCHAR(40) NOT NULL,
+      updated_at VARCHAR(40) NOT NULL,
+      UNIQUE KEY pm_product_standards_code_unique (code),
+      INDEX pm_product_standards_group_idx (product_group_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS pm_product_standard_items (
+      id VARCHAR(64) PRIMARY KEY,
+      product_standard_id VARCHAR(64) NOT NULL,
+      product_variant_id VARCHAR(64) NOT NULL,
+      is_preferred BOOLEAN NOT NULL DEFAULT FALSE,
+      effective_from DATE NULL,
+      effective_to DATE NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'Active',
+      created_at VARCHAR(40) NOT NULL,
+      updated_at VARCHAR(40) NOT NULL,
+      INDEX pm_standard_items_standard_idx (product_standard_id),
+      INDEX pm_standard_items_variant_idx (product_variant_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS pm_product_variant_uoms (
+      id VARCHAR(64) PRIMARY KEY,
+      product_variant_id VARCHAR(64) NOT NULL,
+      uom_id VARCHAR(64) NOT NULL,
+      conversion_factor DECIMAL(15,6) NOT NULL DEFAULT 1,
+      is_base BOOLEAN NOT NULL DEFAULT FALSE,
+      can_purchase BOOLEAN NOT NULL DEFAULT FALSE,
+      can_stock BOOLEAN NOT NULL DEFAULT FALSE,
+      can_issue BOOLEAN NOT NULL DEFAULT FALSE,
+      can_sell BOOLEAN NOT NULL DEFAULT FALSE,
+      status VARCHAR(20) NOT NULL DEFAULT 'Active',
+      created_at VARCHAR(40) NOT NULL,
+      updated_at VARCHAR(40) NOT NULL,
+      INDEX pm_variant_uoms_variant_idx (product_variant_id),
+      INDEX pm_variant_uoms_uom_idx (uom_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
     const defaults: [string, string][] = [
       ["smtp_host", "smtp.gmail.com"],
       ["smtp_port", "587"],
@@ -3038,6 +3166,949 @@ app.post("/api/ai/copywrite", async (req, res) => {
   } catch (err: any) {
     console.error("Gemini AI copy generation failure:", err);
     res.status(500).json({ error: "Gemini copywriter was unable to complete this query.", details: err.message });
+  }
+});
+
+// ─── Product Management (pm_*) helpers ───
+
+function pmNewId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function pmBool(value: any, fallback = false): boolean {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "boolean") return value;
+  return value !== 0 && value !== "0" && value !== "false";
+}
+
+function pmStatus(value: any, fallback = "Active"): string {
+  return ["Active", "Inactive"].includes(value) ? value : fallback;
+}
+
+function pmText(input: any, field: string, fallback = ""): string {
+  return String(input?.[field] ?? fallback).trim();
+}
+
+async function pmGetAll(table: string, orderBy = "name ASC"): Promise<any[]> {
+  const p = getPool();
+  if (!p || !dbReady) return [];
+  const [rows] = await p.query<RowDataPacket[]>(`SELECT * FROM \`${table}\` ORDER BY ${orderBy}`);
+  return rows;
+}
+
+async function pmGetById(table: string, id: string): Promise<any | null> {
+  const p = getPool();
+  if (!p || !dbReady) return null;
+  const [rows] = await p.execute<RowDataPacket[]>(`SELECT * FROM \`${table}\` WHERE id = ?`, [id]);
+  return rows[0] || null;
+}
+
+async function pmDeleteById(table: string, id: string): Promise<boolean> {
+  assertDb();
+  const p = getPool()!;
+  const [result] = await p.execute<ResultSetHeader>(`DELETE FROM \`${table}\` WHERE id = ?`, [id]);
+  return result.affectedRows > 0;
+}
+
+async function pmCount(table: string, column: string, id: string): Promise<number> {
+  const p = getPool();
+  if (!p || !dbReady) return 0;
+  const [rows] = await p.execute<RowDataPacket[]>(
+    `SELECT COUNT(*) AS total FROM \`${table}\` WHERE \`${column}\` = ?`,
+    [id]
+  );
+  return Number((rows[0] as any).total);
+}
+
+// ─── Product Management categories ───
+
+app.get("/api/pm/categories", async (_req, res) => {
+  try {
+    res.json(await pmGetAll("pm_categories", "sort_order ASC, name ASC"));
+  } catch {
+    res.status(500).json({ error: "Failed to fetch categories." });
+  }
+});
+
+app.post("/api/pm/categories", async (req, res) => {
+  try {
+    const input = req.body;
+    if (!input.code || !input.name) return res.status(400).json({ error: "Code and name are required." });
+    const now = new Date().toISOString();
+    const category = {
+      id: pmNewId("cat"),
+      parent_id: input.parent_id || null,
+      code: String(input.code).toUpperCase().trim(),
+      name: String(input.name).trim(),
+      description: pmText(input, "description"),
+      sort_order: input.sort_order !== undefined ? Math.max(0, parseInt(input.sort_order, 10) || 0) : 0,
+      status: pmStatus(input.status),
+      created_at: now,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `INSERT INTO pm_categories (id, parent_id, code, name, description, sort_order, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE parent_id = VALUES(parent_id), code = VALUES(code), name = VALUES(name),
+         description = VALUES(description), sort_order = VALUES(sort_order), status = VALUES(status), updated_at = VALUES(updated_at)`,
+      [category.id, category.parent_id, category.code, category.name, category.description, category.sort_order, category.status, category.created_at, category.updated_at]
+    );
+    res.status(201).json(category);
+  } catch (err: any) {
+    console.error("Error creating category:", err);
+    res.status(500).json({ error: "Failed to create category." });
+  }
+});
+
+app.put("/api/pm/categories/:id", async (req, res) => {
+  try {
+    const existing = await pmGetById("pm_categories", req.params.id);
+    if (!existing) return res.status(404).json({ error: "Category not found." });
+    const input = req.body;
+    const now = new Date().toISOString();
+    const updated = {
+      ...existing,
+      parent_id: input.parent_id !== undefined ? input.parent_id || null : existing.parent_id,
+      code: input.code !== undefined ? String(input.code).toUpperCase().trim() : existing.code,
+      name: input.name !== undefined ? String(input.name).trim() : existing.name,
+      description: input.description !== undefined ? pmText(input, "description") : existing.description,
+      sort_order: input.sort_order !== undefined ? Math.max(0, parseInt(input.sort_order, 10) || 0) : existing.sort_order,
+      status: input.status !== undefined ? pmStatus(input.status, existing.status) : existing.status,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `UPDATE pm_categories SET parent_id = ?, code = ?, name = ?, description = ?, sort_order = ?, status = ?, updated_at = ? WHERE id = ?`,
+      [updated.parent_id, updated.code, updated.name, updated.description, updated.sort_order, updated.status, updated.updated_at, updated.id]
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating category:", err);
+    res.status(500).json({ error: "Failed to update category." });
+  }
+});
+
+app.delete("/api/pm/categories/:id", async (req, res) => {
+  try {
+    const [children, groups] = await Promise.all([
+      pmCount("pm_categories", "parent_id", req.params.id),
+      pmCount("pm_product_groups", "category_id", req.params.id),
+    ]);
+    if (children > 0 || groups > 0) {
+      return res.status(409).json({ error: "Cannot delete a category that has child categories or product groups." });
+    }
+    const deleted = await pmDeleteById("pm_categories", req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Category not found." });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error deleting category:", err);
+    res.status(500).json({ error: "Failed to delete category." });
+  }
+});
+
+// ─── Product Management product groups ───
+
+app.get("/api/pm/product-groups", async (_req, res) => {
+  try {
+    const p = getPool();
+    if (!p || !dbReady) return res.json([]);
+    const [rows] = await p.query<RowDataPacket[]>(
+      `SELECT g.*, c.name AS category_name, c.code AS category_code
+       FROM pm_product_groups g LEFT JOIN pm_categories c ON c.id = g.category_id ORDER BY g.name ASC`
+    );
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: "Failed to fetch product groups." });
+  }
+});
+
+app.post("/api/pm/product-groups", async (req, res) => {
+  try {
+    const input = req.body;
+    if (!input.code || !input.name || !input.category_id) return res.status(400).json({ error: "Code, name, and category are required." });
+    const now = new Date().toISOString();
+    const group = {
+      id: pmNewId("pgrp"),
+      category_id: String(input.category_id),
+      code: String(input.code).toUpperCase().trim(),
+      name: String(input.name).trim(),
+      description: pmText(input, "description"),
+      status: pmStatus(input.status),
+      created_at: now,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `INSERT INTO pm_product_groups (id, category_id, code, name, description, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE category_id = VALUES(category_id), code = VALUES(code), name = VALUES(name),
+         description = VALUES(description), status = VALUES(status), updated_at = VALUES(updated_at)`,
+      [group.id, group.category_id, group.code, group.name, group.description, group.status, group.created_at, group.updated_at]
+    );
+    res.status(201).json(group);
+  } catch (err: any) {
+    console.error("Error creating product group:", err);
+    res.status(500).json({ error: "Failed to create product group." });
+  }
+});
+
+app.put("/api/pm/product-groups/:id", async (req, res) => {
+  try {
+    const existing = await pmGetById("pm_product_groups", req.params.id);
+    if (!existing) return res.status(404).json({ error: "Product group not found." });
+    const input = req.body;
+    const now = new Date().toISOString();
+    const updated = {
+      ...existing,
+      category_id: input.category_id !== undefined ? String(input.category_id) : existing.category_id,
+      code: input.code !== undefined ? String(input.code).toUpperCase().trim() : existing.code,
+      name: input.name !== undefined ? String(input.name).trim() : existing.name,
+      description: input.description !== undefined ? pmText(input, "description") : existing.description,
+      status: input.status !== undefined ? pmStatus(input.status, existing.status) : existing.status,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `UPDATE pm_product_groups SET category_id = ?, code = ?, name = ?, description = ?, status = ?, updated_at = ? WHERE id = ?`,
+      [updated.category_id, updated.code, updated.name, updated.description, updated.status, updated.updated_at, updated.id]
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating product group:", err);
+    res.status(500).json({ error: "Failed to update product group." });
+  }
+});
+
+app.delete("/api/pm/product-groups/:id", async (req, res) => {
+  try {
+    const count = await pmCount("pm_products", "product_group_id", req.params.id);
+    if (count > 0) return res.status(409).json({ error: "Cannot delete a product group that still has products." });
+    const deleted = await pmDeleteById("pm_product_groups", req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Product group not found." });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error deleting product group:", err);
+    res.status(500).json({ error: "Failed to delete product group." });
+  }
+});
+
+// ─── Product Management brands ───
+
+app.get("/api/pm/brands", async (_req, res) => {
+  try {
+    res.json(await pmGetAll("pm_brands"));
+  } catch {
+    res.status(500).json({ error: "Failed to fetch brands." });
+  }
+});
+
+app.post("/api/pm/brands", async (req, res) => {
+  try {
+    const input = req.body;
+    if (!input.code || !input.name) return res.status(400).json({ error: "Code and name are required." });
+    const now = new Date().toISOString();
+    const brand = {
+      id: pmNewId("brnd"),
+      code: String(input.code).toUpperCase().trim(),
+      name: String(input.name).trim(),
+      description: pmText(input, "description"),
+      status: pmStatus(input.status),
+      created_at: now,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `INSERT INTO pm_brands (id, code, name, description, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE code = VALUES(code), name = VALUES(name), description = VALUES(description), status = VALUES(status), updated_at = VALUES(updated_at)`,
+      [brand.id, brand.code, brand.name, brand.description, brand.status, brand.created_at, brand.updated_at]
+    );
+    res.status(201).json(brand);
+  } catch (err: any) {
+    console.error("Error creating brand:", err);
+    res.status(500).json({ error: "Failed to create brand." });
+  }
+});
+
+app.put("/api/pm/brands/:id", async (req, res) => {
+  try {
+    const existing = await pmGetById("pm_brands", req.params.id);
+    if (!existing) return res.status(404).json({ error: "Brand not found." });
+    const input = req.body;
+    const now = new Date().toISOString();
+    const updated = {
+      ...existing,
+      code: input.code !== undefined ? String(input.code).toUpperCase().trim() : existing.code,
+      name: input.name !== undefined ? String(input.name).trim() : existing.name,
+      description: input.description !== undefined ? pmText(input, "description") : existing.description,
+      status: input.status !== undefined ? pmStatus(input.status, existing.status) : existing.status,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `UPDATE pm_brands SET code = ?, name = ?, description = ?, status = ?, updated_at = ? WHERE id = ?`,
+      [updated.code, updated.name, updated.description, updated.status, updated.updated_at, updated.id]
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating brand:", err);
+    res.status(500).json({ error: "Failed to update brand." });
+  }
+});
+
+app.delete("/api/pm/brands/:id", async (req, res) => {
+  try {
+    const count = await pmCount("pm_products", "brand_id", req.params.id);
+    if (count > 0) return res.status(409).json({ error: "Cannot delete a brand that is assigned to products." });
+    const deleted = await pmDeleteById("pm_brands", req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Brand not found." });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error deleting brand:", err);
+    res.status(500).json({ error: "Failed to delete brand." });
+  }
+});
+
+// ─── Product Management UoMs ───
+
+app.get("/api/pm/uoms", async (_req, res) => {
+  try {
+    res.json(await pmGetAll("pm_uoms"));
+  } catch {
+    res.status(500).json({ error: "Failed to fetch UoMs." });
+  }
+});
+
+app.post("/api/pm/uoms", async (req, res) => {
+  try {
+    const input = req.body;
+    if (!input.code || !input.name) return res.status(400).json({ error: "Code and name are required." });
+    const now = new Date().toISOString();
+    const uom = {
+      id: pmNewId("uom"),
+      code: String(input.code).toUpperCase().trim(),
+      name: String(input.name).trim(),
+      type: ["unit", "weight", "volume", "length", "time", "packaging", "other"].includes(input.type) ? input.type : "unit",
+      decimal_places: input.decimal_places !== undefined ? Math.max(0, parseInt(input.decimal_places, 10) || 0) : 0,
+      status: pmStatus(input.status),
+      created_at: now,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `INSERT INTO pm_uoms (id, code, name, type, decimal_places, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE code = VALUES(code), name = VALUES(name), type = VALUES(type), decimal_places = VALUES(decimal_places), status = VALUES(status), updated_at = VALUES(updated_at)`,
+      [uom.id, uom.code, uom.name, uom.type, uom.decimal_places, uom.status, uom.created_at, uom.updated_at]
+    );
+    res.status(201).json(uom);
+  } catch (err: any) {
+    console.error("Error creating UoM:", err);
+    res.status(500).json({ error: "Failed to create UoM." });
+  }
+});
+
+app.put("/api/pm/uoms/:id", async (req, res) => {
+  try {
+    const existing = await pmGetById("pm_uoms", req.params.id);
+    if (!existing) return res.status(404).json({ error: "UoM not found." });
+    const input = req.body;
+    const now = new Date().toISOString();
+    const updated = {
+      ...existing,
+      code: input.code !== undefined ? String(input.code).toUpperCase().trim() : existing.code,
+      name: input.name !== undefined ? String(input.name).trim() : existing.name,
+      type: input.type !== undefined && ["unit", "weight", "volume", "length", "time", "packaging", "other"].includes(input.type) ? input.type : existing.type,
+      decimal_places: input.decimal_places !== undefined ? Math.max(0, parseInt(input.decimal_places, 10) || 0) : existing.decimal_places,
+      status: input.status !== undefined ? pmStatus(input.status, existing.status) : existing.status,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `UPDATE pm_uoms SET code = ?, name = ?, type = ?, decimal_places = ?, status = ?, updated_at = ? WHERE id = ?`,
+      [updated.code, updated.name, updated.type, updated.decimal_places, updated.status, updated.updated_at, updated.id]
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating UoM:", err);
+    res.status(500).json({ error: "Failed to update UoM." });
+  }
+});
+
+app.delete("/api/pm/uoms/:id", async (req, res) => {
+  try {
+    const count = await pmCount("pm_product_variant_uoms", "uom_id", req.params.id);
+    if (count > 0) return res.status(409).json({ error: "Cannot delete a UoM that is in use by variants." });
+    const deleted = await pmDeleteById("pm_uoms", req.params.id);
+    if (!deleted) return res.status(404).json({ error: "UoM not found." });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error deleting UoM:", err);
+    res.status(500).json({ error: "Failed to delete UoM." });
+  }
+});
+
+// ─── Product Management products ───
+
+app.get("/api/pm/products", async (req, res) => {
+  try {
+    const { page, pageSize, search, groupId, categoryId, brandId, status, sort } = req.query;
+    const p = getPool();
+    if (!p || !dbReady) return res.json({ data: [], total: 0 });
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+    if (search) {
+      conditions.push("(p.name LIKE ? OR p.code LIKE ? OR g.name LIKE ? OR b.name LIKE ?)");
+      const like = `%${search}%`;
+      params.push(like, like, like, like);
+    }
+    if (groupId) { conditions.push("p.product_group_id = ?"); params.push(groupId); }
+    if (categoryId) { conditions.push("g.category_id = ?"); params.push(categoryId); }
+    if (brandId) { conditions.push("p.brand_id = ?"); params.push(brandId); }
+    if (status === "active") conditions.push("p.status = 'Active'");
+    else if (status === "inactive") conditions.push("p.status = 'Inactive'");
+
+    const fromSql =
+      `FROM pm_products p
+       LEFT JOIN pm_product_groups g ON g.id = p.product_group_id
+       LEFT JOIN pm_categories c ON c.id = g.category_id
+       LEFT JOIN pm_brands b ON b.id = p.brand_id`;
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const [countRows] = await p.query<RowDataPacket[]>(`SELECT COUNT(*) as total ${fromSql} ${where}`, params);
+    const total = Number((countRows[0] as any).total);
+
+    const orderBy = sort === "code" ? "p.code ASC" : sort === "group" ? "g.name ASC" : sort === "brand" ? "b.name ASC" : "p.name ASC";
+    const selectSql = `SELECT p.*, g.name AS product_group_name, g.code AS product_group_code, c.name AS category_name, b.name AS brand_name,
+         (SELECT COUNT(*) FROM pm_product_variants v WHERE v.product_id = p.id) AS variant_count
+       ${fromSql} ${where} ORDER BY ${orderBy}`;
+
+    const pageSizeNum = pageSize !== undefined ? Math.max(0, Number(pageSize)) : 20;
+    let rows: RowDataPacket[];
+    if (pageSizeNum === 0) {
+      [rows] = await p.query<RowDataPacket[]>(selectSql, params);
+    } else {
+      const pageNum = Math.max(1, Number(page) || 1);
+      [rows] = await p.query<RowDataPacket[]>(`${selectSql} LIMIT ? OFFSET ?`, [...params, pageSizeNum, (pageNum - 1) * pageSizeNum]);
+    }
+    res.json({ data: rows, total });
+  } catch (err: any) {
+    console.error("Error fetching products:", err);
+    res.status(500).json({ error: "Failed to fetch products." });
+  }
+});
+
+app.get("/api/pm/products/:id", async (req, res) => {
+  try {
+    const p = getPool();
+    if (!p || !dbReady) return res.status(503).json({ error: "Database is not available." });
+    const [rows] = await p.execute<RowDataPacket[]>(
+      `SELECT p.*, g.name AS product_group_name, g.code AS product_group_code, c.name AS category_name, b.name AS brand_name
+       FROM pm_products p
+       LEFT JOIN pm_product_groups g ON g.id = p.product_group_id
+       LEFT JOIN pm_categories c ON c.id = g.category_id
+       LEFT JOIN pm_brands b ON b.id = p.brand_id
+       WHERE p.id = ?`,
+      [req.params.id]
+    );
+    const product = rows[0];
+    if (!product) return res.status(404).json({ error: "Product not found." });
+    const [variants] = await p.execute<RowDataPacket[]>(
+      `SELECT * FROM pm_product_variants WHERE product_id = ? ORDER BY name ASC`,
+      [req.params.id]
+    );
+    product.variants = variants;
+    res.json(product);
+  } catch (err: any) {
+    console.error("Error fetching product:", err);
+    res.status(500).json({ error: "Failed to fetch product." });
+  }
+});
+
+app.post("/api/pm/products", async (req, res) => {
+  try {
+    const input = req.body;
+    if (!input.code || !input.name || !input.product_group_id) return res.status(400).json({ error: "Code, name, and product group are required." });
+    const now = new Date().toISOString();
+    const product = {
+      id: pmNewId("prod"),
+      product_group_id: String(input.product_group_id),
+      brand_id: input.brand_id || null,
+      code: String(input.code).toUpperCase().trim(),
+      name: String(input.name).trim(),
+      product_type: ["single", "variation"].includes(input.product_type) ? input.product_type : "single",
+      is_variable: ["single", "variation"].includes(input.product_type) ? input.product_type === "variation" : pmBool(input.is_variable),
+      description: pmText(input, "description"),
+      status: pmStatus(input.status),
+      created_at: now,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `INSERT INTO pm_products (id, product_group_id, brand_id, code, name, product_type, is_variable, description, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE product_group_id = VALUES(product_group_id), brand_id = VALUES(brand_id), code = VALUES(code),
+         name = VALUES(name), product_type = VALUES(product_type), is_variable = VALUES(is_variable), description = VALUES(description),
+         status = VALUES(status), updated_at = VALUES(updated_at)`,
+      [product.id, product.product_group_id, product.brand_id, product.code, product.name, product.product_type, product.is_variable, product.description, product.status, product.created_at, product.updated_at]
+    );
+    res.status(201).json(product);
+  } catch (err: any) {
+    console.error("Error creating product:", err);
+    res.status(500).json({ error: "Failed to create product." });
+  }
+});
+
+app.put("/api/pm/products/:id", async (req, res) => {
+  try {
+    const p = getPool();
+    if (!p || !dbReady) return res.status(503).json({ error: "Database is not available." });
+    const [rows] = await p.execute<RowDataPacket[]>("SELECT * FROM pm_products WHERE id = ?", [req.params.id]);
+    const existing = rows[0] as any;
+    if (!existing) return res.status(404).json({ error: "Product not found." });
+    const input = req.body;
+    const now = new Date().toISOString();
+    const updated = {
+      ...existing,
+      product_group_id: input.product_group_id !== undefined ? String(input.product_group_id) : existing.product_group_id,
+      brand_id: input.brand_id !== undefined ? input.brand_id || null : existing.brand_id,
+      code: input.code !== undefined ? String(input.code).toUpperCase().trim() : existing.code,
+      name: input.name !== undefined ? String(input.name).trim() : existing.name,
+      product_type: input.product_type !== undefined && ["single", "variation"].includes(input.product_type) ? input.product_type : existing.product_type,
+      is_variable: input.product_type !== undefined && ["single", "variation"].includes(input.product_type) ? input.product_type === "variation" : (input.is_variable !== undefined ? pmBool(input.is_variable) : pmBool(existing.is_variable)),
+      description: input.description !== undefined ? pmText(input, "description") : existing.description,
+      status: input.status !== undefined ? pmStatus(input.status, existing.status) : existing.status,
+      updated_at: now,
+    };
+    await p.execute(
+      `UPDATE pm_products SET product_group_id = ?, brand_id = ?, code = ?, name = ?, product_type = ?, is_variable = ?, description = ?, status = ?, updated_at = ? WHERE id = ?`,
+      [updated.product_group_id, updated.brand_id, updated.code, updated.name, updated.product_type, updated.is_variable, updated.description, updated.status, updated.updated_at, updated.id]
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating product:", err);
+    res.status(500).json({ error: "Failed to update product." });
+  }
+});
+
+app.delete("/api/pm/products/:id", async (req, res) => {
+  try {
+    const count = await pmCount("pm_product_variants", "product_id", req.params.id);
+    if (count > 0) return res.status(409).json({ error: "Cannot delete a product that still has variants." });
+    const deleted = await pmDeleteById("pm_products", req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Product not found." });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error deleting product:", err);
+    res.status(500).json({ error: "Failed to delete product." });
+  }
+});
+
+// ─── Product Management variants ───
+
+app.get("/api/pm/variants", async (req, res) => {
+  try {
+    const p = getPool();
+    if (!p || !dbReady) return res.json([]);
+    const conditions: string[] = [];
+    const params: any[] = [];
+    const productId = String(req.query.productId || "");
+    const search = String(req.query.search || "");
+    const status = String(req.query.status || "");
+    if (productId) { conditions.push("v.product_id = ?"); params.push(productId); }
+    if (search) {
+      conditions.push("(v.sku LIKE ? OR v.name LIKE ? OR v.barcode LIKE ? OR p.name LIKE ? OR p.code LIKE ?)");
+      const like = `%${search}%`;
+      params.push(like, like, like, like, like);
+    }
+    if (status === "active") conditions.push("v.status = 'Active'");
+    else if (status === "inactive") conditions.push("v.status = 'Inactive'");
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const [rows] = await p.query<RowDataPacket[]>(
+      `SELECT v.*, p.code AS product_code, p.name AS product_name, p.product_type, p.is_variable, g.name AS product_group_name
+       FROM pm_product_variants v
+       JOIN pm_products p ON p.id = v.product_id
+       LEFT JOIN pm_product_groups g ON g.id = p.product_group_id
+       ${where} ORDER BY v.name ASC`,
+      params
+    );
+    res.json(rows);
+  } catch (err: any) {
+    console.error("Error fetching variants:", err);
+    res.status(500).json({ error: "Failed to fetch variants." });
+  }
+});
+
+app.post("/api/pm/variants", async (req, res) => {
+  try {
+    const input = req.body;
+    if (!input.name || !input.product_id) return res.status(400).json({ error: "Name and product are required." });
+    assertDb();
+    const p = getPool()!;
+    const prod = await pmGetById("pm_products", String(input.product_id));
+    const prefix = (prod?.code ?? "VAR").toUpperCase();
+    let sku = input.sku ? String(input.sku).trim() : "";
+    if (!sku) {
+      const [vrows] = await p.query<RowDataPacket[]>("SELECT sku FROM pm_product_variants WHERE product_id = ?", [input.product_id]);
+      let max = 0;
+      for (const r of vrows as any[]) {
+        if (r.sku.startsWith(`${prefix}-`)) {
+          const n = parseInt(r.sku.slice(prefix.length + 1), 10);
+          if (!Number.isNaN(n)) max = Math.max(max, n);
+        }
+      }
+      sku = `${prefix}-${String(max + 1).padStart(3, "0")}`;
+    }
+    const now = new Date().toISOString();
+    const variant = {
+      id: pmNewId("var"),
+      product_id: String(input.product_id),
+      sku,
+      name: String(input.name).trim(),
+      barcode: input.barcode ? String(input.barcode).trim() : null,
+      description: pmText(input, "description"),
+      status: pmStatus(input.status),
+      created_at: now,
+      updated_at: now,
+    };
+    await p.execute(
+      `INSERT INTO pm_product_variants (id, product_id, sku, name, barcode, description, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE product_id = VALUES(product_id), sku = VALUES(sku), name = VALUES(name), barcode = VALUES(barcode),
+         description = VALUES(description), status = VALUES(status), updated_at = VALUES(updated_at)`,
+      [variant.id, variant.product_id, variant.sku, variant.name, variant.barcode, variant.description, variant.status, variant.created_at, variant.updated_at]
+    );
+    res.status(201).json(variant);
+  } catch (err: any) {
+    console.error("Error creating variant:", err);
+    res.status(500).json({ error: "Failed to create variant." });
+  }
+});
+
+app.put("/api/pm/variants/:id", async (req, res) => {
+  try {
+    const existing = await pmGetById("pm_product_variants", req.params.id);
+    if (!existing) return res.status(404).json({ error: "Variant not found." });
+    const input = req.body;
+    const now = new Date().toISOString();
+    const updated = {
+      ...existing,
+      product_id: input.product_id !== undefined ? String(input.product_id) : existing.product_id,
+      sku: input.sku !== undefined ? String(input.sku).trim() : existing.sku,
+      name: input.name !== undefined ? String(input.name).trim() : existing.name,
+      barcode: input.barcode !== undefined ? (input.barcode ? String(input.barcode).trim() : null) : existing.barcode,
+      description: input.description !== undefined ? pmText(input, "description") : existing.description,
+      status: input.status !== undefined ? pmStatus(input.status, existing.status) : existing.status,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `UPDATE pm_product_variants SET product_id = ?, sku = ?, name = ?, barcode = ?, description = ?, status = ?, updated_at = ? WHERE id = ?`,
+      [updated.product_id, updated.sku, updated.name, updated.barcode, updated.description, updated.status, updated.updated_at, updated.id]
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating variant:", err);
+    res.status(500).json({ error: "Failed to update variant." });
+  }
+});
+
+app.delete("/api/pm/variants/:id", async (req, res) => {
+  try {
+    const deleted = await pmDeleteById("pm_product_variants", req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Variant not found." });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error deleting variant:", err);
+    res.status(500).json({ error: "Failed to delete variant." });
+  }
+});
+
+// ─── Product Management standards ───
+
+app.get("/api/pm/standards", async (_req, res) => {
+  try {
+    const p = getPool();
+    if (!p || !dbReady) return res.json([]);
+    const [rows] = await p.query<RowDataPacket[]>(
+      `SELECT s.*, g.name AS product_group_name, g.code AS product_group_code,
+              (SELECT COUNT(*) FROM pm_product_standard_items i WHERE i.product_standard_id = s.id) AS item_count
+       FROM pm_product_standards s LEFT JOIN pm_product_groups g ON g.id = s.product_group_id ORDER BY s.name ASC`
+    );
+    res.json(rows);
+  } catch (err: any) {
+    console.error("Error fetching standards:", err);
+    res.status(500).json({ error: "Failed to fetch standards." });
+  }
+});
+
+app.get("/api/pm/standards/:id", async (req, res) => {
+  try {
+    const p = getPool();
+    if (!p || !dbReady) return res.status(503).json({ error: "Database is not available." });
+    const [rows] = await p.execute<RowDataPacket[]>(
+      `SELECT s.*, g.name AS product_group_name, g.code AS product_group_code
+       FROM pm_product_standards s LEFT JOIN pm_product_groups g ON g.id = s.product_group_id WHERE s.id = ?`,
+      [req.params.id]
+    );
+    const standard = rows[0];
+    if (!standard) return res.status(404).json({ error: "Standard not found." });
+    const [items] = await p.execute<RowDataPacket[]>(
+      `SELECT i.*, v.sku, v.name AS variant_name, v.barcode, p.code AS product_code, p.name AS product_name
+       FROM pm_product_standard_items i
+       JOIN pm_product_variants v ON v.id = i.product_variant_id
+       LEFT JOIN pm_products p ON p.id = v.product_id
+       WHERE i.product_standard_id = ?
+       ORDER BY i.is_preferred DESC, v.name ASC`,
+      [req.params.id]
+    );
+    standard.items = items;
+    res.json(standard);
+  } catch (err: any) {
+    console.error("Error fetching standard:", err);
+    res.status(500).json({ error: "Failed to fetch standard." });
+  }
+});
+
+app.post("/api/pm/standards", async (req, res) => {
+  try {
+    const input = req.body;
+    if (!input.code || !input.name || !input.product_group_id) return res.status(400).json({ error: "Code, name, and product group are required." });
+    const now = new Date().toISOString();
+    const standard = {
+      id: pmNewId("std"),
+      product_group_id: String(input.product_group_id),
+      code: String(input.code).toUpperCase().trim(),
+      name: String(input.name).trim(),
+      description: pmText(input, "description"),
+      status: pmStatus(input.status),
+      created_at: now,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `INSERT INTO pm_product_standards (id, product_group_id, code, name, description, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE product_group_id = VALUES(product_group_id), code = VALUES(code), name = VALUES(name),
+         description = VALUES(description), status = VALUES(status), updated_at = VALUES(updated_at)`,
+      [standard.id, standard.product_group_id, standard.code, standard.name, standard.description, standard.status, standard.created_at, standard.updated_at]
+    );
+    res.status(201).json(standard);
+  } catch (err: any) {
+    console.error("Error creating standard:", err);
+    res.status(500).json({ error: "Failed to create standard." });
+  }
+});
+
+app.put("/api/pm/standards/:id", async (req, res) => {
+  try {
+    const existing = await pmGetById("pm_product_standards", req.params.id);
+    if (!existing) return res.status(404).json({ error: "Standard not found." });
+    const input = req.body;
+    const now = new Date().toISOString();
+    const updated = {
+      ...existing,
+      product_group_id: input.product_group_id !== undefined ? String(input.product_group_id) : existing.product_group_id,
+      code: input.code !== undefined ? String(input.code).toUpperCase().trim() : existing.code,
+      name: input.name !== undefined ? String(input.name).trim() : existing.name,
+      description: input.description !== undefined ? pmText(input, "description") : existing.description,
+      status: input.status !== undefined ? pmStatus(input.status, existing.status) : existing.status,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `UPDATE pm_product_standards SET product_group_id = ?, code = ?, name = ?, description = ?, status = ?, updated_at = ? WHERE id = ?`,
+      [updated.product_group_id, updated.code, updated.name, updated.description, updated.status, updated.updated_at, updated.id]
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating standard:", err);
+    res.status(500).json({ error: "Failed to update standard." });
+  }
+});
+
+app.delete("/api/pm/standards/:id", async (req, res) => {
+  try {
+    const deleted = await pmDeleteById("pm_product_standards", req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Standard not found." });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error deleting standard:", err);
+    res.status(500).json({ error: "Failed to delete standard." });
+  }
+});
+
+// ─── Product Management standard items ───
+
+app.post("/api/pm/standard-items", async (req, res) => {
+  try {
+    const input = req.body;
+    if (!input.product_standard_id || !input.product_variant_id) return res.status(400).json({ error: "Standard and variant are required." });
+    const now = new Date().toISOString();
+    const item = {
+      id: pmNewId("sitem"),
+      product_standard_id: String(input.product_standard_id),
+      product_variant_id: String(input.product_variant_id),
+      is_preferred: pmBool(input.is_preferred),
+      effective_from: input.effective_from || null,
+      effective_to: input.effective_to || null,
+      status: pmStatus(input.status),
+      created_at: now,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `INSERT INTO pm_product_standard_items (id, product_standard_id, product_variant_id, is_preferred, effective_from, effective_to, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE product_standard_id = VALUES(product_standard_id), product_variant_id = VALUES(product_variant_id),
+         is_preferred = VALUES(is_preferred), effective_from = VALUES(effective_from), effective_to = VALUES(effective_to),
+         status = VALUES(status), updated_at = VALUES(updated_at)`,
+      [item.id, item.product_standard_id, item.product_variant_id, item.is_preferred, item.effective_from, item.effective_to, item.status, item.created_at, item.updated_at]
+    );
+    res.status(201).json(item);
+  } catch (err: any) {
+    console.error("Error creating standard item:", err);
+    res.status(500).json({ error: "Failed to create standard item." });
+  }
+});
+
+app.delete("/api/pm/standard-items/:id", async (req, res) => {
+  try {
+    const deleted = await pmDeleteById("pm_product_standard_items", req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Standard item not found." });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error deleting standard item:", err);
+    res.status(500).json({ error: "Failed to delete standard item." });
+  }
+});
+
+// ─── Product Management variant UoMs ───
+
+app.get("/api/pm/variant-uoms", async (req, res) => {
+  try {
+    const variantId = String(req.query.variant_id || "");
+    if (!variantId) return res.status(400).json({ error: "variant_id is required." });
+    const p = getPool();
+    if (!p || !dbReady) return res.json([]);
+    const [rows] = await p.execute<RowDataPacket[]>(
+      `SELECT u.*, uom.code AS uom_code, uom.name AS uom_name, uom.type AS uom_type, uom.decimal_places AS uom_decimal_places
+       FROM pm_product_variant_uoms u JOIN pm_uoms uom ON uom.id = u.uom_id
+       WHERE u.product_variant_id = ?
+       ORDER BY u.is_base DESC, uom.name ASC`,
+      [variantId]
+    );
+    res.json(rows);
+  } catch (err: any) {
+    console.error("Error fetching variant UoMs:", err);
+    res.status(500).json({ error: "Failed to fetch variant UoMs." });
+  }
+});
+
+app.post("/api/pm/variant-uoms", async (req, res) => {
+  try {
+    const input = req.body;
+    if (!input.product_variant_id || !input.uom_id) return res.status(400).json({ error: "Variant and UoM are required." });
+    const now = new Date().toISOString();
+    const item = {
+      id: pmNewId("vuom"),
+      product_variant_id: String(input.product_variant_id),
+      uom_id: String(input.uom_id),
+      conversion_factor: input.conversion_factor !== undefined && input.conversion_factor !== "" ? Number(input.conversion_factor) : 1,
+      is_base: pmBool(input.is_base),
+      can_purchase: pmBool(input.can_purchase),
+      can_stock: pmBool(input.can_stock),
+      can_issue: pmBool(input.can_issue),
+      can_sell: pmBool(input.can_sell),
+      status: pmStatus(input.status),
+      created_at: now,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `INSERT INTO pm_product_variant_uoms (id, product_variant_id, uom_id, conversion_factor, is_base, can_purchase, can_stock, can_issue, can_sell, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE product_variant_id = VALUES(product_variant_id), uom_id = VALUES(uom_id),
+         conversion_factor = VALUES(conversion_factor), is_base = VALUES(is_base), can_purchase = VALUES(can_purchase),
+         can_stock = VALUES(can_stock), can_issue = VALUES(can_issue), can_sell = VALUES(can_sell),
+         status = VALUES(status), updated_at = VALUES(updated_at)`,
+      [item.id, item.product_variant_id, item.uom_id, item.conversion_factor, item.is_base, item.can_purchase, item.can_stock, item.can_issue, item.can_sell, item.status, item.created_at, item.updated_at]
+    );
+    res.status(201).json(item);
+  } catch (err: any) {
+    console.error("Error creating variant UoM:", err);
+    res.status(500).json({ error: "Failed to create variant UoM." });
+  }
+});
+
+app.put("/api/pm/variant-uoms/:id", async (req, res) => {
+  try {
+    const existing = await pmGetById("pm_product_variant_uoms", req.params.id);
+    if (!existing) return res.status(404).json({ error: "Variant UoM not found." });
+    const input = req.body;
+    const now = new Date().toISOString();
+    const updated = {
+      ...existing,
+      uom_id: input.uom_id !== undefined ? String(input.uom_id) : existing.uom_id,
+      conversion_factor: input.conversion_factor !== undefined && input.conversion_factor !== "" ? Number(input.conversion_factor) : existing.conversion_factor,
+      is_base: input.is_base !== undefined ? pmBool(input.is_base) : pmBool(existing.is_base),
+      can_purchase: input.can_purchase !== undefined ? pmBool(input.can_purchase) : pmBool(existing.can_purchase),
+      can_stock: input.can_stock !== undefined ? pmBool(input.can_stock) : pmBool(existing.can_stock),
+      can_issue: input.can_issue !== undefined ? pmBool(input.can_issue) : pmBool(existing.can_issue),
+      can_sell: input.can_sell !== undefined ? pmBool(input.can_sell) : pmBool(existing.can_sell),
+      status: input.status !== undefined ? pmStatus(input.status, existing.status) : existing.status,
+      updated_at: now,
+    };
+    assertDb();
+    await getPool()!.execute(
+      `UPDATE pm_product_variant_uoms SET uom_id = ?, conversion_factor = ?, is_base = ?, can_purchase = ?, can_stock = ?, can_issue = ?, can_sell = ?, status = ?, updated_at = ? WHERE id = ?`,
+      [updated.uom_id, updated.conversion_factor, updated.is_base, updated.can_purchase, updated.can_stock, updated.can_issue, updated.can_sell, updated.status, updated.updated_at, updated.id]
+    );
+    res.json(updated);
+  } catch (err: any) {
+    console.error("Error updating variant UoM:", err);
+    res.status(500).json({ error: "Failed to update variant UoM." });
+  }
+});
+
+app.delete("/api/pm/variant-uoms/:id", async (req, res) => {
+  try {
+    const deleted = await pmDeleteById("pm_product_variant_uoms", req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Variant UoM not found." });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error deleting variant UoM:", err);
+    res.status(500).json({ error: "Failed to delete variant UoM." });
+  }
+});
+
+// ─── Product Management refs ───
+
+app.get("/api/pm/refs", async (_req, res) => {
+  try {
+    const p = getPool();
+    if (!p || !dbReady) {
+      return res.json({ categories: [], productGroups: [], brands: [], uoms: [], products: [], variants: [], standards: [] });
+    }
+    const [categories] = await p.query<RowDataPacket[]>("SELECT * FROM pm_categories ORDER BY sort_order ASC, name ASC");
+    const [productGroups] = await p.query<RowDataPacket[]>(
+      `SELECT g.*, c.name AS category_name FROM pm_product_groups g LEFT JOIN pm_categories c ON c.id = g.category_id ORDER BY g.name ASC`
+    );
+    const [brands] = await p.query<RowDataPacket[]>("SELECT * FROM pm_brands ORDER BY name ASC");
+    const [uoms] = await p.query<RowDataPacket[]>("SELECT * FROM pm_uoms ORDER BY name ASC");
+    const [products] = await p.query<RowDataPacket[]>(
+      `SELECT p.*, g.name AS product_group_name FROM pm_products p LEFT JOIN pm_product_groups g ON g.id = p.product_group_id ORDER BY p.name ASC`
+    );
+    const [variants] = await p.query<RowDataPacket[]>(
+      `SELECT v.*, p.code AS product_code, p.name AS product_name FROM pm_product_variants v JOIN pm_products p ON p.id = v.product_id ORDER BY v.name ASC`
+    );
+    const [standards] = await p.query<RowDataPacket[]>("SELECT * FROM pm_product_standards ORDER BY name ASC");
+    res.json({ categories, productGroups, brands, uoms, products, variants, standards });
+  } catch (err: any) {
+    console.error("Error fetching product management refs:", err);
+    res.status(500).json({ error: "Failed to fetch references." });
   }
 });
 
