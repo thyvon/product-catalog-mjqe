@@ -120,7 +120,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-foreground tracking-tight">
-            Welcome back, {user?.username}
+            Welcome back, {user?.fullName || user?.username}
           </h1>
           <p className="text-xs text-muted-foreground mt-1">
             Here's an overview of your product catalog.
