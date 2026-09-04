@@ -25,8 +25,8 @@ export default function DebitNoteEmailImportModal({ isOpen, onClose, onImportCom
   const downloadExcelTemplate = async () => {
     const XLSX = await import("xlsx");
     const sampleRows = [
-      ["Main WH", "IT Support", "IT", "PP", "vun.thy@example.com;sokha@example.com", "cc@example.com"],
-      ["Secondary WH", "", "Finance", "SR", "sokha@example.com", ""],
+      ["Main WH", "IT Support", "IT", "PP", "Vun Thy", "vun.thy@example.com;sokha@example.com", "cc@example.com"],
+      ["Secondary WH", "", "Finance", "SR", "Sokha", "sokha@example.com", ""],
     ];
     const ws = XLSX.utils.aoa_to_sheet([IMPORT_COLUMNS, ...sampleRows]);
     const wb = XLSX.utils.book_new();
