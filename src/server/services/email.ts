@@ -94,14 +94,16 @@ export async function runSendDebitNotesEmail(
 
     let smtpUser = getSetting("smtp_user", "SMTP_USER", "");
     let smtpPass = getSetting("smtp_pass", "SMTP_PASS", "");
+    let senderFullName = "";
 
     if (senderUsername) {
       const [userRows] = await p.execute<RowDataPacket[]>(
-        "SELECT email, smtp_pass FROM users WHERE username = ?", [senderUsername]
+        "SELECT email, smtp_pass, fullName FROM users WHERE username = ?", [senderUsername]
       );
       if (userRows.length > 0) {
         if (userRows[0].email) smtpUser = userRows[0].email;
         if (userRows[0].smtp_pass) smtpPass = userRows[0].smtp_pass;
+        if (userRows[0].fullName) senderFullName = userRows[0].fullName;
       }
     }
 
@@ -115,8 +117,8 @@ export async function runSendDebitNotesEmail(
       },
     });
 
-    const fromAddress = getSetting("mail_from_address", "MAIL_FROM_ADDRESS", "") || smtpUser || "noreply@procurement.com";
-    const fromName = getSetting("mail_from_name", "MAIL_FROM_NAME", "PROCUREMENT");
+    const fromAddress = smtpUser || getSetting("mail_from_address", "MAIL_FROM_ADDRESS", "") || "noreply@procurement.com";
+    const fromName = senderFullName || getSetting("mail_from_name", "MAIL_FROM_NAME", "PROCUREMENT");
 
     const recipientGroups = new Map<string, { notes: any[]; cc: string[] }>();
     for (const detail of noteDetails) {
