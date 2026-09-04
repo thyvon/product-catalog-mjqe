@@ -469,6 +469,7 @@ export default function DebitNoteEmailsPage() {
         </BaseModal>
 
         <DataTable<EmailConfig>
+          tableLayout="auto"
           columns={[
             { accessorKey: "warehouse", header: "Warehouse", meta: { width: "120px", className: "font-bold text-foreground" } },
             { accessorKey: "division", header: "Division", meta: { width: "100px", className: "text-muted-foreground" } },
@@ -478,7 +479,6 @@ export default function DebitNoteEmailsPage() {
             {
               accessorKey: "sendToEmail",
               header: "Send To",
-              meta: { width: "220px" },
               cell: ({ row }) => (
                 <div className="flex flex-wrap gap-1">
                   {parseEmailList(row.original.sendToEmail).map((email) => (
@@ -490,7 +490,6 @@ export default function DebitNoteEmailsPage() {
             {
               accessorKey: "ccToEmail",
               header: "CC",
-              meta: { width: "220px" },
               cell: ({ row }) => (
                 <div className="flex flex-wrap gap-1">
                   {parseEmailList(row.original.ccToEmail).map((email) => (

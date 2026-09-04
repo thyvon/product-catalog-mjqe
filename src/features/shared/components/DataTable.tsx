@@ -69,6 +69,7 @@ interface DataTableProps<TData> {
   onSortingChange?: OnChangeFn<SortingState>;
   rowClassName?: (row: TData, index: number) => string;
   aggregates?: React.ReactNode;
+  tableLayout?: "fixed" | "auto";
 }
 
 export default function DataTable<TData>({
@@ -85,6 +86,7 @@ export default function DataTable<TData>({
   onSortingChange,
   rowClassName,
   aggregates,
+  tableLayout = "fixed",
 }: DataTableProps<TData>) {
   const table = useReactTable({
     data,
@@ -128,7 +130,7 @@ export default function DataTable<TData>({
   return (
     <div className="space-y-3">
       <div className="rounded-lg border overflow-x-auto">
-        <Table className="w-full table-fixed min-w-[640px]">
+        <Table className={`w-full ${tableLayout === "auto" ? "table-auto" : "table-fixed"} min-w-[640px]`}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>

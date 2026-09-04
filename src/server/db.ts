@@ -185,16 +185,6 @@ async function createTables(p: mysql.Pool) {
   try { await p.query("ALTER TABLE debit_note_emails DROP COLUMN sendToEmail"); } catch {}
   try { await p.query("ALTER TABLE debit_note_emails DROP COLUMN ccToEmail"); } catch {}
 
-  // Fix column data rotation: division has dept data, dept has campus data, campus has division data
-  try {
-    await p.query("ALTER TABLE debit_note_emails ADD COLUMN _tmp_rotation VARCHAR(255)");
-    await p.query("UPDATE debit_note_emails SET _tmp_rotation = division");
-    await p.query("UPDATE debit_note_emails SET division = campus");
-    await p.query("UPDATE debit_note_emails SET campus = department");
-    await p.query("UPDATE debit_note_emails SET department = _tmp_rotation");
-    await p.query("ALTER TABLE debit_note_emails DROP COLUMN _tmp_rotation");
-  } catch {}
-
   // Backfill debitNoteEmailId on debit_notes that have no email config linked
   try {
     await p.query(`
