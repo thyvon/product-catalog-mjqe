@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { PlusCircle, RefreshCw, Pencil, Trash2, Mail, Upload, Download, Copy } from "lucide-react";
 import DataTable from "@/features/shared/components/DataTable";
 import ListPageLayout from "@/features/shared/components/ListPageLayout";
@@ -16,6 +15,9 @@ import DebitNoteEmailImportModal from "@/features/debit-notes/components/DebitNo
 import { FormLabel } from "@/features/shared/components/FormLabel";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import MultiSelectCombobox from "@/features/shared/components/MultiSelectCombobox";
+
+interface Contact { id: string; email: string; name: string; }
 
 interface EmailConfig {
   id: string;
@@ -24,8 +26,8 @@ interface EmailConfig {
   campus: string;
   division: string;
   receiverName: string;
-  sendToEmail: string;
-  ccToEmail: string;
+  sendToEmail: string[];
+  ccToEmail: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -49,6 +51,15 @@ export default function DebitNoteEmailsPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+
+  const fetchContacts = async (q?: string) => {
+    try {
+      const url = q ? `/api/dn-contacts?q=${encodeURIComponent(q)}` : "/api/dn-contacts";
+      const res = await fetch(url);
+      if (res.ok) setContacts(await res.json());
+    } catch { /* ignored */ }
+  };
 
   const [formData, setFormData] = useState({
     warehouse: "",
@@ -56,17 +67,17 @@ export default function DebitNoteEmailsPage() {
     campus: "",
     division: "",
     receiverName: "",
-    sendToEmail: "",
-    ccToEmail: "",
+    sendToEmail: [] as string[],
+    ccToEmail: [] as string[],
   });
 
-  const fetchConfigs = async () => {
+  const fetchConfigs = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/debit-note/emails");
       if (res.ok) setConfigs(await res.json());
-    } catch { } finally { setLoading(false); }
-  };
+    } catch { /* ignored */ } finally { setLoading(false); }
+  }, []);
 
   const fetchFilterValues = async () => {
     try {
@@ -74,14 +85,14 @@ export default function DebitNoteEmailsPage() {
       if (res.ok) {
         setFilterValues(await res.json());
       }
-    } catch {}
+    } catch { /* ignored */ }
   };
 
-  useEffect(() => { fetchConfigs(); fetchFilterValues(); }, []);
+  useEffect(() => { fetchConfigs(); fetchFilterValues(); fetchContacts(); }, [fetchConfigs]);
 
   const openCreate = () => {
     setEditing(null);
-    setFormData({ warehouse: "", department: "", campus: "", division: "", receiverName: "", sendToEmail: "", ccToEmail: "" });
+    setFormData({ warehouse: "", department: "", campus: "", division: "", receiverName: "", sendToEmail: [], ccToEmail: [] });
     setShowForm(true);
   };
 
@@ -93,8 +104,8 @@ export default function DebitNoteEmailsPage() {
       campus: config.campus,
       division: config.division || "",
       receiverName: config.receiverName,
-      sendToEmail: parseEmailList(config.sendToEmail).join("\n"),
-      ccToEmail: parseEmailList(config.ccToEmail).join("\n"),
+      sendToEmail: parseEmailList(config.sendToEmail),
+      ccToEmail: parseEmailList(config.ccToEmail),
     });
     setShowForm(true);
   };
@@ -107,8 +118,8 @@ export default function DebitNoteEmailsPage() {
       campus: config.campus,
       division: config.division || "",
       receiverName: config.receiverName,
-      sendToEmail: parseEmailList(config.sendToEmail).join("\n"),
-      ccToEmail: parseEmailList(config.ccToEmail).join("\n"),
+      sendToEmail: parseEmailList(config.sendToEmail),
+      ccToEmail: parseEmailList(config.ccToEmail),
     });
     setShowForm(true);
   };
@@ -119,8 +130,8 @@ export default function DebitNoteEmailsPage() {
       return;
     }
 
-    const sendToEmails = formData.sendToEmail.split("\n").map((e) => e.trim()).filter(Boolean);
-    const ccToEmails = formData.ccToEmail.split("\n").map((e) => e.trim()).filter(Boolean);
+    const sendToEmails = formData.sendToEmail.filter(Boolean);
+    const ccToEmails = formData.ccToEmail.filter(Boolean);
 
     if (sendToEmails.length === 0) {
       toast.error("At least one send-to email is required.");
@@ -392,22 +403,47 @@ export default function DebitNoteEmailsPage() {
               <TextField type="text" value={formData.receiverName} onChange={(e) => setFormData({ ...formData, receiverName: e.target.value })} placeholder="e.g. Vun Thy" />
             </div>
             <div>
-              <FormLabel required>Send To Emails </FormLabel>
-              <Textarea
+              <FormLabel required>Send To</FormLabel>
+              <MultiSelectCombobox
+                options={contacts.map((c) => ({ id: c.email, label: c.name ? `${c.name} <${c.email}>` : c.email }))}
                 value={formData.sendToEmail}
-                onChange={(e) => setFormData({ ...formData, sendToEmail: e.target.value })}
-                placeholder={"email1@example.com\nemail2@example.com"}
-                rows={3}
+                onValueChange={(ids) => setFormData({ ...formData, sendToEmail: ids })}
+                placeholder="Search or type email..."
+                emptyMessage="Press Enter to add"
+                onCreate={async (label) => {
+                  const email = label.trim();
+                  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+                  if (formData.sendToEmail.includes(email)) return;
+                  await fetch("/api/dn-contacts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, name: "" }),
+                  });
+                  await fetchContacts();
+                  setFormData({ ...formData, sendToEmail: [...formData.sendToEmail, email] });
+                }}
               />
-              <p className="text-xs text-muted-foreground mt-1">One email per line</p>
             </div>
             <div>
-              <FormLabel>CC Emails (optional)</FormLabel>
-              <Textarea
+              <FormLabel>CC</FormLabel>
+              <MultiSelectCombobox
+                options={contacts.map((c) => ({ id: c.email, label: c.name ? `${c.name} <${c.email}>` : c.email }))}
                 value={formData.ccToEmail}
-                onChange={(e) => setFormData({ ...formData, ccToEmail: e.target.value })}
-                placeholder="cc1@example.com"
-                rows={2}
+                onValueChange={(ids) => setFormData({ ...formData, ccToEmail: ids })}
+                placeholder="Search or type email..."
+                emptyMessage="Press Enter to add"
+                onCreate={async (label) => {
+                  const email = label.trim();
+                  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+                  if (formData.ccToEmail.includes(email)) return;
+                  await fetch("/api/dn-contacts", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, name: "" }),
+                  });
+                  await fetchContacts();
+                  setFormData({ ...formData, ccToEmail: [...formData.ccToEmail, email] });
+                }}
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
@@ -494,12 +530,13 @@ export default function DebitNoteEmailsPage() {
   );
 }
 
-function parseEmailList(value: string | null | undefined): string[] {
+function parseEmailList(value: string[] | string | null | undefined): string[] {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (!value) return [];
   try {
-    if (!value) return [];
     const parsed = JSON.parse(value);
     return Array.isArray(parsed) ? parsed : [parsed].filter(Boolean);
   } catch {
-    return value.split(",").map((item) => item.trim()).filter(Boolean);
+    return String(value).split(",").map((item) => item.trim()).filter(Boolean);
   }
 }

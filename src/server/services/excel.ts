@@ -8,7 +8,7 @@ function toDateOnly(s: any): Date | null {
   return new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
 }
 
-export function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items: any[], preparedBy?: { name: string; position: string }) {
+export function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items: any[], preparedBy?: { name: string; position: string; phone?: string; email?: string }) {
   const sheet = workbook.addWorksheet("Debit Note");
   const COL_COUNT = 14;
 
@@ -139,6 +139,8 @@ export function buildDebitNoteSheet(workbook: ExcelJS.Workbook, note: any, items
   const footerData = [
     ["Prepared by:", preparedBy?.name || note.createdBy || ""],
     ["Position:", preparedBy?.position || ""],
+    ["Phone:", preparedBy?.phone || ""],
+    ["Email:", preparedBy?.email || ""],
     ["Date:", endDateStr],
   ];
   footerData.forEach(([label, value]) => {

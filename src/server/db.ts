@@ -174,8 +174,6 @@ async function createTables(p: mysql.Pool) {
     campus VARCHAR(255) NOT NULL DEFAULT '',
     division VARCHAR(255) NOT NULL DEFAULT '',
     receiverName VARCHAR(255) NOT NULL DEFAULT '',
-    sendToEmail JSON NOT NULL,
-    ccToEmail JSON NOT NULL,
     createdAt VARCHAR(40) NOT NULL,
     updatedAt VARCHAR(40) NOT NULL,
     UNIQUE KEY dn_emails_unique (warehouse, division, department, campus)
@@ -184,6 +182,24 @@ async function createTables(p: mysql.Pool) {
   try { await p.query("ALTER TABLE debit_note_emails ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER campus"); } catch {}
   try { await p.query("ALTER TABLE debit_note_emails DROP INDEX dn_emails_unique"); } catch {}
   try { await p.query("ALTER TABLE debit_note_emails ADD UNIQUE KEY dn_emails_unique (warehouse, division, department, campus)"); } catch {}
+  try { await p.query("ALTER TABLE debit_note_emails DROP COLUMN sendToEmail"); } catch {}
+  try { await p.query("ALTER TABLE debit_note_emails DROP COLUMN ccToEmail"); } catch {}
+
+  await p.query(`CREATE TABLE IF NOT EXISTS dn_contacts (
+    id VARCHAR(64) PRIMARY KEY,
+    email VARCHAR(255) NOT NULL DEFAULT '',
+    name VARCHAR(255) NOT NULL DEFAULT '',
+    createdAt VARCHAR(40) NOT NULL,
+    UNIQUE KEY dn_contacts_email (email)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await p.query(`CREATE TABLE IF NOT EXISTS dn_email_config_contacts (
+    email_config_id VARCHAR(64) NOT NULL,
+    contact_id VARCHAR(64) NOT NULL,
+    type VARCHAR(20) NOT NULL DEFAULT 'send_to',
+    PRIMARY KEY (email_config_id, contact_id, type),
+    INDEX idx_dnecc_contact (contact_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
   await p.query(`CREATE TABLE IF NOT EXISTS debit_notes (
     id VARCHAR(64) PRIMARY KEY,
@@ -235,6 +251,7 @@ async function createTables(p: mysql.Pool) {
     position VARCHAR(255) NOT NULL DEFAULT '',
     telegramId VARCHAR(100) NOT NULL DEFAULT '',
     avatarUrl TEXT NOT NULL,
+    smtp_pass VARCHAR(255) NOT NULL DEFAULT '',
     createdAt VARCHAR(40) NOT NULL,
     updatedAt VARCHAR(40) NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
@@ -476,6 +493,7 @@ async function migrateSchema(p: mysql.Pool) {
   try { await p.query("ALTER TABLE debit_note_items MODIFY COLUMN totalPrice DECIMAL(25,15) NOT NULL DEFAULT 0"); } catch {}
   try { await p.query("ALTER TABLE users ADD COLUMN position VARCHAR(255) NOT NULL DEFAULT '' AFTER phone"); } catch {}
   try { await p.query("ALTER TABLE users ADD COLUMN telegramId VARCHAR(100) NOT NULL DEFAULT '' AFTER position"); } catch {}
+  try { await p.query("ALTER TABLE users ADD COLUMN smtp_pass VARCHAR(255) NOT NULL DEFAULT '' AFTER avatarUrl"); } catch {}
   try { await p.query("ALTER TABLE suppliers ADD COLUMN countryOfOrigin VARCHAR(150) NOT NULL DEFAULT '' AFTER foreignTradeOperator"); } catch {}
 
   // Product Management module migrations

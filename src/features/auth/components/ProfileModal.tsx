@@ -16,6 +16,7 @@ interface ProfileData {
   position: string;
   telegramId: string;
   avatarUrl: string;
+  smtp_pass: string;
 }
 
 interface ProfileModalProps {
@@ -62,6 +63,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           phone: profile.phone,
           position: profile.position,
           telegramId: profile.telegramId,
+          smtp_pass: profile.smtp_pass,
         }),
       });
       if (!r.ok) {
@@ -129,6 +131,19 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               value={profile.telegramId}
               onChange={(e) => setProfile({ ...profile, telegramId: e.target.value })}
             />
+
+            <div className="pt-2 border-t">
+              <p className="text-xs font-medium text-muted-foreground mb-3">Email (SMTP) Credentials</p>
+              <div className="space-y-4">
+                <TextField
+                  label="SMTP Password / App Password"
+                  type="password"
+                  value={profile.smtp_pass || ""}
+                  onChange={(e) => setProfile({ ...profile, smtp_pass: e.target.value })}
+                  placeholder="App-specific password"
+                />
+              </div>
+            </div>
 
             <Button onClick={handleSave} disabled={saving} className="w-full">
               {saving ? <Loader2 className="animate-spin" /> : <Save />}

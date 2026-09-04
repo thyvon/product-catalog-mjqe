@@ -41,13 +41,98 @@ async function generateDebitNoteNo(p: Pool, division: string, department: string
   return maxSuffix === 0 ? base : `${base}-${maxSuffix + 1}`;
 }
 
+// ─── Contacts (shared across email configs) ───
+
+router.get("/api/dn-contacts", async (req, res) => {
+  try {
+    const p = getPool();
+    if (!p) return res.json([]);
+    const q = (req.query.q as string || "").trim();
+    let rows;
+    if (q) {
+      [rows] = await p.execute<RowDataPacket[]>(
+        `SELECT c.id, c.email, c.name, c.createdAt,
+          (SELECT COUNT(*) FROM dn_email_config_contacts ecc WHERE ecc.contact_id = c.id) AS configCount
+         FROM dn_contacts c WHERE c.email LIKE ? OR c.name LIKE ? ORDER BY c.email LIMIT 100`,
+        [`%${q}%`, `%${q}%`]
+      );
+    } else {
+      [rows] = await p.execute<RowDataPacket[]>(
+        `SELECT c.id, c.email, c.name, c.createdAt,
+          (SELECT COUNT(*) FROM dn_email_config_contacts ecc WHERE ecc.contact_id = c.id) AS configCount
+         FROM dn_contacts c ORDER BY c.email`
+      );
+    }
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: "Failed to fetch contacts." });
+  }
+});
+
+router.post("/api/dn-contacts", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const { email, name } = req.body;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Valid email is required." });
+    }
+    const now = new Date().toISOString();
+    const id = `dc-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    await p.execute(
+      "INSERT INTO dn_contacts (id, email, name, createdAt) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name)",
+      [id, email.trim(), (name || "").trim(), now]
+    );
+    const [existing] = await p.execute<RowDataPacket[]>("SELECT id FROM dn_contacts WHERE email = ?", [email.trim()]);
+    res.status(201).json(existing[0] || { id, email: email.trim(), name: name || "" });
+  } catch {
+    res.status(500).json({ error: "Failed to create contact." });
+  }
+});
+
+router.put("/api/dn-contacts/:id", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const { name } = req.body;
+    await p.execute("UPDATE dn_contacts SET name = ? WHERE id = ?", [name || "", req.params.id]);
+    const [rows] = await p.execute<RowDataPacket[]>("SELECT id, email, name FROM dn_contacts WHERE id = ?", [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: "Contact not found." });
+    res.json(rows[0]);
+  } catch {
+    res.status(500).json({ error: "Failed to update contact." });
+  }
+});
+
+router.delete("/api/dn-contacts/:id", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    await p.execute("DELETE FROM dn_email_config_contacts WHERE contact_id = ?", [req.params.id]);
+    const [result] = await p.execute<ResultSetHeader>("DELETE FROM dn_contacts WHERE id = ?", [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Contact not found." });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Failed to delete contact." });
+  }
+});
+
 // ─── Email Configs ───
 
 router.get("/api/debit-note/emails", async (_req, res) => {
   try {
     const p = getPool();
     if (!p) return res.json([]);
-    const [rows] = await p.query<RowDataPacket[]>("SELECT * FROM debit_note_emails ORDER BY createdAt DESC");
+    const [rows] = await p.query<RowDataPacket[]>(
+      `SELECT e.*,
+        (SELECT GROUP_CONCAT(c.email ORDER BY c.email) FROM dn_email_config_contacts ecc JOIN dn_contacts c ON c.id = ecc.contact_id WHERE ecc.email_config_id = e.id AND ecc.type = 'send_to') AS sendToEmail,
+        (SELECT GROUP_CONCAT(c.email ORDER BY c.email) FROM dn_email_config_contacts ecc JOIN dn_contacts c ON c.id = ecc.contact_id WHERE ecc.email_config_id = e.id AND ecc.type = 'cc') AS ccToEmail
+       FROM debit_note_emails e ORDER BY e.createdAt DESC`
+    );
+    for (const row of rows) {
+      row.sendToEmail = row.sendToEmail ? row.sendToEmail.split(",") : [];
+      row.ccToEmail = row.ccToEmail ? row.ccToEmail.split(",") : [];
+    }
     res.json(rows);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch email configs." });
@@ -76,7 +161,14 @@ router.get("/api/debit-note/emails/:id/edit", async (req, res) => {
     const p = getPool()!;
     const [rows] = await p.execute<RowDataPacket[]>("SELECT * FROM debit_note_emails WHERE id = ?", [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: "Email config not found." });
-    res.json(rows[0]);
+    const [recipients] = await p.execute<RowDataPacket[]>(
+      `SELECT c.id, c.email, c.name, ecc.type FROM dn_email_config_contacts ecc
+       JOIN dn_contacts c ON c.id = ecc.contact_id WHERE ecc.email_config_id = ?`, [req.params.id]
+    );
+    const cfg = rows[0];
+    cfg.sendToEmail = recipients.filter((r: any) => r.type === "send_to").map((r: any) => ({ id: r.id, email: r.email, name: r.name }));
+    cfg.ccToEmail = recipients.filter((r: any) => r.type === "cc").map((r: any) => ({ id: r.id, email: r.email, name: r.name }));
+    res.json(cfg);
   } catch {
     res.status(500).json({ error: "Failed to fetch email config." });
   }
@@ -93,18 +185,57 @@ router.post("/api/debit-note/emails", async (req, res) => {
     const sendTo = Array.isArray(sendToEmail) ? sendToEmail : [];
     const ccTo = Array.isArray(ccToEmail) ? ccToEmail : [];
     if (sendTo.length === 0) return res.status(400).json({ error: "At least one send-to email is required." });
-    for (const email of sendTo) { if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: `Invalid email: ${email}` }); }
-    for (const email of ccTo) { if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: `Invalid CC email: ${email}` }); }
 
     const now = new Date().toISOString();
     const id = `dne-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     await p.execute(
-      `INSERT INTO debit_note_emails (id, warehouse, department, campus, division, receiverName, sendToEmail, ccToEmail, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE division = VALUES(division), receiverName = VALUES(receiverName), sendToEmail = VALUES(sendToEmail), ccToEmail = VALUES(ccToEmail), updatedAt = VALUES(updatedAt)`,
-      [id, warehouse, department, campus, division ?? "", receiverName, JSON.stringify(sendTo), JSON.stringify(ccTo), now, now]
+      `INSERT INTO debit_note_emails (id, warehouse, department, campus, division, receiverName, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE division = VALUES(division), receiverName = VALUES(receiverName), updatedAt = VALUES(updatedAt)`,
+      [id, warehouse, department, campus, division ?? "", receiverName, now, now]
     );
-    const [created] = await p.execute<RowDataPacket[]>("SELECT * FROM debit_note_emails WHERE id = ?", [id]);
+
+    const [existing] = await p.execute<RowDataPacket[]>(
+      "SELECT id FROM debit_note_emails WHERE warehouse = ? AND division = ? AND department = ? AND campus = ?",
+      [warehouse, division ?? "", department, campus]
+    );
+    const realId = existing[0]?.id || id;
+
+    // Upsert contacts and link
+    await p.execute("DELETE FROM dn_email_config_contacts WHERE email_config_id = ?", [realId]);
+    const upsertContact = async (item: any) => {
+      const email = (item.email || item).trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+      const name = item.name || "";
+      let contactId = item.id;
+      if (!contactId) {
+        const [found] = await p.execute<RowDataPacket[]>("SELECT id FROM dn_contacts WHERE email = ?", [email]);
+        if (found.length > 0) { contactId = found[0].id; }
+        else {
+          contactId = `dc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          await p.execute("INSERT INTO dn_contacts (id, email, name, createdAt) VALUES (?, ?, ?, ?)",
+            [contactId, email, name, now]);
+        }
+      }
+      return contactId;
+    };
+
+    for (const item of sendTo) {
+      const cid = await upsertContact(item);
+      if (cid) await p.execute("INSERT IGNORE INTO dn_email_config_contacts (email_config_id, contact_id, type) VALUES (?, ?, 'send_to')", [realId, cid]);
+    }
+    for (const item of ccTo) {
+      const cid = await upsertContact(item);
+      if (cid) await p.execute("INSERT IGNORE INTO dn_email_config_contacts (email_config_id, contact_id, type) VALUES (?, ?, 'cc')", [realId, cid]);
+    }
+
+    const [created] = await p.execute<RowDataPacket[]>("SELECT * FROM debit_note_emails WHERE id = ?", [realId]);
+    const [recipients] = await p.execute<RowDataPacket[]>(
+      `SELECT c.id, c.email, c.name, ecc.type FROM dn_email_config_contacts ecc
+       JOIN dn_contacts c ON c.id = ecc.contact_id WHERE ecc.email_config_id = ?`, [realId]
+    );
+    created[0].sendToEmail = recipients.filter((r: any) => r.type === "send_to").map((r: any) => ({ id: r.id, email: r.email, name: r.name }));
+    created[0].ccToEmail = recipients.filter((r: any) => r.type === "cc").map((r: any) => ({ id: r.id, email: r.email, name: r.name }));
     res.status(201).json(created[0]);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to create email config." });
@@ -119,17 +250,56 @@ router.put("/api/debit-note/emails/:id", async (req, res) => {
     if (!existing[0]) return res.status(404).json({ error: "Email config not found." });
 
     const { warehouse, department, campus, division, receiverName, sendToEmail, ccToEmail } = req.body;
-    const sendTo = Array.isArray(sendToEmail) ? sendToEmail : JSON.parse(existing[0].sendToEmail || "[]");
-    const ccTo = Array.isArray(ccToEmail) ? ccToEmail : JSON.parse(existing[0].ccToEmail || "[]");
-    if (sendTo.length === 0) return res.status(400).json({ error: "At least one send-to email is required." });
+    const sendTo = Array.isArray(sendToEmail) ? sendToEmail : null;
+    const ccTo = Array.isArray(ccToEmail) ? ccToEmail : null;
 
     const now = new Date().toISOString();
     await p.execute(
-      `UPDATE debit_note_emails SET warehouse = ?, department = ?, campus = ?, division = ?, receiverName = ?, sendToEmail = ?, ccToEmail = ?, updatedAt = ? WHERE id = ?`,
+      `UPDATE debit_note_emails SET warehouse = ?, department = ?, campus = ?, division = ?, receiverName = ?, updatedAt = ? WHERE id = ?`,
       [warehouse ?? existing[0].warehouse, department ?? existing[0].department, campus ?? existing[0].campus,
-       division ?? existing[0].division, receiverName ?? existing[0].receiverName, JSON.stringify(sendTo), JSON.stringify(ccTo), now, req.params.id]
+       division ?? existing[0].division, receiverName ?? existing[0].receiverName, now, req.params.id]
     );
+
+    if (sendTo !== null || ccTo !== null) {
+      await p.execute("DELETE FROM dn_email_config_contacts WHERE email_config_id = ?", [req.params.id]);
+      const upsertContact = async (item: any) => {
+        const email = (item.email || item).trim();
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+        const name = item.name || "";
+        let contactId = item.id;
+        if (!contactId) {
+          const [found] = await p.execute<RowDataPacket[]>("SELECT id FROM dn_contacts WHERE email = ?", [email]);
+          if (found.length > 0) { contactId = found[0].id; }
+          else {
+            contactId = `dc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            await p.execute("INSERT INTO dn_contacts (id, email, name, createdAt) VALUES (?, ?, ?, ?)",
+              [contactId, email, name, now]);
+          }
+        }
+        return contactId;
+      };
+
+      if (sendTo) {
+        for (const item of sendTo) {
+          const cid = await upsertContact(item);
+          if (cid) await p.execute("INSERT IGNORE INTO dn_email_config_contacts (email_config_id, contact_id, type) VALUES (?, ?, 'send_to')", [req.params.id, cid]);
+        }
+      }
+      if (ccTo) {
+        for (const item of ccTo) {
+          const cid = await upsertContact(item);
+          if (cid) await p.execute("INSERT IGNORE INTO dn_email_config_contacts (email_config_id, contact_id, type) VALUES (?, ?, 'cc')", [req.params.id, cid]);
+        }
+      }
+    }
+
     const [updated] = await p.execute<RowDataPacket[]>("SELECT * FROM debit_note_emails WHERE id = ?", [req.params.id]);
+    const [recipients] = await p.execute<RowDataPacket[]>(
+      `SELECT c.id, c.email, c.name, ecc.type FROM dn_email_config_contacts ecc
+       JOIN dn_contacts c ON c.id = ecc.contact_id WHERE ecc.email_config_id = ?`, [req.params.id]
+    );
+    updated[0].sendToEmail = recipients.filter((r: any) => r.type === "send_to").map((r: any) => ({ id: r.id, email: r.email, name: r.name }));
+    updated[0].ccToEmail = recipients.filter((r: any) => r.type === "cc").map((r: any) => ({ id: r.id, email: r.email, name: r.name }));
     res.json(updated[0]);
   } catch (err: any) {
     res.status(500).json({ error: "Failed to update email config." });
@@ -142,17 +312,13 @@ router.post("/api/debit-note/emails/bulk-delete", async (req, res) => {
     const p = getPool()!;
     const body: { ids?: string[] } = req.body || {};
     const ids = Array.isArray(body.ids) ? body.ids.map((id) => String(id).trim()).filter(Boolean) : [];
-    if (ids.length === 0) {
-      return res.status(400).json({ error: "No email configs selected to delete." });
-    }
-    if (ids.length > 10000) {
-      return res.status(400).json({ error: "Too many configs to delete at once." });
-    }
+    if (ids.length === 0) return res.status(400).json({ error: "No email configs selected to delete." });
+    if (ids.length > 10000) return res.status(400).json({ error: "Too many configs to delete at once." });
     const placeholders = ids.map(() => "?").join(",");
+    await p.execute(`DELETE FROM dn_email_config_contacts WHERE email_config_id IN (${placeholders})`, ids);
     const [result] = await p.execute<ResultSetHeader>(`DELETE FROM debit_note_emails WHERE id IN (${placeholders})`, ids);
     res.json({ success: true, count: result.affectedRows });
   } catch (err: any) {
-    console.error("Error bulk deleting email configs:", err);
     res.status(500).json({ error: "Failed to bulk delete email configs." });
   }
 });
@@ -161,6 +327,7 @@ router.delete("/api/debit-note/emails/:id", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
+    await p.execute("DELETE FROM dn_email_config_contacts WHERE email_config_id = ?", [req.params.id]);
     const [result] = await p.execute<ResultSetHeader>("DELETE FROM debit_note_emails WHERE id = ?", [req.params.id]);
     if (result.affectedRows === 0) return res.status(404).json({ error: "Email config not found." });
     res.json({ success: true });
@@ -170,9 +337,10 @@ router.delete("/api/debit-note/emails/:id", async (req, res) => {
 });
 
 router.post("/api/debit-note/emails/import", async (req, res) => {
+  const p = getPool()!;
+  let conn: import("mysql2/promise").PoolConnection | null = null;
   try {
     assertDb();
-    const p = getPool()!;
     const items: any[] = req.body;
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "Expected a non-empty array of email configs." });
@@ -180,7 +348,6 @@ router.post("/api/debit-note/emails/import", async (req, res) => {
 
     const now = new Date().toISOString();
     const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
     const splitEmails = (raw: string): string[] =>
       raw.split(/[;,\n]+/).map((e: string) => e.trim()).filter(Boolean);
 
@@ -188,58 +355,79 @@ router.post("/api/debit-note/emails/import", async (req, res) => {
     const prepared: { warehouse: string; department: string; campus: string; division: string; receiverName: string; sendTo: string[]; ccTo: string[] }[] = [];
 
     items.forEach((item, index) => {
-      const rowNo = index + 2; // spreadsheet header is row 1, data starts at row 2
+      const rowNo = index + 2;
       const rowErrors: string[] = [];
-
       const warehouse = String(item.warehouse || item["Warehouse"] || "").trim();
       const department = String(item.department || item["Department"] || "").trim();
       const campus = String(item.campus || item["Campus"] || "").trim();
       const division = String(item.division || item["Division"] || "").trim();
       const receiverName = String(item.receiverName || item["Receiver Name"] || item["Receiver"] || "").trim();
-
       if (!warehouse) rowErrors.push("Warehouse");
       if (!department) rowErrors.push("Department");
       if (!campus) rowErrors.push("Campus");
       if (!receiverName) rowErrors.push("Receiver Name");
-
       const rawSendTo = item.sendToEmail || item["Send To Emails"] || item["Send To"] || "";
       const rawCcTo = item.ccToEmail || item["CC Emails"] || item["CC"] || "";
-
       const sendTo = splitEmails(rawSendTo).filter((e: string) => EMAIL_RE.test(e));
       const ccTo = splitEmails(rawCcTo).filter((e: string) => EMAIL_RE.test(e));
-
       if (sendTo.length === 0) rowErrors.push("at least one valid 'Send To Email'");
-
-      if (rowErrors.length > 0) {
-        validationErrors.push(`Row ${rowNo}: ${rowErrors.join(", ")}`);
-      } else {
-        prepared.push({ warehouse, department, campus, division, receiverName, sendTo, ccTo });
-      }
+      if (rowErrors.length > 0) validationErrors.push(`Row ${rowNo}: ${rowErrors.join(", ")}`);
+      else prepared.push({ warehouse, department, campus, division, receiverName, sendTo, ccTo });
     });
 
     if (validationErrors.length > 0) {
       const shown = validationErrors.slice(0, 10).join(" | ");
       const more = validationErrors.length > 10 ? ` | and ${validationErrors.length - 10} more row(s)` : "";
-      return res.status(400).json({
-        error: `Import cancelled: ${validationErrors.length} row(s) failed validation. ${shown}${more}`,
-      });
+      return res.status(400).json({ error: `Import cancelled: ${validationErrors.length} row(s) failed validation. ${shown}${more}` });
     }
+
+    conn = await p.getConnection();
+    await conn.beginTransaction();
 
     let count = 0;
     for (const cfg of prepared) {
-      const id = `dne-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
-      await p.execute(
-        `INSERT INTO debit_note_emails (id, warehouse, department, campus, division, receiverName, sendToEmail, ccToEmail, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE division = VALUES(division), receiverName = VALUES(receiverName), sendToEmail = VALUES(sendToEmail), ccToEmail = VALUES(ccToEmail), updatedAt = VALUES(updatedAt)`,
-        [id, cfg.warehouse, cfg.department, cfg.campus, cfg.division, cfg.receiverName, JSON.stringify(cfg.sendTo), JSON.stringify(cfg.ccTo), now, now]
+      const id = `dne-${crypto.randomUUID()}`;
+      await conn.execute(
+        `INSERT INTO debit_note_emails (id, warehouse, department, campus, division, receiverName, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE division = VALUES(division), receiverName = VALUES(receiverName), updatedAt = VALUES(updatedAt)`,
+        [id, cfg.warehouse, cfg.department, cfg.campus, cfg.division, cfg.receiverName, now, now]
       );
+      const [existing] = await conn.execute<RowDataPacket[]>(
+        "SELECT id FROM debit_note_emails WHERE warehouse = ? AND division = ? AND department = ? AND campus = ?",
+        [cfg.warehouse, cfg.division, cfg.department, cfg.campus]
+      );
+      const realId = existing[0]?.id || id;
+
+      await conn.execute("DELETE FROM dn_email_config_contacts WHERE email_config_id = ?", [realId]);
+      for (const email of cfg.sendTo) {
+        const [found] = await conn.execute<RowDataPacket[]>("SELECT id FROM dn_contacts WHERE email = ?", [email]);
+        let cid = found[0]?.id;
+        if (!cid) {
+          cid = `dc-${crypto.randomUUID()}`;
+          await conn.execute("INSERT INTO dn_contacts (id, email, name, createdAt) VALUES (?, ?, '', ?)", [cid, email, now]);
+        }
+        await conn.execute("INSERT IGNORE INTO dn_email_config_contacts (email_config_id, contact_id, type) VALUES (?, ?, 'send_to')", [realId, cid]);
+      }
+      for (const email of cfg.ccTo) {
+        const [found] = await conn.execute<RowDataPacket[]>("SELECT id FROM dn_contacts WHERE email = ?", [email]);
+        let cid = found[0]?.id;
+        if (!cid) {
+          cid = `dc-${crypto.randomUUID()}`;
+          await conn.execute("INSERT INTO dn_contacts (id, email, name, createdAt) VALUES (?, ?, '', ?)", [cid, email, now]);
+        }
+        await conn.execute("INSERT IGNORE INTO dn_email_config_contacts (email_config_id, contact_id, type) VALUES (?, ?, 'cc')", [realId, cid]);
+      }
       count++;
     }
 
+    await conn.commit();
     res.json({ success: true, count });
   } catch (err: any) {
-    res.status(500).json({ error: "Failed to import email configs." });
+    if (conn) { try { await conn.rollback(); } catch {} }
+    res.status(500).json({ error: err?.message || "Failed to import email configs." });
+  } finally {
+    if (conn) { conn.release(); }
   }
 });
 
@@ -407,7 +595,17 @@ router.get("/api/debit-notes", async (req, res) => {
     const emailMap = new Map<string, any>();
     if (emailIdPlaceholders) {
       const [emailRows] = await p.query<RowDataPacket[]>(`SELECT * FROM debit_note_emails WHERE id IN (${emailIdPlaceholders})`, emailIds);
-      for (const r of emailRows) emailMap.set(r.id, r);
+      const [allRecipients] = await p.query<RowDataPacket[]>(
+        `SELECT ecc.email_config_id, c.email, ecc.type FROM dn_email_config_contacts ecc
+         JOIN dn_contacts c ON c.id = ecc.contact_id WHERE ecc.email_config_id IN (${emailIdPlaceholders})`,
+        emailIds
+      );
+      for (const r of emailRows) {
+        const recipients = allRecipients.filter((rp: any) => rp.email_config_id === r.id);
+        r.sendToEmail = recipients.filter((rp: any) => rp.type === "send_to").map((rp: any) => rp.email);
+        r.ccToEmail = recipients.filter((rp: any) => rp.type === "cc").map((rp: any) => rp.email);
+        emailMap.set(r.id, r);
+      }
     }
 
     const result = rows.map((row) => {
@@ -449,7 +647,17 @@ router.get("/api/debit-notes/:id", async (req, res) => {
     let emailConfig = null;
     if (note.debitNoteEmailId) {
       const [emailRows] = await p.execute<RowDataPacket[]>("SELECT * FROM debit_note_emails WHERE id = ?", [note.debitNoteEmailId]);
-      emailConfig = emailRows[0] || null;
+      if (emailRows[0]) {
+        const [recipients] = await p.execute<RowDataPacket[]>(
+          `SELECT c.email, ecc.type FROM dn_email_config_contacts ecc
+           JOIN dn_contacts c ON c.id = ecc.contact_id WHERE ecc.email_config_id = ?`, [note.debitNoteEmailId]
+        );
+        emailConfig = {
+          ...emailRows[0],
+          sendToEmail: recipients.filter((r: any) => r.type === "send_to").map((r: any) => r.email),
+          ccToEmail: recipients.filter((r: any) => r.type === "cc").map((r: any) => r.email),
+        };
+      }
     }
     res.json({
       ...note,
@@ -562,7 +770,7 @@ router.post("/api/debit-notes/send-emails", async (req, res) => {
     if (existing && !existing.finished) return res.status(409).json({ error: "Email sending is already in progress." });
 
     emailProgressMap.set(progressKey, { status: "Starting...", finished: false });
-    runSendDebitNotesEmail(noteIds, false, progressKey).catch((err) => {
+    runSendDebitNotesEmail(noteIds, false, progressKey, req.body.user).catch((err) => {
       console.error("Email send error:", err);
       emailProgressMap.set(progressKey, { status: `Error: ${err.message}`, finished: true });
     });
@@ -584,7 +792,7 @@ router.post("/api/debit-notes/:id/resend", async (req, res) => {
     if (existing && !existing.finished) return res.status(409).json({ error: "Email sending is already in progress." });
 
     emailProgressMap.set(progressKey, { status: "Starting...", finished: false });
-    runSendDebitNotesEmail([req.params.id], true, progressKey).catch((err) => {
+    runSendDebitNotesEmail([req.params.id], true, progressKey, req.body.user).catch((err) => {
       console.error("Email resend error:", err);
       emailProgressMap.set(progressKey, { status: `Error: ${err.message}`, finished: true });
     });
@@ -605,8 +813,8 @@ router.get("/api/debit-notes/:id/export", async (req, res) => {
     const note = noteRows[0];
     const [items] = await p.execute<RowDataPacket[]>("SELECT * FROM debit_note_items WHERE debitNoteId = ? ORDER BY id ASC", [req.params.id]);
     const workbook = new ExcelJS.Workbook();
-    const [userRows] = await p.execute<RowDataPacket[]>("SELECT fullName, position FROM users WHERE username = ?", [note.createdBy]);
-    const pb = userRows.length > 0 ? { name: userRows[0].fullName, position: userRows[0].position } : undefined;
+    const [userRows] = await p.execute<RowDataPacket[]>("SELECT fullName, position, phone, email FROM users WHERE username = ?", [note.createdBy]);
+    const pb = userRows.length > 0 ? { name: userRows[0].fullName, position: userRows[0].position, phone: userRows[0].phone, email: userRows[0].email } : undefined;
     buildDebitNoteSheet(workbook, note, items, pb);
     const buffer = await workbook.xlsx.writeBuffer();
     const fileName = `DebitNote_${note.referenceNumber}.xlsx`.replace(/[^a-zA-Z0-9_.-]/g, "_");
@@ -655,8 +863,8 @@ router.post("/api/debit-notes/export-bulk", async (req, res) => {
       if (noteRows.length === 0) continue;
       const note = noteRows[0];
       const [items] = await p.execute<RowDataPacket[]>("SELECT * FROM debit_note_items WHERE debitNoteId = ? ORDER BY id ASC", [noteId]);
-      const [userRows] = await p.execute<RowDataPacket[]>("SELECT fullName, position FROM users WHERE username = ?", [note.createdBy]);
-      const pb = userRows.length > 0 ? { name: userRows[0].fullName, position: userRows[0].position } : undefined;
+      const [userRows] = await p.execute<RowDataPacket[]>("SELECT fullName, position, phone, email FROM users WHERE username = ?", [note.createdBy]);
+      const pb = userRows.length > 0 ? { name: userRows[0].fullName, position: userRows[0].position, phone: userRows[0].phone, email: userRows[0].email } : undefined;
       const workbook = new ExcelJS.Workbook();
       buildDebitNoteSheet(workbook, note, items, pb);
       const buffer = await workbook.xlsx.writeBuffer();

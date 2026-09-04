@@ -34,7 +34,7 @@ interface DebitNote {
   createdBy: string;
   itemCount: number;
   totalAmount: number;
-  debitNoteEmail: { receiverName: string; sendToEmail: string } | null;
+  debitNoteEmail: { receiverName: string; sendToEmail: string[]; ccToEmail: string[] } | null;
   createdAt: string;
 }
 

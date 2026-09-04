@@ -18,6 +18,7 @@ export async function runSendDebitNotesEmail(
   debitNoteIds: string[],
   allowResend: boolean,
   progressKey: string,
+  senderUsername?: string,
 ): Promise<void> {
   try {
     assertDb();
@@ -64,7 +65,17 @@ export async function runSendDebitNotesEmail(
         let emailConfig = null;
         if (note.debitNoteEmailId) {
           const [emailRows] = await p.execute<RowDataPacket[]>("SELECT * FROM debit_note_emails WHERE id = ?", [note.debitNoteEmailId]);
-          emailConfig = emailRows[0] || null;
+          if (emailRows[0]) {
+            const [recipients] = await p.execute<RowDataPacket[]>(
+              `SELECT c.email, ecc.type FROM dn_email_config_contacts ecc
+               JOIN dn_contacts c ON c.id = ecc.contact_id WHERE ecc.email_config_id = ?`, [note.debitNoteEmailId]
+            );
+            emailConfig = {
+              ...emailRows[0],
+              sendToEmail: recipients.filter((r: any) => r.type === "send_to").map((r: any) => r.email),
+              ccToEmail: recipients.filter((r: any) => r.type === "cc").map((r: any) => r.email),
+            };
+          }
         }
         noteDetails.push({ ...note, items, emailConfig });
       }
@@ -81,17 +92,30 @@ export async function runSendDebitNotesEmail(
     const getSetting = (key: string, envKey: string, fallback: string): string =>
       dbSettings[key] || process.env[envKey] || fallback;
 
+    let smtpUser = getSetting("smtp_user", "SMTP_USER", "");
+    let smtpPass = getSetting("smtp_pass", "SMTP_PASS", "");
+
+    if (senderUsername) {
+      const [userRows] = await p.execute<RowDataPacket[]>(
+        "SELECT email, smtp_pass FROM users WHERE username = ?", [senderUsername]
+      );
+      if (userRows.length > 0) {
+        if (userRows[0].email) smtpUser = userRows[0].email;
+        if (userRows[0].smtp_pass) smtpPass = userRows[0].smtp_pass;
+      }
+    }
+
     const transporter = nodemailer.createTransport({
       host: getSetting("smtp_host", "SMTP_HOST", "smtp.gmail.com"),
       port: parseInt(getSetting("smtp_port", "SMTP_PORT", "587")),
       secure: getSetting("smtp_secure", "SMTP_SECURE", "") === "true",
       auth: {
-        user: getSetting("smtp_user", "SMTP_USER", ""),
-        pass: getSetting("smtp_pass", "SMTP_PASS", ""),
+        user: smtpUser,
+        pass: smtpPass,
       },
     });
 
-    const fromAddress = getSetting("mail_from_address", "MAIL_FROM_ADDRESS", "") || getSetting("smtp_user", "SMTP_USER", "") || "noreply@procurement.com";
+    const fromAddress = getSetting("mail_from_address", "MAIL_FROM_ADDRESS", "") || smtpUser || "noreply@procurement.com";
     const fromName = getSetting("mail_from_name", "MAIL_FROM_NAME", "PROCUREMENT");
 
     const recipientGroups = new Map<string, { notes: any[]; cc: string[] }>();
@@ -100,8 +124,8 @@ export async function runSendDebitNotesEmail(
         await p.execute("UPDATE debit_notes SET status = 'pending' WHERE id = ?", [detail.id]);
         continue;
       }
-      const sendToEmails: string[] = JSON.parse(detail.emailConfig.sendToEmail || "[]");
-      const ccEmails: string[] = JSON.parse(detail.emailConfig.ccToEmail || "[]");
+      const sendToEmails: string[] = Array.isArray(detail.emailConfig.sendToEmail) ? detail.emailConfig.sendToEmail : [];
+      const ccEmails: string[] = Array.isArray(detail.emailConfig.ccToEmail) ? detail.emailConfig.ccToEmail : [];
 
       for (const email of sendToEmails) {
         const trimmed = email.trim();
@@ -135,8 +159,8 @@ export async function runSendDebitNotesEmail(
       try {
         const attachments: any[] = [];
         for (const detail of group.notes) {
-          const [userRows] = await p.execute<RowDataPacket[]>("SELECT fullName, position FROM users WHERE username = ?", [detail.createdBy]);
-          const pb = userRows.length > 0 ? { name: userRows[0].fullName, position: userRows[0].position } : undefined;
+          const [userRows] = await p.execute<RowDataPacket[]>("SELECT fullName, position, phone, email FROM users WHERE username = ?", [detail.createdBy]);
+          const pb = userRows.length > 0 ? { name: userRows[0].fullName, position: userRows[0].position, phone: userRows[0].phone, email: userRows[0].email } : undefined;
           const workbook = new ExcelJS.Workbook();
           buildDebitNoteSheet(workbook, detail, detail.items, pb);
           const buffer = await workbook.xlsx.writeBuffer();
@@ -144,18 +168,18 @@ export async function runSendDebitNotesEmail(
           attachments.push({ filename: fileName, content: buffer as Buffer });
         }
 
-        let creatorName = "Vun Thy";
-        let creatorPosition = "Procurement Officer";
-        let creatorPhone = "+855 96 36 12 146";
-        let creatorEmail = "vun.thy@mjqeducation.edu.kh";
+        let creatorName = "";
+        let creatorPosition = "";
+        let creatorPhone = "";
+        let creatorEmail = "";
         const firstNote = group.notes[0];
         if (firstNote?.createdBy) {
           const [uRows] = await p.execute<RowDataPacket[]>("SELECT fullName, position, phone, email FROM users WHERE username = ?", [firstNote.createdBy]);
           if (uRows.length > 0) {
-            creatorName = uRows[0].fullName || creatorName;
-            creatorPosition = uRows[0].position || creatorPosition;
-            creatorPhone = uRows[0].phone || creatorPhone;
-            creatorEmail = uRows[0].email || creatorEmail;
+            creatorName = uRows[0].fullName || "";
+            creatorPosition = uRows[0].position || "";
+            creatorPhone = uRows[0].phone || "";
+            creatorEmail = uRows[0].email || "";
           }
         }
 
