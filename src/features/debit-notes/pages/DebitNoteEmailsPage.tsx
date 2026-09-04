@@ -465,9 +465,9 @@ export default function DebitNoteEmailsPage() {
               header: "Send To",
               meta: { className: "text-muted-foreground" },
               cell: ({ row }) => (
-                <div className="flex flex-wrap gap-1 max-w-[320px]">
+                <div className="flex flex-wrap gap-1">
                   {parseEmailList(row.original.sendToEmail).map((email) => (
-                    <Badge key={email} className="border-emerald-200 bg-emerald-50 text-emerald-700 truncate max-w-full dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">{email}</Badge>
+                    <Badge key={email} variant="outline" className="text-emerald-600 border-emerald-300 bg-emerald-50/50 dark:text-emerald-400 dark:border-emerald-700">{email}</Badge>
                   ))}
                 </div>
               ),
@@ -477,9 +477,9 @@ export default function DebitNoteEmailsPage() {
               header: "CC",
               meta: { className: "text-muted-foreground" },
               cell: ({ row }) => (
-                <div className="flex flex-wrap gap-1 max-w-[320px]">
+                <div className="flex flex-wrap gap-1">
                   {parseEmailList(row.original.ccToEmail).map((email) => (
-                    <Badge key={email} className="border-amber-200 bg-amber-50 text-amber-700 truncate max-w-full dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300">{email}</Badge>
+                    <Badge key={email} variant="outline" className="text-amber-600 border-amber-300 bg-amber-50/50 dark:text-amber-400 dark:border-amber-700">{email}</Badge>
                   ))}
                 </div>
               ),
