@@ -291,17 +291,17 @@ export default function DebitNoteEmailsPage() {
   ], [filterValues.warehouses]);
 
   const divisionOptions = useMemo(() => [
-    { value: "", label: "All Departments" },
+    { value: "", label: "All Divisions" },
     ...filterValues.divisions.map((d) => ({ value: d, label: d })),
   ], [filterValues.divisions]);
 
   const departmentOptions = useMemo(() => [
-    { value: "", label: "All Campuses" },
+    { value: "", label: "All Departments" },
     ...filterValues.departments.map((d) => ({ value: d, label: d })),
   ], [filterValues.departments]);
 
   const campusOptions = useMemo(() => [
-    { value: "", label: "All Divisions" },
+    { value: "", label: "All Campuses" },
     ...filterValues.campuses.map((c) => ({ value: c, label: c })),
   ], [filterValues.campuses]);
 
@@ -352,21 +352,21 @@ export default function DebitNoteEmailsPage() {
             <SelectField
               value={divisionFilter}
               onChange={setDivisionFilter}
-              placeholder="All Departments"
+              placeholder="All Divisions"
               containerClassName="min-w-[140px]"
               options={divisionOptions}
             />
             <SelectField
               value={departmentFilter}
               onChange={setDepartmentFilter}
-              placeholder="All Campuses"
+              placeholder="All Departments"
               containerClassName="min-w-[140px]"
               options={departmentOptions}
             />
             <SelectField
               value={campusFilter}
               onChange={setCampusFilter}
-              placeholder="All Divisions"
+              placeholder="All Campuses"
               containerClassName="min-w-[140px]"
               options={campusOptions}
             />
