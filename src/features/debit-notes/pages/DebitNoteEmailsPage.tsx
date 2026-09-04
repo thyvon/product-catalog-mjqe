@@ -339,7 +339,7 @@ export default function DebitNoteEmailsPage() {
         )}
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search by warehouse, department, campus, or receiver..."
+        searchPlaceholder="Search by warehouse, division, department, campus, or receiver..."
         filters={(
           <>
             <SelectField
