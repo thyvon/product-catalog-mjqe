@@ -41,10 +41,12 @@ export default function DebitNoteEmailsPage() {
   const [editing, setEditing] = useState<EmailConfig | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [warehouseFilter, setWarehouseFilter] = useState("");
+  const [divisionFilter, setDivisionFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [campusFilter, setCampusFilter] = useState("");
-  const [filterValues, setFilterValues] = useState<{ warehouses: string[]; departments: string[]; campuses: string[] }>({
+  const [filterValues, setFilterValues] = useState<{ warehouses: string[]; divisions: string[]; departments: string[]; campuses: string[] }>({
     warehouses: [],
+    divisions: [],
     departments: [],
     campuses: [],
   });
@@ -195,15 +197,16 @@ export default function DebitNoteEmailsPage() {
     );
   };
 
-  const hasActiveFilters = Boolean(searchQuery || warehouseFilter || departmentFilter || campusFilter);
+  const hasActiveFilters = Boolean(searchQuery || warehouseFilter || divisionFilter || departmentFilter || campusFilter);
 
   const filtered = configs.filter((c) => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || [c.warehouse, c.department, c.campus, c.division, c.receiverName].some((value) => value.toLowerCase().includes(q));
     const matchesWarehouse = !warehouseFilter || c.warehouse === warehouseFilter;
+    const matchesDivision = !divisionFilter || c.division === divisionFilter;
     const matchesDepartment = !departmentFilter || c.department === departmentFilter;
     const matchesCampus = !campusFilter || c.campus === campusFilter;
-    return matchesSearch && matchesWarehouse && matchesDepartment && matchesCampus;
+    return matchesSearch && matchesWarehouse && matchesDivision && matchesDepartment && matchesCampus;
   });
 
   const handleBulkDelete = useCallback(() => {
@@ -287,6 +290,11 @@ export default function DebitNoteEmailsPage() {
     ...filterValues.warehouses.map((w) => ({ value: w, label: w })),
   ], [filterValues.warehouses]);
 
+  const divisionOptions = useMemo(() => [
+    { value: "", label: "All Divisions" },
+    ...filterValues.divisions.map((d) => ({ value: d, label: d })),
+  ], [filterValues.divisions]);
+
   const departmentOptions = useMemo(() => [
     { value: "", label: "All Departments" },
     ...filterValues.departments.map((d) => ({ value: d, label: d })),
@@ -340,6 +348,13 @@ export default function DebitNoteEmailsPage() {
               placeholder="All Warehouses"
               containerClassName="min-w-[140px]"
               options={warehouseOptions}
+            />
+            <SelectField
+              value={divisionFilter}
+              onChange={setDivisionFilter}
+              placeholder="All Divisions"
+              containerClassName="min-w-[140px]"
+              options={divisionOptions}
             />
             <SelectField
               value={departmentFilter}

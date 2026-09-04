@@ -28,7 +28,7 @@ export default function ContactsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Contact | null>(null);
   const [formData, setFormData] = useState({ email: "", name: "" });
@@ -227,8 +227,8 @@ export default function ContactsPage() {
             pageSize,
             total: contacts.length,
             onPageChange: setCurrentPage,
-            onPageSizeChange: () => {},
-            pageSizeOptions: [10, 20, 50],
+            onPageSizeChange: setPageSize,
+            pageSizeOptions: [10, 25, 50, 100],
           }}
         />
       </ListPageLayout>

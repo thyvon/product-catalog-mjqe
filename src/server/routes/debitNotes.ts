@@ -144,10 +144,12 @@ router.get("/api/debit-note/emails/filters/values", async (_req, res) => {
     assertDb();
     const p = getPool()!;
     const [warehouses] = await p.query<RowDataPacket[]>("SELECT DISTINCT warehouse FROM debit_note_emails WHERE warehouse != '' ORDER BY warehouse");
+    const [divisions] = await p.query<RowDataPacket[]>("SELECT DISTINCT division FROM debit_note_emails WHERE division != '' ORDER BY division");
     const [departments] = await p.query<RowDataPacket[]>("SELECT DISTINCT department FROM debit_note_emails WHERE department != '' ORDER BY department");
     const [campuses] = await p.query<RowDataPacket[]>("SELECT DISTINCT campus FROM debit_note_emails WHERE campus != '' ORDER BY campus");
     res.json({
       warehouses: warehouses.map((r: any) => r.warehouse),
+      divisions: divisions.map((r: any) => r.division),
       departments: departments.map((r: any) => r.department),
       campuses: campuses.map((r: any) => r.campus),
     });

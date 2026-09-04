@@ -40,7 +40,7 @@ export default function UserManagementPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(10);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [formData, setFormData] = useState({
@@ -351,8 +351,8 @@ export default function UserManagementPage() {
             pageSize,
             total: filtered.length,
             onPageChange: setCurrentPage,
-            onPageSizeChange: () => {},
-            pageSizeOptions: [10, 20, 50],
+            onPageSizeChange: setPageSize,
+            pageSizeOptions: [10, 25, 50, 100],
           }}
         />
       </ListPageLayout>
