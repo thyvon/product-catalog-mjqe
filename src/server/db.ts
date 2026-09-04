@@ -195,6 +195,20 @@ async function createTables(p: mysql.Pool) {
     await p.query("ALTER TABLE debit_note_emails DROP COLUMN _tmp_rotation");
   } catch {}
 
+  // Backfill debitNoteEmailId on debit_notes that have no email config linked
+  try {
+    await p.query(`
+      UPDATE debit_notes dn
+      JOIN debit_note_emails dne
+        ON dne.warehouse = dn.warehouse
+        AND dne.division = dn.division
+        AND dne.department = dn.department
+        AND dne.campus = dn.campus
+      SET dn.debitNoteEmailId = dne.id
+      WHERE (dn.debitNoteEmailId IS NULL OR dn.debitNoteEmailId = '')
+    `);
+  } catch {}
+
   await p.query(`CREATE TABLE IF NOT EXISTS dn_contacts (
     id VARCHAR(64) PRIMARY KEY,
     email VARCHAR(255) NOT NULL DEFAULT '',
