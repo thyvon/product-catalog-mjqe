@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 
 interface User {
   username: string;
@@ -8,7 +8,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
   isAuthenticated: boolean;
@@ -16,34 +16,28 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const VALID_CREDENTIALS = [
-  { username: "admin", password: "admin", role: "Admin" },
-  { username: "procurement", password: "procurement", role: "Procurement" },
-];
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem("auth_user");
     return stored ? JSON.parse(stored) : null;
   });
 
-  const login = (username: string, password: string): boolean => {
-    const match = VALID_CREDENTIALS.find(
-      (c) => c.username === username && c.password === password
-    );
-    if (match) {
-      const user = { username: match.username, role: match.role };
-      setUser(user);
-      localStorage.setItem("auth_user", JSON.stringify(user));
-      fetch(`/api/users/profile?username=${encodeURIComponent(username)}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.fullName) updateProfile({ fullName: data.fullName });
-        })
-        .catch(() => {});
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      const u = { username: data.username, role: data.role, fullName: data.fullName };
+      setUser(u);
+      localStorage.setItem("auth_user", JSON.stringify(u));
       return true;
+    } catch {
+      return false;
     }
-    return false;
   };
 
   const logout = () => {

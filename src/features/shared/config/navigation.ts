@@ -9,6 +9,7 @@ import {
   Settings,
   PackageSearch,
   Users,
+  UserCog,
 } from "lucide-react";
 
 export interface NavItem {
@@ -27,5 +28,6 @@ export const navItems: NavItem[] = [
   { to: "/debit-notes", label: "Debit Notes", icon: Receipt },
   { to: "/debit-note-emails", label: "DN Emails", icon: Mail },
   { to: "/contacts", label: "Contacts", icon: Users },
+  { to: "/users", label: "Users", icon: UserCog },
   { to: "/settings", label: "Settings", icon: Settings },
 ];

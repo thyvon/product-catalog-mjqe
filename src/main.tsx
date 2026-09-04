@@ -35,6 +35,7 @@ const ProductManagementPage = lazy(() => import('@/features/product-management/p
 const PmProductFormPage = lazy(() => import('@/features/product-management/pages/PmProductFormPage'));
 const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'));
 const ContactsPage = lazy(() => import('@/features/debit-notes/pages/ContactsPage'));
+const UserManagementPage = lazy(() => import('@/features/users/pages/UserManagementPage'));
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -67,6 +68,7 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="/debit-notes" element={<DebitNoteListPage />} />
                   <Route path="/debit-note-emails" element={<DebitNoteEmailsPage />} />
                   <Route path="/contacts" element={<ContactsPage />} />
+                  <Route path="/users" element={<UserManagementPage />} />
                   <Route path="/stock-issue-items" element={<StockIssueItemsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                 </Route>

@@ -14,7 +14,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -23,11 +25,18 @@ export default function LoginPage() {
       return;
     }
 
-    const success = login(username, password);
-    if (success) {
-      navigate("/", { replace: true });
-    } else {
-      setError("Invalid username or password.");
+    setLoading(true);
+    try {
+      const success = await login(username, password);
+      if (success) {
+        navigate("/", { replace: true });
+      } else {
+        setError("Invalid username or password.");
+      }
+    } catch {
+      setError("Login failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -85,12 +94,12 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full">
-            Sign In
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading ? "Signing in..." : "Sign In"}
           </Button>
 
           <p className="text-xs text-center text-muted-foreground font-mono">
-            Demo: admin / admin
+            Contact admin for account access
           </p>
         </form>
       </div>
