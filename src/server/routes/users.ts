@@ -19,19 +19,25 @@ router.get("/api/users", async (_req, res) => {
   }
 });
 
-// ─── Get single user ───
-router.get("/api/users/:id", async (req, res) => {
+// ─── Login (DB-backed) ───
+router.post("/api/users/login", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: "Username and password are required." });
+    }
     const [rows] = await p.execute<RowDataPacket[]>(
-      "SELECT id, username, role, fullName, email, phone, position, telegramId, avatarUrl, createdAt, updatedAt FROM users WHERE id = ?",
-      [req.params.id]
+      "SELECT id, username, role, fullName FROM users WHERE username = ? AND password = ?",
+      [username, password]
     );
-    if (rows.length === 0) return res.status(404).json({ error: "User not found." });
+    if (rows.length === 0) {
+      return res.status(401).json({ error: "Invalid username or password." });
+    }
     res.json(rows[0]);
   } catch {
-    res.status(500).json({ error: "Failed to fetch user." });
+    res.status(500).json({ error: "Login failed." });
   }
 });
 
@@ -102,8 +108,9 @@ router.post("/api/users", async (req, res) => {
       [id]
     );
     res.status(201).json(rows[0]);
-  } catch (err: any) {
-    res.status(500).json({ error: err?.message || "Failed to create user." });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to create user.";
+    res.status(500).json({ error: message });
   }
 });
 
@@ -130,8 +137,9 @@ router.put("/api/users/:id", async (req, res) => {
       [req.params.id]
     );
     res.json(rows[0] || { success: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err?.message || "Failed to update user." });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update user.";
+    res.status(500).json({ error: message });
   }
 });
 
@@ -149,30 +157,9 @@ router.delete("/api/users/:id", async (req, res) => {
     }
     await p.execute("DELETE FROM users WHERE id = ?", [req.params.id]);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err?.message || "Failed to delete user." });
-  }
-});
-
-// ─── Login (DB-backed) ───
-router.post("/api/users/login", async (req, res) => {
-  try {
-    assertDb();
-    const p = getPool()!;
-    const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ error: "Username and password are required." });
-    }
-    const [rows] = await p.execute<RowDataPacket[]>(
-      "SELECT id, username, role, fullName FROM users WHERE username = ? AND password = ?",
-      [username, password]
-    );
-    if (rows.length === 0) {
-      return res.status(401).json({ error: "Invalid username or password." });
-    }
-    res.json(rows[0]);
-  } catch {
-    res.status(500).json({ error: "Login failed." });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to delete user.";
+    res.status(500).json({ error: message });
   }
 });
 
