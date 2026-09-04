@@ -256,9 +256,9 @@ async function createTables(p: mysql.Pool) {
     updatedAt VARCHAR(40) NOT NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
-  // Seed admin user if no users exist
-  const [userRows] = await p.query<RowDataPacket[]>("SELECT COUNT(*) AS cnt FROM users");
-  if (userRows[0]?.cnt === 0) {
+  // Seed admin user if not exists
+  const [adminRows] = await p.query<RowDataPacket[]>("SELECT id FROM users WHERE username = 'admin'");
+  if (adminRows.length === 0) {
     const now = new Date().toISOString();
     await p.query(
       "INSERT INTO users (id, username, password, role, fullName, email, position, avatarUrl, smtp_pass, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)",
