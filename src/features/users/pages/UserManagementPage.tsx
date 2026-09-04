@@ -39,6 +39,8 @@ export default function UserManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
   const [formData, setFormData] = useState({
@@ -69,6 +71,13 @@ export default function UserManagementPage() {
       [u.username, u.fullName, u.email, u.role, u.position].some((v) => v?.toLowerCase().includes(q))
     );
   }, [users, searchQuery]);
+
+  useEffect(() => { setCurrentPage(1); }, [searchQuery]);
+
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [currentPage, filtered, pageSize]);
 
   const openCreate = () => {
     setEditing(null);
@@ -334,9 +343,17 @@ export default function UserManagementPage() {
 
         <DataTable<User>
           columns={columns}
-          data={filtered}
+          data={paginatedUsers}
           loading={loading}
           emptyMessage="No users found."
+          pagination={{
+            currentPage,
+            pageSize,
+            total: filtered.length,
+            onPageChange: setCurrentPage,
+            onPageSizeChange: () => {},
+            pageSizeOptions: [10, 20, 50],
+          }}
         />
       </ListPageLayout>
     </PageContent>

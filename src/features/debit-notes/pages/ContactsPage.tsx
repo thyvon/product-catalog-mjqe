@@ -27,6 +27,8 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Contact | null>(null);
   const [formData, setFormData] = useState({ email: "", name: "" });
@@ -44,6 +46,13 @@ export default function ContactsPage() {
     const t = setTimeout(() => fetchContacts(searchQuery || undefined), searchQuery ? 300 : 0);
     return () => clearTimeout(t);
   }, [searchQuery, fetchContacts]);
+
+  useEffect(() => { setCurrentPage(1); }, [searchQuery]);
+
+  const paginatedContacts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return contacts.slice(start, start + pageSize);
+  }, [currentPage, contacts, pageSize]);
 
   const openCreate = () => {
     setEditing(null);
@@ -210,9 +219,17 @@ export default function ContactsPage() {
 
         <DataTable<Contact>
           columns={columns}
-          data={contacts}
+          data={paginatedContacts}
           loading={loading}
           emptyMessage="No contacts found."
+          pagination={{
+            currentPage,
+            pageSize,
+            total: contacts.length,
+            onPageChange: setCurrentPage,
+            onPageSizeChange: () => {},
+            pageSizeOptions: [10, 20, 50],
+          }}
         />
       </ListPageLayout>
     </PageContent>
