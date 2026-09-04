@@ -455,15 +455,15 @@ export default function DebitNoteEmailsPage() {
 
         <DataTable<EmailConfig>
           columns={[
-            { accessorKey: "warehouse", header: "Warehouse", meta: { className: "font-bold text-foreground" } },
-            { accessorKey: "division", header: "Division", meta: { className: "text-muted-foreground" } },
-            { accessorKey: "department", header: "Department", meta: { className: "text-muted-foreground" } },
-            { accessorKey: "campus", header: "Campus", meta: { className: "text-muted-foreground" } },
-            { accessorKey: "receiverName", header: "Receiver", meta: { className: "font-medium text-foreground" } },
+            { accessorKey: "warehouse", header: "Warehouse", meta: { width: "120px", className: "font-bold text-foreground" } },
+            { accessorKey: "division", header: "Division", meta: { width: "100px", className: "text-muted-foreground" } },
+            { accessorKey: "department", header: "Department", meta: { width: "110px", className: "text-muted-foreground" } },
+            { accessorKey: "campus", header: "Campus", meta: { width: "80px", className: "text-muted-foreground" } },
+            { accessorKey: "receiverName", header: "Receiver", meta: { width: "120px", className: "font-medium text-foreground" } },
             {
               accessorKey: "sendToEmail",
               header: "Send To",
-              meta: { className: "text-muted-foreground" },
+              meta: { width: "220px" },
               cell: ({ row }) => (
                 <div className="flex flex-wrap gap-1">
                   {parseEmailList(row.original.sendToEmail).map((email) => (
@@ -475,7 +475,7 @@ export default function DebitNoteEmailsPage() {
             {
               accessorKey: "ccToEmail",
               header: "CC",
-              meta: { className: "text-muted-foreground" },
+              meta: { width: "220px" },
               cell: ({ row }) => (
                 <div className="flex flex-wrap gap-1">
                   {parseEmailList(row.original.ccToEmail).map((email) => (
