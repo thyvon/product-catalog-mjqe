@@ -40,10 +40,8 @@ export default function ContactsPage() {
     } catch { /* ignored */ } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchContacts(); }, [fetchContacts]);
-
   useEffect(() => {
-    const t = setTimeout(() => fetchContacts(searchQuery || undefined), 300);
+    const t = setTimeout(() => fetchContacts(searchQuery || undefined), searchQuery ? 300 : 0);
     return () => clearTimeout(t);
   }, [searchQuery, fetchContacts]);
 
