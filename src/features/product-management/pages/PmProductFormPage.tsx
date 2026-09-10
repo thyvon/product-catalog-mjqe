@@ -840,7 +840,7 @@ export default function PmProductFormPage() {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-lg border border-border">
-              <Table className="w-max table-auto">
+              <Table className="w-fit">
                 <TableHeader className="bg-muted/60">
                   <TableRow>
                     <TableHead className="w-12">No.</TableHead>
@@ -879,7 +879,6 @@ export default function PmProductFormPage() {
                                   placeholder={`Pick ${t.name.toLowerCase()}...`}
                                   options={(t.values ?? []).map((vv) => ({ value: vv.id, label: vv.name }))}
                                   className="h-8 text-xs"
-                                  containerClassName="min-w-28"
                                 />
                               </TableCell>
                             );
@@ -898,7 +897,6 @@ export default function PmProductFormPage() {
                             placeholder="—"
                             options={uoms.map((u) => ({ value: u.id, label: u.name }))}
                             className="h-8 text-xs"
-                            containerClassName="min-w-28"
                           />
                         </TableCell>
                         <TableCell>
@@ -913,7 +911,6 @@ export default function PmProductFormPage() {
                                 label: `${s.short_name || s.name}${s.conversion_factor ? ` (×${s.conversion_factor})` : ""}`,
                               }))}
                             className="h-8 text-xs"
-                            containerClassName="min-w-28"
                           />
                         </TableCell>
                         <TableCell>
@@ -922,7 +919,7 @@ export default function PmProductFormPage() {
                             value={row.basePurchase}
                             onChange={(e) => updateRow(key, { basePurchase: e.target.value })}
                             placeholder="0.00"
-                            className="h-8 w-28 font-mono text-xs"
+                            className="h-8 font-mono text-xs"
                           />
                         </TableCell>
                         <TableCell>
@@ -931,7 +928,7 @@ export default function PmProductFormPage() {
                             value={row.subPurchase}
                             onChange={(e) => updateRow(key, { subPurchase: e.target.value })}
                             placeholder="0.00"
-                            className="h-8 w-28 font-mono text-xs"
+                            className="h-8 font-mono text-xs"
                           />
                         </TableCell>
                         <TableCell>
@@ -1086,7 +1083,7 @@ export default function PmProductFormPage() {
                             value={newRowFields.basePurchase ?? ""}
                             onChange={(e) => setNewRowFields((prev) => ({ ...prev, basePurchase: e.target.value }))}
                             placeholder="0.00"
-                            className="h-8 w-28 font-mono text-xs"
+                            className="h-8 font-mono text-xs"
                           />
                         </TableCell>
                         <TableCell>
@@ -1095,7 +1092,7 @@ export default function PmProductFormPage() {
                             value={newRowFields.subPurchase ?? ""}
                             onChange={(e) => setNewRowFields((prev) => ({ ...prev, subPurchase: e.target.value }))}
                             placeholder="0.00"
-                            className="h-8 w-28 font-mono text-xs"
+                            className="h-8 font-mono text-xs"
                           />
                         </TableCell>
                         <TableCell>
