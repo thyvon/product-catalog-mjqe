@@ -11,6 +11,7 @@ import PageContent from "@/features/shared/components/PageContent";
 import { Field } from "@/features/shared/components/Field";
 import { FormLabel } from "@/features/shared/components/FormLabel";
 import SelectField from "@/features/shared/components/SelectField";
+import CreatableCombobox from "@/features/shared/components/CreatableCombobox";
 import TextField from "@/features/shared/components/TextField";
 import MultiSelectCombobox from "@/features/shared/components/MultiSelectCombobox";
 import { useToast } from "@/features/shared/components/Toast";
@@ -181,7 +182,7 @@ export default function PmProductFormPage() {
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [addingRow, setAddingRow] = useState(false);
   const [addingBusy, setAddingBusy] = useState(false);
-  const [rowDraft, setRowDraft] = useState<Record<string, { valueId?: string; text?: string }>>({});
+  const [rowDraft, setRowDraft] = useState<Record<string, { valueId?: string }>>({});
   const [newRowFields, setNewRowFields] = useState<Record<string, string>>({});
   const imageInputRef = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -408,24 +409,18 @@ export default function PmProductFormPage() {
   const commitAddRow = async () => {
     const missing = templateIds.filter((tid) => {
       const d = rowDraft[tid];
-      return !(d?.valueId || d?.text?.trim());
+      return !d?.valueId;
     });
     if (missing.length > 0) {
-      toast.error("Fill every template column — pick an existing value or type a new one.");
+      toast.error("Select a value for every template column.");
       return;
     }
     setAddingBusy(true);
     try {
       const values: Record<string, string> = {};
       for (const tid of templateIds) {
-        const t = templates.find((x) => x.id === tid);
-        if (!t) continue;
-        const d = rowDraft[tid] ?? {};
-        if (d.text?.trim()) {
-          const created = await createValue(t, d.text.trim());
-          if (!created) throw new Error(`Failed to create "${d.text}".`);
-          values[tid] = created.id;
-        } else if (d.valueId) {
+        const d = rowDraft[tid];
+        if (d?.valueId) {
           values[tid] = d.valueId;
         }
       }
@@ -857,19 +852,19 @@ export default function PmProductFormPage() {
                     <TableHead className="w-12">No.</TableHead>
                     {productType === "variation" &&
                       templateIds.map((tid) => (
-                        <TableHead key={tid} className="min-w-[130px]">
+                        <TableHead key={tid} className="w-[150px]">
                           {templates.find((t) => t.id === tid)?.name ?? "Value"}
                         </TableHead>
                       ))}
-                    <TableHead className="min-w-[130px]">Item Code (SKU)</TableHead>
-                    <TableHead className="min-w-[110px]">Base UoM</TableHead>
-                    <TableHead className="min-w-[110px]">Sub UoM</TableHead>
-                    <TableHead className="min-w-[110px]">Base UoM Purchase</TableHead>
-                    <TableHead className="min-w-[110px]">Sub UoM Purchase</TableHead>
-                    <TableHead className="min-w-[90px]">Status</TableHead>
-                    <TableHead className="min-w-[80px]">Image</TableHead>
-                    <TableHead className="min-w-[160px]">Remark</TableHead>
-                    <TableHead className="min-w-[70px] text-right">Actions</TableHead>
+                    <TableHead className="w-[150px]">Item Code (SKU)</TableHead>
+                    <TableHead className="w-[130px]">Base UoM</TableHead>
+                    <TableHead className="w-[130px]">Sub UoM</TableHead>
+                    <TableHead className="w-[150px]">Base UoM Purchase</TableHead>
+                    <TableHead className="w-[150px]">Sub UoM Purchase</TableHead>
+                    <TableHead className="w-[90px]">Status</TableHead>
+                    <TableHead className="w-[80px]">Image</TableHead>
+                    <TableHead className="w-[160px]">Remark</TableHead>
+                    <TableHead className="w-[80px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1049,34 +1044,22 @@ export default function PmProductFormPage() {
                         const d = rowDraft[tid] ?? {};
                         return (
                           <TableCell key={tid}>
-                            <div className="flex gap-1">
-                              <SelectField
-                                value={d.valueId ?? ""}
-                                onChange={(v) => setRowDraft((prev) => ({ ...prev, [tid]: { valueId: v || undefined } }))}
-                                placeholder={`Pick ${t.name.toLowerCase()}...`}
-                                options={(t.values ?? []).map((vv) => ({ value: vv.id, label: vv.name }))}
-                                className="h-8 text-xs"
-                                containerClassName="min-w-28"
-                              />
-                              <Input
-                                value={d.text ?? ""}
-                                onChange={(e) => setRowDraft((prev) => ({ ...prev, [tid]: { text: e.target.value } }))}
-                                onKeyDown={async (e) => {
-                                  if (e.key === "Enter" && d.text?.trim()) {
-                                    e.preventDefault();
-                                    const created = await createValue(t, d.text.trim());
-                                    if (created) {
-                                      setRowDraft((prev) => ({
-                                        ...prev,
-                                        [tid]: { valueId: created.id },
-                                      }));
-                                    }
+                            <CreatableCombobox
+                              value={(t.values ?? []).find((vv) => vv.id === d.valueId)?.name ?? ""}
+                              onChange={async (name) => {
+                                const existing = (t.values ?? []).find((vv) => vv.name.toLowerCase() === name.toLowerCase());
+                                if (existing) {
+                                  setRowDraft((prev) => ({ ...prev, [tid]: { valueId: existing.id } }));
+                                } else {
+                                  const created = await createValue(t, name);
+                                  if (created) {
+                                    setRowDraft((prev) => ({ ...prev, [tid]: { valueId: created.id } }));
                                   }
-                                }}
-                                placeholder="New + Enter"
-                                className="h-8 w-24 text-xs"
-                              />
-                            </div>
+                                }
+                              }}
+                              options={(t.values ?? []).map((vv) => vv.name)}
+                              placeholder={`${t.name}...`}
+                            />
                           </TableCell>
                         );
                       })}
