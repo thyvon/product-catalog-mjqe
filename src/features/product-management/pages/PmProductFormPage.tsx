@@ -182,6 +182,7 @@ export default function PmProductFormPage() {
   const [addingRow, setAddingRow] = useState(false);
   const [addingBusy, setAddingBusy] = useState(false);
   const [rowDraft, setRowDraft] = useState<Record<string, { valueId?: string; text?: string }>>({});
+  const [newRowFields, setNewRowFields] = useState<Record<string, string>>({});
   const imageInputRef = useRef<Record<string, HTMLInputElement | null>>({});
 
   const loadTemplates = async (): Promise<PMVariationTemplate[]> => {
@@ -401,6 +402,7 @@ export default function PmProductFormPage() {
     }
     setAddingRow(true);
     setRowDraft({});
+    setNewRowFields({});
   };
 
   const commitAddRow = async () => {
@@ -432,17 +434,18 @@ export default function PmProductFormPage() {
         {
           uid: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           values,
-          sku: genSku(prev.length),
-          remark: "",
-          baseUom: uomId ?? "",
-          subUom: "",
-          basePurchase: "",
-          subPurchase: "",
+          sku: newRowFields.sku?.trim() || genSku(prev.length),
+          remark: newRowFields.remark?.trim() ?? "",
+          baseUom: newRowFields.baseUom || uomId || "",
+          subUom: newRowFields.subUom || "",
+          basePurchase: newRowFields.basePurchase ?? "",
+          subPurchase: newRowFields.subPurchase ?? "",
           imageUrl: "",
         },
       ]);
       setAddingRow(false);
       setRowDraft({});
+      setNewRowFields({});
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -1038,70 +1041,153 @@ export default function PmProductFormPage() {
               </Table>
             </div>
 
-            {productType === "variation" && (
-              addingRow ? (
-                <div className="mt-3 space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
-                  <p className="text-sm font-semibold">Add Variant Row</p>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {templateIds.map((tid) => {
-                      const t = templates.find((x) => x.id === tid);
-                      if (!t) return null;
-                      const d = rowDraft[tid] ?? {};
-                      return (
-                        <Field key={t.id} label={t.name}>
-                          <div className="flex gap-1.5">
-                            <div className="flex-1">
+            {productType === "variation" && addingRow && (
+              <div className="overflow-x-auto rounded-lg border border-primary/30">
+                <Table>
+                  <TableBody>
+                    <TableRow className="bg-primary/5">
+                      <TableCell className="text-xs text-muted-foreground">New</TableCell>
+                      {templateIds.map((tid) => {
+                        const t = templates.find((x) => x.id === tid);
+                        if (!t) return null;
+                        const d = rowDraft[tid] ?? {};
+                        return (
+                          <TableCell key={tid}>
+                            <div className="flex gap-1">
                               <SelectField
                                 value={d.valueId ?? ""}
                                 onChange={(v) => setRowDraft((prev) => ({ ...prev, [tid]: { valueId: v || undefined } }))}
                                 placeholder={`Pick ${t.name.toLowerCase()}...`}
                                 options={(t.values ?? []).map((vv) => ({ value: vv.id, label: vv.name }))}
+                                className="h-8 text-xs"
+                                containerClassName="min-w-28"
+                              />
+                              <Input
+                                value={d.text ?? ""}
+                                onChange={(e) => setRowDraft((prev) => ({ ...prev, [tid]: { text: e.target.value } }))}
+                                onKeyDown={async (e) => {
+                                  if (e.key === "Enter" && d.text?.trim()) {
+                                    e.preventDefault();
+                                    const created = await createValue(t, d.text.trim());
+                                    if (created) {
+                                      setRowDraft((prev) => ({
+                                        ...prev,
+                                        [tid]: { valueId: created.id },
+                                      }));
+                                    }
+                                  }
+                                }}
+                                placeholder="New + Enter"
+                                className="h-8 w-24 text-xs"
                               />
                             </div>
-                            <Input
-                              value={d.text ?? ""}
-                              onChange={(e) => setRowDraft((prev) => ({ ...prev, [tid]: { text: e.target.value } }))}
-                              onKeyDown={async (e) => {
-                                if (e.key === "Enter" && d.text?.trim()) {
-                                  e.preventDefault();
-                                  const created = await createValue(t, d.text.trim());
-                                  if (created) {
-                                    setRowDraft((prev) => ({
-                                      ...prev,
-                                      [tid]: { valueId: created.id },
-                                    }));
-                                  }
-                                }
-                              }}
-                              placeholder="Or type new + Enter"
-                              className="h-9 w-40 text-xs"
-                            />
-                          </div>
-                        </Field>
-                      );
-                    })}
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground">
-                      Pick an existing value or type a new one — new values are saved into the template.
-                    </p>
-                    <div className="flex shrink-0 gap-2">
-                      <Button variant="outline" size="sm" onClick={() => { setAddingRow(false); setRowDraft({}); }} disabled={addingBusy}>
-                        Cancel
-                      </Button>
-                      <Button size="sm" onClick={commitAddRow} disabled={addingBusy}>
-                        {addingBusy ? <Loader2 className="animate-spin" /> : <Plus />}
-                        Add Row
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <Button variant="outline" size="sm" className="mt-3" onClick={startAddRow}>
-                  <Plus />
-                  Add Variant Row
-                </Button>
-              )
+                          </TableCell>
+                        );
+                      })}
+                      <TableCell>
+                        <Input
+                          value={newRowFields.sku ?? ""}
+                          onChange={(e) => setNewRowFields((prev) => ({ ...prev, sku: e.target.value }))}
+                          placeholder={genSku(variantRows.length)}
+                          className="h-8 font-mono text-xs"
+                        />
+                      </TableCell>
+                      <TableCell className="whitespace-normal break-words align-top text-xs">
+                        {`${name.trim() || "Product"}${templateIds.map((tid) => {
+                          const d = rowDraft[tid];
+                          const val = d?.valueId
+                            ? templates.find((x) => x.id === tid)?.values?.find((v) => v.id === d.valueId)?.name
+                            : d?.text?.trim();
+                          return val ? ` — ${val}` : "";
+                        }).join("")}`}
+                      </TableCell>
+                      <TableCell>
+                        <SelectField
+                          value={newRowFields.baseUom ?? ""}
+                          onChange={(v) => setNewRowFields((prev) => ({ ...prev, baseUom: v }))}
+                          placeholder="—"
+                          options={uoms.map((u) => ({ value: u.id, label: u.name }))}
+                          className="h-8 text-xs"
+                          containerClassName="min-w-28"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <SelectField
+                          value={newRowFields.subUom ?? ""}
+                          onChange={(v) => setNewRowFields((prev) => ({ ...prev, subUom: v }))}
+                          placeholder="—"
+                          options={(uoms.find((u) => u.id === (newRowFields.baseUom ?? ""))?.sub_units ?? [])
+                            .filter((s) => (s.status ?? "Active") !== "Inactive")
+                            .map((s) => ({
+                              value: s.id ?? "",
+                              label: `${s.short_name || s.name}${s.conversion_factor ? ` (×${s.conversion_factor})` : ""}`,
+                            }))}
+                          className="h-8 text-xs"
+                          containerClassName="min-w-28"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={newRowFields.basePurchase ?? ""}
+                          onChange={(e) => setNewRowFields((prev) => ({ ...prev, basePurchase: e.target.value }))}
+                          placeholder="0.00"
+                          className="h-8 w-28 font-mono text-xs"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={newRowFields.subPurchase ?? ""}
+                          onChange={(e) => setNewRowFields((prev) => ({ ...prev, subPurchase: e.target.value }))}
+                          placeholder="0.00"
+                          className="h-8 w-28 font-mono text-xs"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <PmStatusBadge status="Active" />
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="size-9 border-dashed"
+                          disabled
+                          aria-label="Upload image"
+                        >
+                          <ImagePlus className="size-4" />
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={newRowFields.remark ?? ""}
+                          onChange={(e) => setNewRowFields((prev) => ({ ...prev, remark: e.target.value }))}
+                          placeholder="Remark..."
+                          className="h-8 text-xs"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="size-7" onClick={() => { setAddingRow(false); setRowDraft({}); setNewRowFields({}); }} disabled={addingBusy} aria-label="Cancel">
+                            <X className="size-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="size-7 text-primary" onClick={commitAddRow} disabled={addingBusy} aria-label="Add row">
+                            {addingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {productType === "variation" && !addingRow && (
+              <Button variant="outline" size="sm" className="mt-3" onClick={startAddRow}>
+                <Plus />
+                Add Variant Row
+              </Button>
             )}
           </CardContent>
         </Card>
