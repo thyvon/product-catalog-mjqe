@@ -840,25 +840,25 @@ export default function PmProductFormPage() {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-lg border border-border">
-              <Table className="w-max table-auto">
+              <Table className="table-auto">
                 <TableHeader className="bg-muted/60">
                   <TableRow>
                     <TableHead className="w-12">No.</TableHead>
                     {productType === "variation" &&
                       templateIds.map((tid) => (
-                        <TableHead key={tid} className="min-w-[120px]">
+                        <TableHead key={tid}>
                           {templates.find((t) => t.id === tid)?.name ?? "Value"}
                         </TableHead>
                       ))}
-                    <TableHead className="min-w-[120px]">Item Code (SKU)</TableHead>
-                    <TableHead className="min-w-[100px]">Base UoM</TableHead>
-                    <TableHead className="min-w-[100px]">Sub UoM</TableHead>
-                    <TableHead className="min-w-[130px]">Base UoM Purchase</TableHead>
-                    <TableHead className="min-w-[130px]">Sub UoM Purchase</TableHead>
-                    <TableHead className="min-w-[80px]">Status</TableHead>
-                    <TableHead className="min-w-[60px]">Image</TableHead>
-                    <TableHead className="min-w-[120px]">Remark</TableHead>
-                    <TableHead className="min-w-[70px] text-right">Actions</TableHead>
+                    <TableHead>Item Code (SKU)</TableHead>
+                    <TableHead>Base UoM</TableHead>
+                    <TableHead>Sub UoM</TableHead>
+                    <TableHead>Base UoM Purchase</TableHead>
+                    <TableHead>Sub UoM Purchase</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Image</TableHead>
+                    <TableHead>Remark</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
