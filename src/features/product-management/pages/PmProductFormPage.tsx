@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import PageContent from "@/features/shared/components/PageContent";
 import { Field } from "@/features/shared/components/Field";
 import { FormLabel } from "@/features/shared/components/FormLabel";
@@ -840,39 +839,39 @@ export default function PmProductFormPage() {
           </CardHeader>
           <CardContent>
             <div className="rounded-lg border border-border">
-              <Table className="w-auto table-auto">
-                <TableHeader className="bg-muted/60">
-                  <TableRow>
-                    <TableHead className="w-12">No.</TableHead>
+              <table className="table-auto">
+                <thead className="bg-muted/60">
+                  <tr>
+                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground w-12">No.</th>
                     {productType === "variation" &&
                       templateIds.map((tid) => (
-                        <TableHead key={tid}>
+                        <th key={tid} className="h-10 px-2 text-left align-middle font-medium text-foreground">
                           {templates.find((t) => t.id === tid)?.name ?? "Value"}
-                        </TableHead>
+                        </th>
                       ))}
-                    <TableHead>Item Code (SKU)</TableHead>
-                    <TableHead>Base UoM</TableHead>
-                    <TableHead>Sub UoM</TableHead>
-                    <TableHead>Base UoM Purchase</TableHead>
-                    <TableHead>Sub UoM Purchase</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Image</TableHead>
-                    <TableHead>Remark</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Item Code (SKU)</th>
+                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Base UoM</th>
+                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Sub UoM</th>
+                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Base UoM Purchase</th>
+                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Sub UoM Purchase</th>
+                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Status</th>
+                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Image</th>
+                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Remark</th>
+                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {variantRows.map((row, index) => {
                     const key = row.uid;
                     return (
-                      <TableRow key={key} className="hover:bg-muted/40">
-                        <TableCell className="text-xs text-muted-foreground">{index + 1}</TableCell>
+                      <tr key={key} className="border-b hover:bg-muted/40">
+                        <td className="p-2 align-middle text-xs text-muted-foreground">{index + 1}</td>
                         {productType === "variation" &&
                           templateIds.map((tid) => {
                             const t = templates.find((x) => x.id === tid);
                             if (!t) return null;
                             return (
-                              <TableCell key={tid}>
+                              <td key={tid} className="p-2 align-middle">
                                 <SelectField
                                   value={row.values[tid] ?? ""}
                                   onChange={(v) => updateRow(key, { values: { ...row.values, [tid]: v } })}
@@ -880,17 +879,17 @@ export default function PmProductFormPage() {
                                   options={(t.values ?? []).map((vv) => ({ value: vv.id, label: vv.name }))}
                                   className="h-8 text-xs"
                                 />
-                              </TableCell>
+                              </td>
                             );
                           })}
-                        <TableCell>
+                        <td className="p-2 align-middle">
                           <TextField
                             value={row.sku}
                             onChange={(e) => updateRow(key, { sku: e.target.value })}
                             className="h-8 font-mono text-xs"
                           />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <SelectField
                             value={row.baseUom}
                             onChange={(v) => updateRow(key, { baseUom: v })}
@@ -898,8 +897,8 @@ export default function PmProductFormPage() {
                             options={uoms.map((u) => ({ value: u.id, label: u.name }))}
                             className="h-8 text-xs"
                           />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <SelectField
                             value={row.subUom}
                             onChange={(v) => updateRow(key, { subUom: v })}
@@ -912,8 +911,8 @@ export default function PmProductFormPage() {
                               }))}
                             className="h-8 text-xs"
                           />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <Input
                             type="number"
                             value={row.basePurchase}
@@ -921,8 +920,8 @@ export default function PmProductFormPage() {
                             placeholder="0.00"
                             className="h-8 font-mono text-xs"
                           />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <Input
                             type="number"
                             value={row.subPurchase}
@@ -930,11 +929,11 @@ export default function PmProductFormPage() {
                             placeholder="0.00"
                             className="h-8 font-mono text-xs"
                           />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <PmStatusBadge status="Active" />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           {row.imageUrl ? (
                             <div className="group relative flex size-9 items-center justify-center overflow-hidden rounded-md border border-border">
                               <img src={row.imageUrl} alt="Variant preview" className="size-full object-cover" />
@@ -989,16 +988,16 @@ export default function PmProductFormPage() {
                               e.target.value = "";
                             }}
                           />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <Input
                             value={row.remark}
                             onChange={(e) => updateRow(key, { remark: e.target.value })}
                             placeholder="Remark..."
                             className="h-8 text-xs"
                           />
-                        </TableCell>
-                        <TableCell className="text-right">
+                        </td>
+                        <td className="p-2 align-middle text-right">
                           {productType === "variation" ? (
                             <Button
                               type="button"
@@ -1014,19 +1013,19 @@ export default function PmProductFormPage() {
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     );
                   })}
                     {productType === "variation" && addingRow && (
-                      <TableRow className="bg-primary/5">
-                        <TableCell className="text-xs text-muted-foreground">New</TableCell>
+                      <tr className="border-b bg-primary/5">
+                        <td className="p-2 align-middle text-xs text-muted-foreground">New</td>
                         {templateIds.map((tid) => {
                           const t = templates.find((x) => x.id === tid);
                           if (!t) return null;
                           const d = rowDraft[tid] ?? {};
                           return (
-                            <TableCell key={tid}>
+                            <td key={tid} className="p-2 align-middle">
                               <CreatableCombobox
                                 value={(t.values ?? []).find((vv) => vv.id === d.valueId)?.name ?? ""}
                                 onChange={async (name) => {
@@ -1043,18 +1042,18 @@ export default function PmProductFormPage() {
                                 options={(t.values ?? []).map((vv) => vv.name)}
                                 placeholder={`${t.name}...`}
                               />
-                            </TableCell>
+                            </td>
                           );
                         })}
-                        <TableCell>
+                        <td className="p-2 align-middle">
                           <Input
                             value={newRowFields.sku ?? ""}
                             onChange={(e) => setNewRowFields((prev) => ({ ...prev, sku: e.target.value }))}
                             placeholder={genSku(variantRows.length)}
                             className="h-8 font-mono text-xs"
                           />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <SelectField
                             value={newRowFields.baseUom ?? ""}
                             onChange={(v) => setNewRowFields((prev) => ({ ...prev, baseUom: v }))}
@@ -1062,8 +1061,8 @@ export default function PmProductFormPage() {
                             options={uoms.map((u) => ({ value: u.id, label: u.name }))}
                             className="h-8 text-xs"
                           />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <SelectField
                             value={newRowFields.subUom ?? ""}
                             onChange={(v) => setNewRowFields((prev) => ({ ...prev, subUom: v }))}
@@ -1076,8 +1075,8 @@ export default function PmProductFormPage() {
                               }))}
                             className="h-8 text-xs"
                           />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <Input
                             type="number"
                             value={newRowFields.basePurchase ?? ""}
@@ -1085,8 +1084,8 @@ export default function PmProductFormPage() {
                             placeholder="0.00"
                             className="h-8 font-mono text-xs"
                           />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <Input
                             type="number"
                             value={newRowFields.subPurchase ?? ""}
@@ -1094,11 +1093,11 @@ export default function PmProductFormPage() {
                             placeholder="0.00"
                             className="h-8 font-mono text-xs"
                           />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <PmStatusBadge status="Active" />
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <Button
                             type="button"
                             variant="outline"
@@ -1109,16 +1108,16 @@ export default function PmProductFormPage() {
                           >
                             <ImagePlus className="size-4" />
                           </Button>
-                        </TableCell>
-                        <TableCell>
+                        </td>
+                        <td className="p-2 align-middle">
                           <Input
                             value={newRowFields.remark ?? ""}
                             onChange={(e) => setNewRowFields((prev) => ({ ...prev, remark: e.target.value }))}
                             placeholder="Remark..."
                             className="h-8 text-xs"
                           />
-                        </TableCell>
-                        <TableCell className="text-right">
+                        </td>
+                        <td className="p-2 align-middle text-right">
                           <div className="flex justify-end gap-1">
                             <Button variant="ghost" size="icon" className="size-7" onClick={() => { setAddingRow(false); setRowDraft({}); setNewRowFields({}); }} disabled={addingBusy} aria-label="Cancel">
                               <X className="size-3.5" />
@@ -1127,11 +1126,11 @@ export default function PmProductFormPage() {
                               {addingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
                             </Button>
                           </div>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     )}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
 
             {productType === "variation" && !addingRow && (
