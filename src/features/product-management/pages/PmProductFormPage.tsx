@@ -313,12 +313,6 @@ export default function PmProductFormPage() {
   const genSku = (prevCount: number): string =>
     `${(code.trim() || "CO").toUpperCase()}-${String(prevCount + 1).padStart(3, "0")}`;
 
-  const rowLabel = (row: VariantRow): string =>
-    templateIds
-      .map((tid) => valueNames.get(row.values[tid] ?? ""))
-      .filter(Boolean)
-      .join(", ");
-
   const updateRow = (uid: string, patch: Partial<VariantRow>) => {
     setVariantRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r)));
   };
@@ -870,7 +864,6 @@ export default function PmProductFormPage() {
                 <TableBody>
                   {variantRows.map((row, index) => {
                     const key = row.uid;
-                    const label = rowLabel(row);
                     return (
                       <TableRow key={key} className="hover:bg-muted/40">
                         <TableCell className="text-xs text-muted-foreground">{index + 1}</TableCell>
