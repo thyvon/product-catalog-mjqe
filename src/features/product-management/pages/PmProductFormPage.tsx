@@ -176,6 +176,7 @@ export default function PmProductFormPage() {
   const [templateIds, setTemplateIds] = useState<string[]>([]);
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
   const [saving, setSaving] = useState(false);
+  const [singleImageUrl, setSingleImageUrl] = useState("");
 
   const [quickAdd, setQuickAdd] = useState<SimpleEntity | null>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
@@ -226,6 +227,9 @@ export default function PmProductFormPage() {
           setStatus(product.status ?? "Active");
           setVariants(product.variants ?? []);
           setTemplateIds(product.variation_template_ids ?? []);
+          if (toProductType(product.product_type) === "single") {
+            setSingleImageUrl(product.variants?.[0]?.image_url ?? "");
+          }
 
           // Build matrix rows strictly from saved variants — preserves existing data
           const rows: VariantRow[] = (product.variants ?? []).map((v, i) => {
@@ -334,7 +338,11 @@ export default function PmProductFormPage() {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Failed to upload image.");
-    updateRow(uid, { imageUrl: data.imageUrl });
+    if (uid === "__single__") {
+      setSingleImageUrl(data.imageUrl);
+    } else {
+      updateRow(uid, { imageUrl: data.imageUrl });
+    }
     return data.imageUrl as string;
   };
 
@@ -486,7 +494,7 @@ export default function PmProductFormPage() {
                 subUom: subUnitId ?? "",
                 basePurchase: "",
                 subPurchase: "",
-                imageUrl: "",
+                imageUrl: singleImageUrl,
               },
             ];
     }
@@ -660,6 +668,57 @@ export default function PmProductFormPage() {
                   <Field label="EN Description" wide>
                     <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="English description..." />
                   </Field>
+                  {productType === "single" && (
+                    <Field label="Product Image" wide>
+                      {singleImageUrl ? (
+                        <div className="group relative inline-flex size-20 items-center justify-center overflow-hidden rounded-lg border border-border">
+                          <img src={singleImageUrl} alt="Product preview" className="size-full object-cover" />
+                          <div className="absolute inset-0 flex items-center justify-center gap-1 bg-background/70 opacity-0 transition-opacity group-hover:opacity-100">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-6"
+                              onClick={() => document.getElementById("single-image-input")?.click()}
+                              aria-label="Replace image"
+                            >
+                              <ImagePlus className="size-3" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-6 text-destructive"
+                              onClick={() => setSingleImageUrl("")}
+                              aria-label="Remove image"
+                            >
+                              <X className="size-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="size-20 border-dashed"
+                          onClick={() => document.getElementById("single-image-input")?.click()}
+                        >
+                          <ImagePlus className="size-5 text-muted-foreground" />
+                        </Button>
+                      )}
+                      <input
+                        id="single-image-input"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageFile("__single__", file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </Field>
+                  )}
                 </div>
               </div>
 
@@ -688,7 +747,7 @@ export default function PmProductFormPage() {
                             setProductGroupId("");
                           }}
                           placeholder="Select category..."
-                          options={parentCategories.map((c) => ({ value: c.id, label: `${c.code} — ${c.name}` }))}
+                          options={parentCategories.map((c) => ({ value: c.id, label: c.name }))}
                         />
                       </div>
                       <Button variant="outline" size="icon" className="shrink-0" onClick={() => setQuickAdd("category")} aria-label="Add category">
