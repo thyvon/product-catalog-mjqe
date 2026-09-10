@@ -846,19 +846,19 @@ export default function PmProductFormPage() {
                     <TableHead className="w-12">No.</TableHead>
                     {productType === "variation" &&
                       templateIds.map((tid) => (
-                        <TableHead key={tid} className="w-[150px]">
+                        <TableHead key={tid} className="min-w-[120px]">
                           {templates.find((t) => t.id === tid)?.name ?? "Value"}
                         </TableHead>
                       ))}
-                    <TableHead className="w-[150px]">Item Code (SKU)</TableHead>
-                    <TableHead className="w-[130px]">Base UoM</TableHead>
-                    <TableHead className="w-[130px]">Sub UoM</TableHead>
-                    <TableHead className="w-[150px]">Base UoM Purchase</TableHead>
-                    <TableHead className="w-[150px]">Sub UoM Purchase</TableHead>
-                    <TableHead className="w-[90px]">Status</TableHead>
-                    <TableHead className="w-[80px]">Image</TableHead>
-                    <TableHead className="w-[160px]">Remark</TableHead>
-                    <TableHead className="w-[80px] text-right">Actions</TableHead>
+                    <TableHead className="min-w-[120px]">Item Code (SKU)</TableHead>
+                    <TableHead className="min-w-[100px]">Base UoM</TableHead>
+                    <TableHead className="min-w-[100px]">Sub UoM</TableHead>
+                    <TableHead className="min-w-[130px]">Base UoM Purchase</TableHead>
+                    <TableHead className="min-w-[130px]">Sub UoM Purchase</TableHead>
+                    <TableHead className="min-w-[80px]">Status</TableHead>
+                    <TableHead className="min-w-[60px]">Image</TableHead>
+                    <TableHead className="min-w-[120px]">Remark</TableHead>
+                    <TableHead className="min-w-[70px] text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
