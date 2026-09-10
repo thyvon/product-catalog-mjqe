@@ -1028,130 +1028,121 @@ export default function PmProductFormPage() {
                       </TableRow>
                     );
                   })}
+                    {productType === "variation" && addingRow && (
+                      <TableRow className="bg-primary/5">
+                        <TableCell className="text-xs text-muted-foreground">New</TableCell>
+                        {templateIds.map((tid) => {
+                          const t = templates.find((x) => x.id === tid);
+                          if (!t) return null;
+                          const d = rowDraft[tid] ?? {};
+                          return (
+                            <TableCell key={tid}>
+                              <CreatableCombobox
+                                value={(t.values ?? []).find((vv) => vv.id === d.valueId)?.name ?? ""}
+                                onChange={async (name) => {
+                                  const existing = (t.values ?? []).find((vv) => vv.name.toLowerCase() === name.toLowerCase());
+                                  if (existing) {
+                                    setRowDraft((prev) => ({ ...prev, [tid]: { valueId: existing.id } }));
+                                  } else {
+                                    const created = await createValue(t, name);
+                                    if (created) {
+                                      setRowDraft((prev) => ({ ...prev, [tid]: { valueId: created.id } }));
+                                    }
+                                  }
+                                }}
+                                options={(t.values ?? []).map((vv) => vv.name)}
+                                placeholder={`${t.name}...`}
+                              />
+                            </TableCell>
+                          );
+                        })}
+                        <TableCell>
+                          <Input
+                            value={newRowFields.sku ?? ""}
+                            onChange={(e) => setNewRowFields((prev) => ({ ...prev, sku: e.target.value }))}
+                            placeholder={genSku(variantRows.length)}
+                            className="h-8 font-mono text-xs"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <SelectField
+                            value={newRowFields.baseUom ?? ""}
+                            onChange={(v) => setNewRowFields((prev) => ({ ...prev, baseUom: v }))}
+                            placeholder="—"
+                            options={uoms.map((u) => ({ value: u.id, label: u.name }))}
+                            className="h-8 text-xs"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <SelectField
+                            value={newRowFields.subUom ?? ""}
+                            onChange={(v) => setNewRowFields((prev) => ({ ...prev, subUom: v }))}
+                            placeholder="—"
+                            options={(uoms.find((u) => u.id === (newRowFields.baseUom ?? ""))?.sub_units ?? [])
+                              .filter((s) => (s.status ?? "Active") !== "Inactive")
+                              .map((s) => ({
+                                value: s.id ?? "",
+                                label: `${s.short_name || s.name}${s.conversion_factor ? ` (×${s.conversion_factor})` : ""}`,
+                              }))}
+                            className="h-8 text-xs"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={newRowFields.basePurchase ?? ""}
+                            onChange={(e) => setNewRowFields((prev) => ({ ...prev, basePurchase: e.target.value }))}
+                            placeholder="0.00"
+                            className="h-8 w-28 font-mono text-xs"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={newRowFields.subPurchase ?? ""}
+                            onChange={(e) => setNewRowFields((prev) => ({ ...prev, subPurchase: e.target.value }))}
+                            placeholder="0.00"
+                            className="h-8 w-28 font-mono text-xs"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <PmStatusBadge status="Active" />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="size-9 border-dashed"
+                            disabled
+                            aria-label="Upload image"
+                          >
+                            <ImagePlus className="size-4" />
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={newRowFields.remark ?? ""}
+                            onChange={(e) => setNewRowFields((prev) => ({ ...prev, remark: e.target.value }))}
+                            placeholder="Remark..."
+                            className="h-8 text-xs"
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="size-7" onClick={() => { setAddingRow(false); setRowDraft({}); setNewRowFields({}); }} disabled={addingBusy} aria-label="Cancel">
+                              <X className="size-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="size-7 text-primary" onClick={commitAddRow} disabled={addingBusy} aria-label="Add row">
+                              {addingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
                 </TableBody>
               </Table>
             </div>
-
-            {productType === "variation" && addingRow && (
-              <div className="overflow-x-auto rounded-lg border border-primary/30">
-                <Table>
-                  <TableBody>
-                    <TableRow className="bg-primary/5">
-                      <TableCell className="text-xs text-muted-foreground">New</TableCell>
-                      {templateIds.map((tid) => {
-                        const t = templates.find((x) => x.id === tid);
-                        if (!t) return null;
-                        const d = rowDraft[tid] ?? {};
-                        return (
-                          <TableCell key={tid}>
-                            <CreatableCombobox
-                              value={(t.values ?? []).find((vv) => vv.id === d.valueId)?.name ?? ""}
-                              onChange={async (name) => {
-                                const existing = (t.values ?? []).find((vv) => vv.name.toLowerCase() === name.toLowerCase());
-                                if (existing) {
-                                  setRowDraft((prev) => ({ ...prev, [tid]: { valueId: existing.id } }));
-                                } else {
-                                  const created = await createValue(t, name);
-                                  if (created) {
-                                    setRowDraft((prev) => ({ ...prev, [tid]: { valueId: created.id } }));
-                                  }
-                                }
-                              }}
-                              options={(t.values ?? []).map((vv) => vv.name)}
-                              placeholder={`${t.name}...`}
-                            />
-                          </TableCell>
-                        );
-                      })}
-                      <TableCell>
-                        <Input
-                          value={newRowFields.sku ?? ""}
-                          onChange={(e) => setNewRowFields((prev) => ({ ...prev, sku: e.target.value }))}
-                          placeholder={genSku(variantRows.length)}
-                          className="h-8 font-mono text-xs"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <SelectField
-                          value={newRowFields.baseUom ?? ""}
-                          onChange={(v) => setNewRowFields((prev) => ({ ...prev, baseUom: v }))}
-                          placeholder="—"
-                          options={uoms.map((u) => ({ value: u.id, label: u.name }))}
-                          className="h-8 text-xs"
-                          containerClassName="min-w-28"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <SelectField
-                          value={newRowFields.subUom ?? ""}
-                          onChange={(v) => setNewRowFields((prev) => ({ ...prev, subUom: v }))}
-                          placeholder="—"
-                          options={(uoms.find((u) => u.id === (newRowFields.baseUom ?? ""))?.sub_units ?? [])
-                            .filter((s) => (s.status ?? "Active") !== "Inactive")
-                            .map((s) => ({
-                              value: s.id ?? "",
-                              label: `${s.short_name || s.name}${s.conversion_factor ? ` (×${s.conversion_factor})` : ""}`,
-                            }))}
-                          className="h-8 text-xs"
-                          containerClassName="min-w-28"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={newRowFields.basePurchase ?? ""}
-                          onChange={(e) => setNewRowFields((prev) => ({ ...prev, basePurchase: e.target.value }))}
-                          placeholder="0.00"
-                          className="h-8 w-28 font-mono text-xs"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={newRowFields.subPurchase ?? ""}
-                          onChange={(e) => setNewRowFields((prev) => ({ ...prev, subPurchase: e.target.value }))}
-                          placeholder="0.00"
-                          className="h-8 w-28 font-mono text-xs"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <PmStatusBadge status="Active" />
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="size-9 border-dashed"
-                          disabled
-                          aria-label="Upload image"
-                        >
-                          <ImagePlus className="size-4" />
-                        </Button>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          value={newRowFields.remark ?? ""}
-                          onChange={(e) => setNewRowFields((prev) => ({ ...prev, remark: e.target.value }))}
-                          placeholder="Remark..."
-                          className="h-8 text-xs"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="size-7" onClick={() => { setAddingRow(false); setRowDraft({}); setNewRowFields({}); }} disabled={addingBusy} aria-label="Cancel">
-                            <X className="size-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="size-7 text-primary" onClick={commitAddRow} disabled={addingBusy} aria-label="Add row">
-                            {addingBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            )}
 
             {productType === "variation" && !addingRow && (
               <Button variant="outline" size="sm" className="mt-3" onClick={startAddRow}>
