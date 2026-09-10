@@ -838,26 +838,26 @@ export default function PmProductFormPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border border-border">
-              <table className="table-auto">
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full min-w-[900px] border-collapse text-sm">
                 <thead className="bg-muted/60">
-                  <tr>
-                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground w-12">No.</th>
+                  <tr className="border-b">
+                    <th className="h-10 px-2 text-left font-medium">No.</th>
                     {productType === "variation" &&
                       templateIds.map((tid) => (
-                        <th key={tid} className="h-10 px-2 text-left align-middle font-medium text-foreground">
+                        <th key={tid} className="h-10 px-2 text-left font-medium min-w-[130px]">
                           {templates.find((t) => t.id === tid)?.name ?? "Value"}
                         </th>
                       ))}
-                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Item Code (SKU)</th>
-                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Base UoM</th>
-                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Sub UoM</th>
-                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Base UoM Purchase</th>
-                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Sub UoM Purchase</th>
-                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Status</th>
-                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Image</th>
-                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground">Remark</th>
-                    <th className="h-10 px-2 text-left align-middle font-medium text-foreground text-right">Actions</th>
+                    <th className="h-10 px-2 text-left font-medium min-w-[140px]">Item Code (SKU)</th>
+                    <th className="h-10 px-2 text-left font-medium min-w-[120px]">Base UoM</th>
+                    <th className="h-10 px-2 text-left font-medium min-w-[120px]">Sub UoM</th>
+                    <th className="h-10 px-2 text-left font-medium min-w-[150px]">Base UoM Purchase</th>
+                    <th className="h-10 px-2 text-left font-medium min-w-[150px]">Sub UoM Purchase</th>
+                    <th className="h-10 px-2 text-left font-medium min-w-[80px]">Status</th>
+                    <th className="h-10 px-2 text-left font-medium min-w-[60px]">Image</th>
+                    <th className="h-10 px-2 text-left font-medium min-w-[120px]">Remark</th>
+                    <th className="h-10 px-2 text-right font-medium min-w-[80px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
