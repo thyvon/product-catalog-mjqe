@@ -862,7 +862,6 @@ export default function PmProductFormPage() {
                         </TableHead>
                       ))}
                     <TableHead className="min-w-[130px]">Item Code (SKU)</TableHead>
-                    <TableHead className="w-[320px]">Description</TableHead>
                     <TableHead className="min-w-[110px]">Base UoM</TableHead>
                     <TableHead className="min-w-[110px]">Sub UoM</TableHead>
                     <TableHead className="min-w-[110px]">Base UoM Purchase</TableHead>
@@ -903,9 +902,6 @@ export default function PmProductFormPage() {
                             onChange={(e) => updateRow(key, { sku: e.target.value })}
                             className="h-8 font-mono text-xs"
                           />
-                        </TableCell>
-                        <TableCell className="whitespace-normal break-words align-top text-xs">
-                          {`${name.trim() || "Product"}${label ? ` — ${label}` : ""}`}
                         </TableCell>
                         <TableCell>
                           <SelectField
@@ -1091,15 +1087,6 @@ export default function PmProductFormPage() {
                           placeholder={genSku(variantRows.length)}
                           className="h-8 font-mono text-xs"
                         />
-                      </TableCell>
-                      <TableCell className="whitespace-normal break-words align-top text-xs">
-                        {`${name.trim() || "Product"}${templateIds.map((tid) => {
-                          const d = rowDraft[tid];
-                          const val = d?.valueId
-                            ? templates.find((x) => x.id === tid)?.values?.find((v) => v.id === d.valueId)?.name
-                            : d?.text?.trim();
-                          return val ? ` — ${val}` : "";
-                        }).join("")}`}
                       </TableCell>
                       <TableCell>
                         <SelectField
