@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowLeft, ImagePlus, Loader2, Plus, Save, Search, Spark
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import PageContent from "@/features/shared/components/PageContent";
@@ -39,6 +40,83 @@ import type {
   PMVariationTemplate,
   PMVariationTemplateValue,
 } from "@/features/shared/types";
+
+function ProductFormSkeleton() {
+  return (
+    <PageContent maxWidth="full" className="bg-background">
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Skeleton className="size-9 rounded-md" />
+            <div className="space-y-1.5">
+              <Skeleton className="h-6 w-28" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-5 w-28" />
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.3fr_1fr]">
+              <div>
+                <Skeleton className="h-4 w-36" />
+                <div className="mt-2 space-y-4">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <div className="flex gap-1.5">
+                      <Skeleton className="h-9 flex-1" />
+                      <Skeleton className="size-9 shrink-0" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-[76px] w-full" />
+                  </div>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-[76px] w-full" />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Skeleton className="h-4 w-28" />
+                <div className="mt-2 space-y-4">
+                  {["h-4 w-20", "h-4 w-16", "h-4 w-24", "h-4 w-16", "h-4 w-28", "h-4 w-16", "h-4 w-12", "h-4 w-12"].map((size, i) => (
+                    <div key={i} className="space-y-2">
+                      <Skeleton className={size} />
+                      <div className="flex gap-1.5">
+                        <Skeleton className="h-9 flex-1" />
+                        {i < 5 && <Skeleton className="size-9 shrink-0" />}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-4 w-20" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-48 w-full rounded-lg" />
+          </CardContent>
+        </Card>
+
+        <div className="flex items-center justify-end gap-2">
+          <Skeleton className="h-9 w-20" />
+          <Skeleton className="h-9 w-32" />
+        </div>
+      </div>
+    </PageContent>
+  );
+}
 
 type ProductType = "single" | "variation";
 
@@ -545,6 +623,8 @@ export default function PmProductFormPage() {
       setSaving(false);
     }
   };
+
+  if (loading) return <ProductFormSkeleton />;
 
   return (
     <PageContent maxWidth="full" className="bg-background">
