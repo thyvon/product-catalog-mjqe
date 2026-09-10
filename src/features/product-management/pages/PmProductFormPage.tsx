@@ -839,8 +839,8 @@ export default function PmProductFormPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <Table className="w-fit">
+            <div className="rounded-lg border border-border">
+              <Table className="table-auto">
                 <TableHeader className="bg-muted/60">
                   <TableRow>
                     <TableHead className="w-12">No.</TableHead>
