@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, ImagePlus, Loader2, Plus, Save, Search, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowLeft, ImagePlus, Loader2, Plus, Save, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,6 @@ import {
 import type {
   PMBrand,
   PMCategory,
-  PMProduct,
   PMProductGroup,
   PMUom,
   PMVariant,
@@ -162,8 +161,7 @@ export default function PmProductFormPage() {
 
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
-  const [nameMatches, setNameMatches] = useState<PMProduct[]>([]);
-  const [nameChecking, setNameChecking] = useState(false);
+
   const [categoryId, setCategoryId] = useState("");
   const [subCategoryId, setSubCategoryId] = useState("");
   const [productGroupId, setProductGroupId] = useState("");
@@ -272,26 +270,7 @@ export default function PmProductFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, toast]);
 
-  useEffect(() => {
-    const q = name.trim();
-    if (q.length < 2) {
-      setNameMatches([]);
-      setNameChecking(false);
-      return;
-    }
-    setNameChecking(true);
-    const timer = setTimeout(async () => {
-      try {
-        const result = await pmProducts({ search: q, pageSize: "5" });
-        setNameMatches(result.data.filter((p) => p.id !== id));
-      } catch {
-        setNameMatches([]);
-      } finally {
-        setNameChecking(false);
-      }
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [name, id]);
+
 
   // ── Category cascade ──
   const categoryIds = useMemo(() => new Set(categories.map((c) => c.id)), [categories]);
@@ -686,40 +665,6 @@ export default function PmProductFormPage() {
                       placeholder="Khmer description..."
                       rows={3}
                     />
-                    {nameChecking && (
-                      <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Search className="size-3.5" />
-                        Checking for existing products...
-                      </p>
-                    )}
-                    {!nameChecking && nameMatches.length > 0 && (
-                      <div className="mt-1.5 space-y-1.5 rounded-lg border border-amber-300/60 bg-amber-50/60 px-3 py-2 dark:border-amber-500/30 dark:bg-amber-500/10">
-                        <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400">
-                          <AlertTriangle className="size-3.5" />
-                          {nameMatches.some((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase())
-                            ? "A product with this exact description already exists."
-                            : "Similar existing products found."}
-                        </p>
-                        {nameMatches.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            className="flex w-full items-center justify-between gap-3 rounded-md border border-border bg-background px-2.5 py-1.5 text-left text-xs hover:bg-muted"
-                            onClick={() => navigate(`/product-management/products/${p.id}/edit`)}
-                          >
-                            <span className="min-w-0 truncate">
-                              <span className="font-medium text-foreground">{p.name}</span>
-                              <span className="ml-1.5 text-muted-foreground">
-                                {p.code} · {p.product_group_name || "No group"}
-                              </span>
-                            </span>
-                            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                              {p.status} · {p.variant_count ?? 0} variant{p.variant_count === 1 ? "" : "s"}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </Field>
                   <Field label="EN Description" wide>
                     <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="English description..." />
