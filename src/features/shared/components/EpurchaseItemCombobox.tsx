@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check } from "lucide-react";
 import {
   Combobox,
   ComboboxContent,
@@ -130,7 +129,6 @@ export default function EpurchaseItemCombobox({
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs font-medium">{item.code}</span>
-                  {value === item.code && <Check className="size-3.5 shrink-0 text-primary" />}
                 </div>
                 <span className="text-xs text-muted-foreground">{item.description}</span>
               </div>
