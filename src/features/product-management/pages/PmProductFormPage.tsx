@@ -694,6 +694,7 @@ export default function PmProductFormPage() {
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Khmer description..."
                       rows={3}
+                      autoComplete="off"
                     />
                   </Field>
                   <Field label="EN Description" wide>
