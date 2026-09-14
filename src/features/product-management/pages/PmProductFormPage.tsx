@@ -697,7 +697,7 @@ export default function PmProductFormPage() {
                     />
                   </Field>
                   <Field label="EN Description" wide>
-                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="English description..." />
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="English description..." autoComplete="off" />
                   </Field>
                   {productType === "single" && (
                     <Field label="Product Image" wide>
