@@ -115,7 +115,7 @@ export default function EpurchaseItemCombobox({
         showClear={!!value}
         className={className}
       />
-      <ComboboxContent>
+      <ComboboxContent className="min-w-80">
         {sessionError && filtered.length === 0 && (
           <ComboboxEmpty>
             <span className="text-muted-foreground">Type an item code manually</span>
