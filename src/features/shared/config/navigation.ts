@@ -22,7 +22,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/catalog", label: "Catalog", icon: ShoppingBag },
-  { to: "/company-items", label: "Company Items", icon: Globe },
+  { to: "/company-items", label: "E-Purchase Item", icon: Globe },
   { to: "/product-management", label: "Product Management", icon: PackageSearch },
   { to: "/supplier-register", label: "Supplier Register", icon: Building2 },
   { to: "/supplier-docs", label: "Supplier Docs", icon: FileText },
