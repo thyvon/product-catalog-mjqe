@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ImagePlus, Loader2, Plus, Save, Trash2, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -140,6 +141,7 @@ interface VariantRow {
   values: Record<string, string>; // templateId -> valueId
   sku: string;
   epurchaseItemCode: string;
+  epurchaseDescription: string;
   remark: string;
   baseUom: string;
   subUom: string;
@@ -266,6 +268,7 @@ export default function PmProductFormPage() {
               values,
               sku: v.sku ?? "",
               epurchaseItemCode: v.epurchase_item_code ?? "",
+              epurchaseDescription: "",
               remark: v.description ?? "",
               baseUom: product.uom_id ?? "",
               subUom: v.sub_unit_id ?? "",
@@ -456,6 +459,7 @@ export default function PmProductFormPage() {
           values,
           sku: newRowFields.sku?.trim() || genSku(prev.length),
           epurchaseItemCode: "",
+          epurchaseDescription: "",
           remark: newRowFields.remark?.trim() ?? "",
           baseUom: newRowFields.baseUom || uomId || "",
           subUom: newRowFields.subUom || "",
@@ -515,6 +519,7 @@ export default function PmProductFormPage() {
                 values: {},
                 sku: `${(code.trim() || "CO").toUpperCase()}-001`,
                 epurchaseItemCode: "",
+                epurchaseDescription: "",
                 remark: "",
                 baseUom: uomId ?? "",
                 subUom: subUnitId ?? "",
@@ -968,17 +973,30 @@ export default function PmProductFormPage() {
                             );
                           })}
                         <td className="p-2 align-middle">
-                          <EpurchaseItemCombobox
-                            value={row.sku}
-                            onChange={(v) => {
-                              updateRow(key, { sku: v, epurchaseItemCode: v });
-                            }}
-                            onSelectItem={(item) => {
-                              updateRow(key, { remark: item.description });
-                            }}
-                            placeholder="Select item..."
-                            className="h-8 text-xs"
-                          />
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <div>
+                                  <EpurchaseItemCombobox
+                                    value={row.sku}
+                                    onChange={(v) => {
+                                      updateRow(key, { sku: v, epurchaseItemCode: v, epurchaseDescription: "" });
+                                    }}
+                                    onSelectItem={(item) => {
+                                      updateRow(key, { remark: item.description, epurchaseDescription: item.description });
+                                    }}
+                                    placeholder="Select item..."
+                                    className="h-8 text-xs"
+                                  />
+                                </div>
+                              }
+                            />
+                            {row.epurchaseDescription && (
+                              <TooltipContent side="top" className="max-w-xs">
+                                <p className="text-xs">{row.epurchaseDescription}</p>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
                         </td>
                         <td className="p-2 align-middle">
                           <SelectField
