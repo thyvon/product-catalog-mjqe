@@ -688,17 +688,19 @@ export default function PmProductFormPage() {
                       </div>
                     </Field>
                   )}
-                  <Field label="KH Description" wide>
+                   <Field label="KH Description" wide>
                     <Textarea
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Khmer description..."
                       rows={3}
                       autoComplete="new-password"
+                      name="pm_kh_desc_no_autofill"
+                      id="pm_kh_desc_no_autofill"
                     />
                   </Field>
                   <Field label="EN Description" wide>
-                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="English description..." autoComplete="new-password" />
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="English description..." autoComplete="new-password" name="pm_en_desc_no_autofill" id="pm_en_desc_no_autofill" />
                   </Field>
                   {productType === "single" && (
                     <Field label="Product Image" wide>
