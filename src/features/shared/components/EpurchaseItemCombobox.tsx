@@ -132,7 +132,7 @@ export default function EpurchaseItemCombobox({
                   <span className="font-mono text-xs font-medium">{item.code}</span>
                   {value === item.code && <Check className="size-3.5 shrink-0 text-primary" />}
                 </div>
-                <span className="truncate text-xs text-muted-foreground">{item.description}</span>
+                <span className="text-xs text-muted-foreground">{item.description}</span>
               </div>
             </ComboboxItem>
           ))}
