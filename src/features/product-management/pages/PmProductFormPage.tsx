@@ -986,7 +986,7 @@ export default function PmProductFormPage() {
                                       updateRow(key, { remark: item.description, epurchaseDescription: item.description });
                                     }}
                                     placeholder="Select item..."
-                                    className="h-8 text-xs"
+                                    className="h-8 w-64 text-xs"
                                   />
                                 </div>
                               }
