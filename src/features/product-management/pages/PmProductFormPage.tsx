@@ -694,11 +694,11 @@ export default function PmProductFormPage() {
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Khmer description..."
                       rows={3}
-                      autoComplete="off"
+                      autoComplete="new-password"
                     />
                   </Field>
                   <Field label="EN Description" wide>
-                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="English description..." autoComplete="off" />
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="English description..." autoComplete="new-password" />
                   </Field>
                   {productType === "single" && (
                     <Field label="Product Image" wide>
