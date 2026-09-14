@@ -38,6 +38,7 @@ export default function EpurchaseItemCombobox({
   const [loading, setLoading] = useState(false);
   const [sessionError, setSessionError] = useState(false);
   const loadedRef = useRef(false);
+  const syncDoneRef = useRef(false);
 
   const loadItems = useCallback(async (search?: string) => {
     setLoading(true);
@@ -60,7 +61,19 @@ export default function EpurchaseItemCombobox({
 
   useEffect(() => {
     setQuery(value || "");
+    syncDoneRef.current = false;
   }, [value]);
+
+  // When items load and value exists, fire onSelectItem once so parent can auto-fill description
+  useEffect(() => {
+    if (loadedRef.current && value && onSelectItem && !syncDoneRef.current) {
+      const matched = items.find((i) => i.code === value);
+      if (matched) {
+        syncDoneRef.current = true;
+        onSelectItem(matched);
+      }
+    }
+  }, [items, value, onSelectItem]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
