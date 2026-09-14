@@ -29,6 +29,7 @@ import {
   pmUoms,
   pmVariationTemplates,
   pmSaveVariationTemplate,
+  fetchEpurchaseItemCodes,
 } from "@/features/product-management/api";
 import type {
   PMBrand,
@@ -174,6 +175,7 @@ export default function PmProductFormPage() {
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
   const [epurchaseItemCode, setEpurchaseItemCode] = useState(searchParams.get("epurchase_item_code") || "");
+  const [epurchaseDescription, setEpurchaseDescription] = useState("");
 
   const [variants, setVariants] = useState<PMVariant[]>([]);
   const [templateIds, setTemplateIds] = useState<string[]>([]);
@@ -239,6 +241,15 @@ export default function PmProductFormPage() {
           setEpurchaseItemCode(product.epurchase_item_code ?? "");
           setVariants(product.variants ?? []);
           setTemplateIds(product.variation_template_ids ?? []);
+
+          // Fetch original E-Purchase description if linked
+          if (product.epurchase_item_code) {
+            try {
+              const epItems = await fetchEpurchaseItemCodes(product.epurchase_item_code);
+              const match = epItems.find((i) => i.code === product.epurchase_item_code);
+              if (match) setEpurchaseDescription(match.description);
+            } catch { /* ignore */ }
+          }
           if (toProductType(product.product_type) === "single") {
             setSingleImageUrl(product.variants?.[0]?.image_url ?? "");
           }
@@ -656,13 +667,22 @@ export default function PmProductFormPage() {
                       onChange={(v) => {
                         setCode(v);
                         if (v) setEpurchaseItemCode(v);
+                        else setEpurchaseDescription("");
                       }}
                       onSelectItem={(item) => {
                         setName(item.description);
+                        setEpurchaseDescription(item.description);
                       }}
                       placeholder="Select E-Purchase item code..."
                     />
                   </Field>
+                  {epurchaseDescription && (
+                    <Field label="E-Purchase Description (Original)" wide>
+                      <div className="rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                        {epurchaseDescription}
+                      </div>
+                    </Field>
+                  )}
                   <Field label="KH Description" wide>
                     <Textarea
                       value={name}
