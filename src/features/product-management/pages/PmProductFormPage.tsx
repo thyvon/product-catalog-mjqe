@@ -180,7 +180,6 @@ export default function PmProductFormPage() {
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [singleImageUrl, setSingleImageUrl] = useState("");
-
   const [quickAdd, setQuickAdd] = useState<SimpleEntity | null>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [addingRow, setAddingRow] = useState(false);
@@ -188,6 +187,15 @@ export default function PmProductFormPage() {
   const [rowDraft, setRowDraft] = useState<Record<string, { valueId?: string }>>({});
   const [newRowFields, setNewRowFields] = useState<Record<string, string>>({});
   const imageInputRef = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // When opening from E-Purchase page with query param, auto-set code + name
+  useEffect(() => {
+    const epCode = searchParams.get("epurchase_item_code");
+    if (epCode && !isEdit) {
+      setCode(epCode);
+      setEpurchaseItemCode(epCode);
+    }
+  }, [searchParams, isEdit]);
 
   const loadTemplates = async (): Promise<PMVariationTemplate[]> => {
     try {
