@@ -14,6 +14,7 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   MAIL_FROM: z.string().optional(),
+  COMPANY_API_URL: z.string().default("http://esign.mjqe.com.kh"),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -9,7 +9,7 @@ import { FormLabel } from "@/features/shared/components/FormLabel";
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -20,18 +20,18 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
 
-    if (!username.trim() || !password.trim()) {
-      setError("Please enter username and password.");
+    if (!employeeId.trim() || !password.trim()) {
+      setError("Please enter employee ID and password.");
       return;
     }
 
     setLoading(true);
     try {
-      const success = await login(username, password);
+      const success = await login(employeeId, password);
       if (success) {
         navigate("/", { replace: true });
       } else {
-        setError("Invalid username or password.");
+        setError("Invalid employee ID or password.");
       }
     } catch {
       setError("Login failed. Please try again.");
@@ -63,12 +63,12 @@ export default function LoginPage() {
           )}
 
           <div>
-            <FormLabel variant="mono">Username</FormLabel>
+            <FormLabel variant="mono">Employee ID</FormLabel>
             <Input
               type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
+              value={employeeId}
+              onChange={(e) => setEmployeeId(e.target.value)}
+              placeholder="Enter your employee ID"
               autoFocus
             />
           </div>

@@ -36,6 +36,7 @@ const PmProductFormPage = lazy(() => import('@/features/product-management/pages
 const SettingsPage = lazy(() => import('@/features/settings/pages/SettingsPage'));
 const ContactsPage = lazy(() => import('@/features/debit-notes/pages/ContactsPage'));
 const UserManagementPage = lazy(() => import('@/features/users/pages/UserManagementPage'));
+const CompanyItemsPage = lazy(() => import('@/features/company-products/pages/CompanyItemsPage'));
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -60,6 +61,7 @@ createRoot(document.getElementById('root')!).render(
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/dashboard" element={<Navigate to="/" replace />} />
                   <Route path="/catalog" element={<CatalogPage />} />
+                  <Route path="/company-items" element={<CompanyItemsPage />} />
                   <Route path="/product-management" element={<ProductManagementPage />} />
                   <Route path="/product-management/products/new" element={<PmProductFormPage />} />
                   <Route path="/product-management/products/:id/edit" element={<PmProductFormPage />} />

@@ -496,6 +496,7 @@ async function createTables(p: mysql.Pool) {
     updated_at VARCHAR(40) NOT NULL,
     PRIMARY KEY (product_id, field_name)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
 }
 
 async function migrateSchema(p: mysql.Pool) {

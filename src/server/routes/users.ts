@@ -5,13 +5,51 @@ import { getPool, assertDb } from "../db.js";
 
 const router = Router();
 
+// ─── Sync company API user into local DB ───
+router.post("/api/users/sync", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const { employeeId, cardId, name, email, position, avatarUrl } = req.body;
+    if (!employeeId) {
+      return res.status(400).json({ error: "employeeId is required." });
+    }
+    const now = new Date().toISOString();
+    const [existing] = await p.execute<RowDataPacket[]>(
+      "SELECT id FROM users WHERE username = ? OR (card_id IS NOT NULL AND card_id != '' AND card_id = ?)",
+      [employeeId, cardId || ""]
+    );
+    if (existing.length > 0) {
+      await p.execute(
+        "UPDATE users SET username = ?, fullName = ?, email = ?, position = ?, avatarUrl = ?, card_id = ?, updatedAt = ? WHERE id = ?",
+        [employeeId, name || "", email || "", position || "", avatarUrl || "", cardId || "", now, existing[0].id]
+      );
+    } else {
+      const id = `usr-${crypto.randomUUID()}`;
+      await p.execute(
+        `INSERT INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, card_id, smtp_pass, createdAt, updatedAt)
+         VALUES (?, ?, '', 'User', ?, ?, '', ?, '', ?, '', ?, ?, ?)`,
+        [id, employeeId, name || "", email || "", position || "", avatarUrl || "", cardId || "", now, now]
+      );
+    }
+    const [rows] = await p.execute<RowDataPacket[]>(
+      "SELECT id, username, role, fullName, email, phone, position, telegramId, avatarUrl, card_id, smtp_pass, createdAt, updatedAt FROM users WHERE username = ?",
+      [employeeId]
+    );
+    res.json(rows[0] || { success: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to sync user.";
+    res.status(500).json({ error: message });
+  }
+});
+
 // ─── List all users ───
 router.get("/api/users", async (_req, res) => {
   try {
     assertDb();
     const p = getPool()!;
     const [rows] = await p.execute<RowDataPacket[]>(
-      "SELECT id, username, role, fullName, email, phone, position, telegramId, avatarUrl, createdAt, updatedAt FROM users ORDER BY createdAt DESC"
+      "SELECT id, username, role, fullName, email, phone, position, telegramId, createdAt, updatedAt FROM users ORDER BY createdAt DESC"
     );
     res.json(rows);
   } catch {

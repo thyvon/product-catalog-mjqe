@@ -264,7 +264,6 @@ export default function StockIssueItemsPage() {
     {
       accessorKey: "transactionDate",
       header: "Date",
-      meta: { width: "110px" },
       cell: ({ row }) => (
         <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
           {row.original.transactionDate
@@ -276,7 +275,6 @@ export default function StockIssueItemsPage() {
     {
       accessorKey: "itemCode",
       header: "Item Code",
-      meta: { width: "140px" },
       cell: ({ row }) => (
         <span className="px-2 py-0.5 bg-primary text-primary-foreground rounded font-semibold font-mono tracking-wider text-xs whitespace-nowrap">
           {row.original.itemCode}
@@ -295,7 +293,7 @@ export default function StockIssueItemsPage() {
     {
       accessorKey: "quantity",
       header: "Qty",
-      meta: { align: "right", width: "64px" },
+      meta: { align: "right" },
       cell: ({ row }) => (
         <span className="font-mono font-bold text-sm text-foreground">{row.original.quantity}</span>
       ),
@@ -303,7 +301,6 @@ export default function StockIssueItemsPage() {
     {
       accessorKey: "uom",
       header: "UoM",
-      meta: { width: "60px" },
       cell: ({ row }) => (
         <Badge variant="outline" className="font-mono text-xs uppercase px-1.5">
           {row.original.uom}
@@ -313,7 +310,7 @@ export default function StockIssueItemsPage() {
     {
       accessorKey: "unitPrice",
       header: "Unit Price",
-      meta: { align: "right", width: "110px" },
+      meta: { align: "right" },
       cell: ({ row }) => (
         <span className="font-mono text-sm text-muted-foreground">{formatAmount(Number(row.original.unitPrice))}</span>
       ),
@@ -321,19 +318,18 @@ export default function StockIssueItemsPage() {
     {
       accessorKey: "totalPrice",
       header: "Total",
-      meta: { align: "right", width: "120px" },
+      meta: { align: "right" },
       cell: ({ row }) => (
         <span className="font-mono font-bold text-sm text-foreground">{formatAmount(Number(row.original.totalPrice))}</span>
       ),
     },
-    { accessorKey: "warehouse", header: "Warehouse", meta: { width: "120px", className: "text-sm text-muted-foreground truncate max-w-[120px]" } },
-    { accessorKey: "department", header: "Dept", meta: { width: "100px", className: "text-sm text-muted-foreground truncate max-w-[100px]" } },
-    { accessorKey: "campus", header: "Campus", meta: { width: "90px", className: "text-sm text-muted-foreground truncate max-w-[90px]" } },
-    { accessorKey: "requesterName", header: "Requester", meta: { width: "120px", className: "text-sm text-muted-foreground truncate max-w-[120px]" } },
+    { accessorKey: "warehouse", header: "Warehouse", meta: { className: "text-sm text-muted-foreground" } },
+    { accessorKey: "department", header: "Dept", meta: { className: "text-sm text-muted-foreground" } },
+    { accessorKey: "campus", header: "Campus", meta: { className: "text-sm text-muted-foreground" } },
+    { accessorKey: "requesterName", header: "Requester", meta: { className: "text-sm text-muted-foreground" } },
     {
       accessorKey: "transactionType",
       header: "Type",
-      meta: { width: "90px" },
       cell: ({ row }) => row.original.transactionType ? (
         <Badge variant="secondary" className="text-xs font-medium uppercase tracking-wide">
           {row.original.transactionType}
@@ -343,7 +339,6 @@ export default function StockIssueItemsPage() {
     {
       accessorKey: "referenceNo",
       header: "Ref.No",
-      meta: { width: "130px" },
       cell: ({ row }) => (
         <span className="font-mono text-xs text-muted-foreground whitespace-nowrap">{row.original.referenceNo || "—"}</span>
       ),
@@ -351,7 +346,6 @@ export default function StockIssueItemsPage() {
     {
       accessorKey: "accountCode",
       header: "Account",
-      meta: { width: "110px" },
       cell: ({ row }) => (
         <span className="font-mono text-xs text-muted-foreground truncate block max-w-[110px]" title={row.original.accountCode}>
           {row.original.accountCode || "—"}
@@ -370,7 +364,7 @@ export default function StockIssueItemsPage() {
     {
       id: "actions",
       header: "",
-      meta: { align: "right", width: "80px" },
+      meta: { align: "right" },
       cell: ({ row }) => {
         const item = row.original;
         return (
@@ -498,6 +492,7 @@ export default function StockIssueItemsPage() {
         />
 
         <DataTable<StockIssueItem>
+          tableLayout="auto"
           columns={columns}
           data={items}
           loading={loading}

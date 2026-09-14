@@ -74,8 +74,8 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       setProfile(data);
       updateProfile({ fullName: data.fullName });
       toast.success("Profile updated successfully");
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSaving(false);
     }
