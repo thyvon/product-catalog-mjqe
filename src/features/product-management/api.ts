@@ -75,3 +75,17 @@ export const pmDeleteVariationTemplate = (id: string) => api.delete(`/api/pm/var
 
 export const pmSaveStandardItem = (body: Record<string, unknown>) => api.post("/api/pm/standard-items", body);
 export const pmDeleteStandardItem = (id: string) => api.delete(`/api/pm/standard-items/${id}`);
+
+export const pmLinkedEpurchaseCodes = () => api.get<string[]>("/api/pm/products/linked-epurchase-codes");
+
+export const fetchEpurchaseItemCodes = async (search?: string): Promise<{ code: string; description: string }[]> => {
+  const userId = JSON.parse(localStorage.getItem("auth_user") || "{}")?.id;
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  const qs = params.toString();
+  const res = await fetch(`/api/company/items/codes${qs ? `?${qs}` : ""}`, {
+    headers: { "X-User-Id": String(userId || "") },
+  });
+  if (!res.ok) throw new Error("Failed to fetch E-Purchase items");
+  return res.json();
+};

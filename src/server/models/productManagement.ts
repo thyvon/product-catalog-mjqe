@@ -380,9 +380,9 @@ export async function getProductsPaginated(opts: {
   const params: any[] = [];
 
   if (search) {
-    conditions.push("(p.name LIKE ? OR p.code LIKE ? OR g.name LIKE ? OR b.name LIKE ?)");
+    conditions.push("(p.name LIKE ? OR p.code LIKE ? OR g.name LIKE ? OR b.name LIKE ? OR p.epurchase_item_code LIKE ?)");
     const like = `%${search}%`;
-    params.push(like, like, like, like);
+    params.push(like, like, like, like, like);
   }
   if (groupId) {
     conditions.push("p.product_group_id = ?");
@@ -496,15 +496,16 @@ export async function upsertProduct(product: any): Promise<void> {
   assertDb();
   const p = getPool()!;
   await p.execute(
-    `INSERT INTO pm_products (id, product_group_id, category_id, brand_id, uom_id, sub_unit_id, code, name, product_type, is_variable,
+    `INSERT INTO pm_products (id, product_group_id, category_id, brand_id, uom_id, sub_unit_id, epurchase_item_code, code, name, product_type, is_variable,
        purchase_price, sub_unit_purchase_price, image_url, description, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         product_group_id = VALUES(product_group_id),
         category_id = VALUES(category_id),
         brand_id = VALUES(brand_id),
         uom_id = VALUES(uom_id),
         sub_unit_id = VALUES(sub_unit_id),
+        epurchase_item_code = VALUES(epurchase_item_code),
         code = VALUES(code),
         name = VALUES(name),
         product_type = VALUES(product_type),
@@ -522,6 +523,7 @@ export async function upsertProduct(product: any): Promise<void> {
       product.brand_id || null,
       product.uom_id || null,
       product.sub_unit_id || null,
+      product.epurchase_item_code || null,
       product.code,
       product.name,
       product.product_type || "single",
@@ -615,12 +617,13 @@ export async function upsertVariant(variant: any): Promise<void> {
   assertDb();
   const p = getPool()!;
   await p.execute(
-    `INSERT INTO pm_product_variants (id, product_id, sku, name, description, variation_value_ids, sub_unit_id,
+    `INSERT INTO pm_product_variants (id, product_id, sku, epurchase_item_code, name, description, variation_value_ids, sub_unit_id,
        purchase_price, sub_unit_purchase_price, image_url, is_active, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         product_id = VALUES(product_id),
         sku = VALUES(sku),
+        epurchase_item_code = VALUES(epurchase_item_code),
         name = VALUES(name),
         description = VALUES(description),
         variation_value_ids = VALUES(variation_value_ids),
@@ -635,6 +638,7 @@ export async function upsertVariant(variant: any): Promise<void> {
       variant.id,
       variant.product_id,
       variant.sku,
+      variant.epurchase_item_code || null,
       variant.name,
       variant.description || "",
       variant.variation_value_ids
@@ -1126,6 +1130,21 @@ export async function getComboCandidateProducts(): Promise<any[]> {
     ...product,
     variations: variantMap[product.id] ?? [],
   }));
+}
+
+export async function getLinkedEpurchaseItemCodes(): Promise<string[]> {
+  const p = getPool();
+  if (!p || !isDbReady()) return [];
+  const [productRows] = await p.query<RowDataPacket[]>(
+    "SELECT epurchase_item_code FROM pm_products WHERE epurchase_item_code IS NOT NULL AND epurchase_item_code != ''"
+  );
+  const [variantRows] = await p.query<RowDataPacket[]>(
+    "SELECT epurchase_item_code FROM pm_product_variants WHERE epurchase_item_code IS NOT NULL AND epurchase_item_code != ''"
+  );
+  const codes = new Set<string>();
+  for (const r of productRows) codes.add(r.epurchase_item_code);
+  for (const r of variantRows) codes.add(r.epurchase_item_code);
+  return [...codes];
 }
 
 export { newId, coerceBool };

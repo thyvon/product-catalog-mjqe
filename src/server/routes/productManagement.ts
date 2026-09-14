@@ -69,6 +69,7 @@ import {
   getProductCustomFields,
   replaceProductCustomFields,
   getComboCandidateProducts,
+  getLinkedEpurchaseItemCodes,
 } from "../models/productManagement.js";
 
 const router = Router();
@@ -142,6 +143,18 @@ router.get("/api/pm/refs", async (_req, res) => {
   } catch (err: any) {
     console.error("Error fetching product management refs:", err);
     res.status(500).json({ error: "Failed to fetch references." });
+  }
+});
+
+// ─── Linked E-Purchase item codes ───
+
+router.get("/api/pm/products/linked-epurchase-codes", async (_req, res) => {
+  try {
+    const codes = await getLinkedEpurchaseItemCodes();
+    res.json(codes);
+  } catch (err: any) {
+    console.error("Error fetching linked e-purchase codes:", err);
+    res.status(500).json({ error: "Failed to fetch linked codes." });
   }
 });
 
@@ -542,6 +555,7 @@ function buildProductRow(input: any, existing: any = {}): any {
     brand_id: input.brand_id !== undefined ? (input.brand_id || null) : existing.brand_id,
     uom_id: input.uom_id !== undefined ? (input.uom_id || null) : existing.uom_id,
     sub_unit_id: input.sub_unit_id !== undefined ? (input.sub_unit_id || null) : existing.sub_unit_id,
+    epurchase_item_code: input.epurchase_item_code !== undefined ? (input.epurchase_item_code || null) : (existing.epurchase_item_code ?? null),
     code: input.code !== undefined ? String(input.code).toUpperCase().trim() : existing.code,
     name: input.name !== undefined ? String(input.name).trim() : existing.name,
     product_type: productType,

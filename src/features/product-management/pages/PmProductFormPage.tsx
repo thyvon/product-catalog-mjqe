@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ImagePlus, Loader2, Plus, Save, Sparkles, Trash2, X } from "lucide-react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft, ImagePlus, Loader2, Plus, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { Field } from "@/features/shared/components/Field";
 import { FormLabel } from "@/features/shared/components/FormLabel";
 import SelectField from "@/features/shared/components/SelectField";
 import CreatableCombobox from "@/features/shared/components/CreatableCombobox";
-import TextField from "@/features/shared/components/TextField";
+import EpurchaseItemCombobox from "@/features/shared/components/EpurchaseItemCombobox";
 import MultiSelectCombobox from "@/features/shared/components/MultiSelectCombobox";
 import { useToast } from "@/features/shared/components/Toast";
 import PmSimpleFormModal, { type SimpleEntity } from "@/features/product-management/components/PmSimpleFormModal";
@@ -138,6 +138,7 @@ interface VariantRow {
   uid: string;
   values: Record<string, string>; // templateId -> valueId
   sku: string;
+  epurchaseItemCode: string;
   remark: string;
   baseUom: string;
   subUom: string;
@@ -149,6 +150,7 @@ interface VariantRow {
 export default function PmProductFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const isEdit = !!id;
 
@@ -171,6 +173,7 @@ export default function PmProductFormPage() {
   const [productType, setProductType] = useState<ProductType>("single");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
+  const [epurchaseItemCode, setEpurchaseItemCode] = useState(searchParams.get("epurchase_item_code") || "");
 
   const [variants, setVariants] = useState<PMVariant[]>([]);
   const [templateIds, setTemplateIds] = useState<string[]>([]);
@@ -225,6 +228,7 @@ export default function PmProductFormPage() {
           setProductType(toProductType(product.product_type));
           setDescription(product.description ?? "");
           setStatus(product.status ?? "Active");
+          setEpurchaseItemCode(product.epurchase_item_code ?? "");
           setVariants(product.variants ?? []);
           setTemplateIds(product.variation_template_ids ?? []);
           if (toProductType(product.product_type) === "single") {
@@ -242,6 +246,7 @@ export default function PmProductFormPage() {
               uid: v.id ?? `row-${i}`,
               values,
               sku: v.sku ?? "",
+              epurchaseItemCode: v.epurchase_item_code ?? "",
               remark: v.description ?? "",
               baseUom: product.uom_id ?? "",
               subUom: v.sub_unit_id ?? "",
@@ -431,6 +436,7 @@ export default function PmProductFormPage() {
           uid: `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           values,
           sku: newRowFields.sku?.trim() || genSku(prev.length),
+          epurchaseItemCode: "",
           remark: newRowFields.remark?.trim() ?? "",
           baseUom: newRowFields.baseUom || uomId || "",
           subUom: newRowFields.subUom || "",
@@ -489,6 +495,7 @@ export default function PmProductFormPage() {
                 uid: "__single__",
                 values: {},
                 sku: `${(code.trim() || "CO").toUpperCase()}-001`,
+                epurchaseItemCode: "",
                 remark: "",
                 baseUom: uomId ?? "",
                 subUom: subUnitId ?? "",
@@ -550,6 +557,7 @@ export default function PmProductFormPage() {
           product_type: productType,
           is_variable: productType === "variation",
           variation_template_ids: productType === "variation" ? templateIds : [],
+          epurchase_item_code: epurchaseItemCode || null,
           description,
           status,
         },
@@ -578,6 +586,7 @@ export default function PmProductFormPage() {
             status: "Active",
             ...(productType === "variation" ? { variation_value_ids: valueIds } : {}),
             sub_unit_id: row.subUom || null,
+            epurchase_item_code: row.epurchaseItemCode || null,
             purchase_price:
               row.basePurchase !== "" && !Number.isNaN(Number(row.basePurchase)) ? Number(row.basePurchase) : null,
             sub_unit_purchase_price:
@@ -634,28 +643,17 @@ export default function PmProductFormPage() {
                 <FormLabel>Product Description</FormLabel>
                 <div className="mt-2 space-y-4">
                   <Field label="Product Code" wide>
-                    <div className="flex gap-1.5">
-                      <div className="flex-1">
-                        <TextField
-                          value={code}
-                          onChange={(e) => setCode(e.target.value.toUpperCase())}
-                          placeholder="Auto-generated if blank"
-                          className="font-mono"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="shrink-0"
-                        onClick={() => name.trim() && setCode(autoCode(name.trim()))}
-                        disabled={!name.trim()}
-                        aria-label="Generate product code from description"
-                        title="Generate code from description"
-                      >
-                        <Sparkles className="size-4" />
-                      </Button>
-                    </div>
+                    <EpurchaseItemCombobox
+                      value={code}
+                      onChange={(v) => {
+                        setCode(v);
+                        if (v) setEpurchaseItemCode(v);
+                      }}
+                      onSelectItem={(item) => {
+                        setName(item.description);
+                      }}
+                      placeholder="Select E-Purchase item code..."
+                    />
                   </Field>
                   <Field label="KH Description" wide>
                     <Textarea
@@ -942,10 +940,16 @@ export default function PmProductFormPage() {
                             );
                           })}
                         <td className="p-2 align-middle">
-                          <TextField
+                          <EpurchaseItemCombobox
                             value={row.sku}
-                            onChange={(e) => updateRow(key, { sku: e.target.value })}
-                            className="h-8 font-mono text-xs"
+                            onChange={(v) => {
+                              updateRow(key, { sku: v, epurchaseItemCode: v });
+                            }}
+                            onSelectItem={(item) => {
+                              updateRow(key, { remark: item.description });
+                            }}
+                            placeholder="Select item..."
+                            className="h-8 text-xs"
                           />
                         </td>
                         <td className="p-2 align-middle">

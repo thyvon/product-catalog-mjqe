@@ -157,6 +157,14 @@ export default function PmProductsTab({ productGroups, brands, refreshRefs }: Pr
       cell: ({ row }) => row.original.sub_unit_name || "—",
     },
     {
+      id: "epurchase",
+      header: "E-Purchase",
+      meta: { width: "8%" },
+      cell: ({ row }) => row.original.epurchase_item_code ? (
+        <Badge variant="outline" className="font-mono text-xs">{row.original.epurchase_item_code}</Badge>
+      ) : "—",
+    },
+    {
       id: "type",
       header: "Type",
       meta: { width: "7%" },

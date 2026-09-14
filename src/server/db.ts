@@ -539,6 +539,8 @@ async function migrateSchema(p: mysql.Pool) {
   try { await p.query("ALTER TABLE pm_categories ADD COLUMN short_code VARCHAR(10) NULL AFTER name"); } catch {}
   try { await p.query("ALTER TABLE pm_categories ADD COLUMN image_url VARCHAR(500) NULL AFTER short_code"); } catch {}
   try { await p.query("ALTER TABLE pm_brands ADD COLUMN image_url VARCHAR(500) NULL AFTER description"); } catch {}
+  try { await p.query("ALTER TABLE pm_products ADD COLUMN epurchase_item_code VARCHAR(50) NULL AFTER sub_unit_id"); } catch {}
+  try { await p.query("ALTER TABLE pm_product_variants ADD COLUMN epurchase_item_code VARCHAR(50) NULL AFTER sku"); } catch {}
 
   // Drop deprecated stock/selling/barcode columns (catalog-only schema)
   for (const col of ["barcode_type", "stock_tracking", "tax_type", "selling_price",

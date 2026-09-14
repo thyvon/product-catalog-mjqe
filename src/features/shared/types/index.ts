@@ -140,6 +140,7 @@ export interface PMProduct {
   brand_id: string | null;
   uom_id: string | null;
   sub_unit_id: string | null;
+  epurchase_item_code: string | null;
   code: string;
   name: string;
   product_type: "single" | "variation";
@@ -166,6 +167,7 @@ export interface PMVariant {
   id: string;
   product_id: string;
   sku: string;
+  epurchase_item_code: string | null;
   name: string;
   description: string;
   variation_value_ids?: string[];

@@ -181,4 +181,30 @@ router.get("/api/company/items", async (req, res) => {
   }
 });
 
+// GET /api/company/items/codes — returns ItemCode + Description pairs for dropdowns
+router.get("/api/company/items/codes", async (req, res) => {
+  try {
+    const userId = (req.headers["x-user-id"] as string) || "";
+    if (!userId) { res.status(401).json({ error: "User ID not provided" }); return; }
+
+    const session = getSessionForUser(userId);
+    if (!session) { res.status(401).json({ error: "Company session expired. Please log in again." }); return; }
+
+    const searchValue = String(req.query.search || "").trim();
+    const result = await fetchCompanyItems(session, { start: "0", length: "200", search: searchValue });
+    if (result.success === false) throw new Error(result.message || "Access denied");
+
+    const items = (result.data ?? [])
+      .filter(isValidItem)
+      .map((item) => ({
+        code: String(item.ItemCode ?? "").trim(),
+        description: String(item.Description ?? "").trim(),
+      }));
+
+    res.json(items);
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to fetch item codes" });
+  }
+});
+
 export default router;
