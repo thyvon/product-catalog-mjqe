@@ -676,7 +676,7 @@ export default function PmProductFormPage() {
                         else setEpurchaseDescription("");
                       }}
                       onSelectItem={(item) => {
-                        setName(item.description);
+                        if (!isEdit) setName(item.description);
                         setEpurchaseDescription(item.description);
                       }}
                       placeholder="Select E-Purchase item code..."
