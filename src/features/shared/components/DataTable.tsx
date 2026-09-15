@@ -140,22 +140,24 @@ export default function DataTable<TData>({
                   return (
                     <TableHead
                       key={header.id}
-                      className={`whitespace-nowrap${canSort ? " cursor-pointer select-none" : ""}`}
+                      className={`${canSort ? "cursor-pointer select-none" : ""}`}
                       onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
                       style={{ textAlign: meta?.align || "left", width: meta?.width }}
                     >
-                      <span className="inline-flex items-center">
-                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                      <div className="flex items-center gap-1">
+                        <span className="break-words leading-tight">
+                          {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                        </span>
                         {canSort && (
                           header.column.getIsSorted() === "asc" ? (
-                            <ArrowUp className="ml-1 size-3" />
+                            <ArrowUp className="shrink-0 size-3" />
                           ) : header.column.getIsSorted() === "desc" ? (
-                            <ArrowDown className="ml-1 size-3" />
+                            <ArrowDown className="shrink-0 size-3" />
                           ) : (
-                            <ArrowUpDown className="ml-1 size-3 text-muted-foreground/50" />
+                            <ArrowUpDown className="shrink-0 size-3 text-muted-foreground/50" />
                           )
                         )}
-                      </span>
+                      </div>
                     </TableHead>
                   );
                 })}
