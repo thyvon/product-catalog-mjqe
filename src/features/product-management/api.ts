@@ -87,6 +87,13 @@ export const fetchEpurchaseItemCodes = async (search?: string): Promise<{ code: 
   const res = await fetch(`/api/company/items/codes${qs ? `?${qs}` : ""}`, {
     headers: { "X-User-Id": String(userId || "") },
   });
+  if (res.status === 401) {
+    localStorage.removeItem("auth_user");
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_form_token");
+    window.location.href = "/login";
+    throw new Error("Session expired");
+  }
   if (!res.ok) throw new Error("Failed to fetch E-Purchase items");
   return res.json();
 };

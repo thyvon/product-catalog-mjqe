@@ -13,10 +13,12 @@ import PmMergeVariationModal from "@/features/product-management/components/PmMe
 import type { CompanyItem } from "@/features/company-products/types";
 import type { PMProduct } from "@/features/shared/types";
 import { pmLinkedEpurchaseCodes, pmProducts } from "@/features/product-management/api";
+import { useAuth } from "@/features/auth/AuthContext";
 
 export default function CompanyItemsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { logout } = useAuth();
   const [rows, setRows] = useState<CompanyItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -71,6 +73,12 @@ export default function CompanyItemsPage() {
       if (controller.signal.aborted) return;
 
       const json = await res.json();
+
+      if (res.status === 401) {
+        logout();
+        navigate("/login");
+        return;
+      }
 
       if (!res.ok || json.error) {
         setRows([]);
