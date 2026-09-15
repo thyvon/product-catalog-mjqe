@@ -358,6 +358,8 @@ async function createTables(p: mysql.Pool) {
     brand_id VARCHAR(64) NULL,
     uom_id VARCHAR(64) NULL,
     sub_unit_id VARCHAR(64) NULL,
+    epurchase_item_code VARCHAR(50) NULL,
+    model_or_part VARCHAR(255) NULL,
     code VARCHAR(100) NOT NULL,
     name VARCHAR(255) NOT NULL,
     product_type VARCHAR(50) NOT NULL DEFAULT 'single',
@@ -378,6 +380,8 @@ async function createTables(p: mysql.Pool) {
     id VARCHAR(64) PRIMARY KEY,
     product_id VARCHAR(64) NOT NULL,
     sku VARCHAR(150) NOT NULL,
+    epurchase_item_code VARCHAR(50) NULL,
+    model_or_part VARCHAR(255) NULL,
     name VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     variation_value_ids JSON NULL,
@@ -540,7 +544,9 @@ async function migrateSchema(p: mysql.Pool) {
   try { await p.query("ALTER TABLE pm_categories ADD COLUMN image_url VARCHAR(500) NULL AFTER short_code"); } catch {}
   try { await p.query("ALTER TABLE pm_brands ADD COLUMN image_url VARCHAR(500) NULL AFTER description"); } catch {}
   try { await p.query("ALTER TABLE pm_products ADD COLUMN epurchase_item_code VARCHAR(50) NULL AFTER sub_unit_id"); } catch {}
+  try { await p.query("ALTER TABLE pm_products ADD COLUMN model_or_part VARCHAR(255) NULL AFTER epurchase_item_code"); } catch {}
   try { await p.query("ALTER TABLE pm_product_variants ADD COLUMN epurchase_item_code VARCHAR(50) NULL AFTER sku"); } catch {}
+  try { await p.query("ALTER TABLE pm_product_variants ADD COLUMN model_or_part VARCHAR(255) NULL AFTER epurchase_item_code"); } catch {}
 
   // Drop deprecated stock/selling/barcode columns (catalog-only schema)
   for (const col of ["barcode_type", "stock_tracking", "tax_type", "selling_price",

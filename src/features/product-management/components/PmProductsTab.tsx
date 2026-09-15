@@ -165,6 +165,12 @@ export default function PmProductsTab({ productGroups, brands, refreshRefs }: Pr
       ) : "—",
     },
     {
+      id: "model_or_part",
+      header: "Model/Part",
+      meta: { width: "10%" },
+      cell: ({ row }) => row.original.model_or_part || "—",
+    },
+    {
       id: "type",
       header: "Type",
       meta: { width: "7%" },

@@ -496,9 +496,9 @@ export async function upsertProduct(product: any): Promise<void> {
   assertDb();
   const p = getPool()!;
   await p.execute(
-    `INSERT INTO pm_products (id, product_group_id, category_id, brand_id, uom_id, sub_unit_id, epurchase_item_code, code, name, product_type, is_variable,
+    `INSERT INTO pm_products (id, product_group_id, category_id, brand_id, uom_id, sub_unit_id, epurchase_item_code, model_or_part, code, name, product_type, is_variable,
        purchase_price, sub_unit_purchase_price, image_url, description, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         product_group_id = VALUES(product_group_id),
         category_id = VALUES(category_id),
@@ -506,6 +506,7 @@ export async function upsertProduct(product: any): Promise<void> {
         uom_id = VALUES(uom_id),
         sub_unit_id = VALUES(sub_unit_id),
         epurchase_item_code = VALUES(epurchase_item_code),
+        model_or_part = VALUES(model_or_part),
         code = VALUES(code),
         name = VALUES(name),
         product_type = VALUES(product_type),
@@ -524,6 +525,7 @@ export async function upsertProduct(product: any): Promise<void> {
       product.uom_id || null,
       product.sub_unit_id || null,
       product.epurchase_item_code || null,
+      product.model_or_part || null,
       product.code,
       product.name,
       product.product_type || "single",
@@ -617,13 +619,14 @@ export async function upsertVariant(variant: any): Promise<void> {
   assertDb();
   const p = getPool()!;
   await p.execute(
-    `INSERT INTO pm_product_variants (id, product_id, sku, epurchase_item_code, name, description, variation_value_ids, sub_unit_id,
+    `INSERT INTO pm_product_variants (id, product_id, sku, epurchase_item_code, model_or_part, name, description, variation_value_ids, sub_unit_id,
        purchase_price, sub_unit_purchase_price, image_url, is_active, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         product_id = VALUES(product_id),
         sku = VALUES(sku),
         epurchase_item_code = VALUES(epurchase_item_code),
+        model_or_part = VALUES(model_or_part),
         name = VALUES(name),
         description = VALUES(description),
         variation_value_ids = VALUES(variation_value_ids),
@@ -639,6 +642,7 @@ export async function upsertVariant(variant: any): Promise<void> {
       variant.product_id,
       variant.sku,
       variant.epurchase_item_code || null,
+      variant.model_or_part || null,
       variant.name,
       variant.description || "",
       variant.variation_value_ids

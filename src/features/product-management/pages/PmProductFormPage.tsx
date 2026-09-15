@@ -142,6 +142,7 @@ interface VariantRow {
   sku: string;
   epurchaseItemCode: string;
   epurchaseDescription: string;
+  modelOrPart: string;
   remark: string;
   baseUom: string;
   subUom: string;
@@ -174,6 +175,7 @@ export default function PmProductFormPage() {
   const [brandId, setBrandId] = useState("");
   const [uomId, setUomId] = useState("");
   const [subUnitId, setSubUnitId] = useState("");
+  const [modelOrPart, setModelOrPart] = useState("");
   const [productType, setProductType] = useState<ProductType>("single");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<"Active" | "Inactive">("Active");
@@ -242,6 +244,7 @@ export default function PmProductFormPage() {
           setDescription(product.description ?? "");
           setStatus(product.status ?? "Active");
           setEpurchaseItemCode(product.epurchase_item_code ?? "");
+          setModelOrPart(product.model_or_part ?? "");
           setVariants(product.variants ?? []);
           setTemplateIds(product.variation_template_ids ?? []);
 
@@ -270,6 +273,7 @@ export default function PmProductFormPage() {
               sku: v.sku ?? "",
               epurchaseItemCode: v.epurchase_item_code ?? "",
               epurchaseDescription: "",
+              modelOrPart: v.model_or_part ?? "",
               remark: v.description ?? "",
               baseUom: product.uom_id ?? "",
               subUom: v.sub_unit_id ?? "",
@@ -461,6 +465,7 @@ export default function PmProductFormPage() {
           sku: newRowFields.sku?.trim() || genSku(prev.length),
           epurchaseItemCode: "",
           epurchaseDescription: "",
+          modelOrPart: "",
           remark: newRowFields.remark?.trim() ?? "",
           baseUom: newRowFields.baseUom || uomId || "",
           subUom: newRowFields.subUom || "",
@@ -521,6 +526,7 @@ export default function PmProductFormPage() {
                 sku: `${(code.trim() || "CO").toUpperCase()}-001`,
                 epurchaseItemCode: "",
                 epurchaseDescription: "",
+                modelOrPart: "",
                 remark: "",
                 baseUom: uomId ?? "",
                 subUom: subUnitId ?? "",
@@ -583,6 +589,7 @@ export default function PmProductFormPage() {
           is_variable: productType === "variation",
           variation_template_ids: productType === "variation" ? templateIds : [],
           epurchase_item_code: epurchaseItemCode || null,
+          model_or_part: modelOrPart || null,
           description,
           status,
         },
@@ -612,6 +619,7 @@ export default function PmProductFormPage() {
             ...(productType === "variation" ? { variation_value_ids: valueIds } : {}),
             sub_unit_id: row.subUom || null,
             epurchase_item_code: row.epurchaseItemCode || null,
+            model_or_part: row.modelOrPart || null,
             purchase_price:
               row.basePurchase !== "" && !Number.isNaN(Number(row.basePurchase)) ? Number(row.basePurchase) : null,
             sub_unit_purchase_price:
@@ -841,6 +849,16 @@ export default function PmProductFormPage() {
                         <Plus className="size-4" />
                       </Button>
                     </div>
+                  </Field>
+                  <Field label="Model / Part">
+                    <Input
+                      value={modelOrPart}
+                      onChange={(e) => setModelOrPart(e.target.value)}
+                      placeholder="Model or part number..."
+                      autoComplete="new-password"
+                      name={`pm_model_${formId}`}
+                      id={`pm_model_${formId}`}
+                    />
                   </Field>
                   <Field label="Unit of Measure">
                     <div className="flex gap-1.5">
