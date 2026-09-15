@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import {
   Combobox,
   ComboboxContent,
@@ -52,6 +53,11 @@ export default function EpurchaseItemCombobox({
       setSessionError(true);
     } finally {
       setLoading(false);
+      // Restore focus after re-render
+      requestAnimationFrame(() => {
+        const input = document.querySelector<HTMLInputElement>("[data-slot='combobox-input'] input");
+        input?.focus();
+      });
     }
   }, []);
 
@@ -128,11 +134,17 @@ export default function EpurchaseItemCombobox({
       disabled={disabled}
     >
       <ComboboxInput
-        placeholder={loading ? "Loading..." : sessionError ? "Type item code..." : placeholder}
+        placeholder={loading ? "Searching..." : sessionError ? "Type item code..." : placeholder}
         disabled={disabled || loading}
         showClear={!!value}
         className={className}
+        autoFocus
       />
+      {loading && (
+        <div className="pointer-events-none absolute inset-y-0 end-10 flex items-center">
+          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+        </div>
+      )}
       <ComboboxContent className="min-w-80">
         {sessionError && filtered.length === 0 && (
           <ComboboxEmpty>
