@@ -7,6 +7,12 @@ type RequestOptions = {
   headers?: Record<string, string>;
 };
 
+let onSessionExpired: (() => void) | null = null;
+
+export function setOnSessionExpired(cb: () => void) {
+  onSessionExpired = cb;
+}
+
 class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -14,6 +20,10 @@ class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
   }
+}
+
+function handle401() {
+  if (onSessionExpired) onSessionExpired();
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -37,6 +47,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401) handle401();
     throw new ApiError(data.error || `Request failed (${res.status})`, res.status);
   }
 
@@ -67,6 +78,7 @@ async function companyRequest<T>(path: string, options: RequestOptions = {}): Pr
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401) handle401();
     throw new ApiError(data.error || `Request failed (${res.status})`, res.status);
   }
 

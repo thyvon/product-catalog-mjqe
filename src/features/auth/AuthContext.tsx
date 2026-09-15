@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { api } from "@/features/shared/api/client";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { api, setOnSessionExpired } from "@/features/shared/api/client";
 
 interface User {
   id: number;
@@ -127,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     const userId = user?.id;
     setUser(null);
     setToken(null);
@@ -138,7 +138,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (userId) {
       fetch(`/api/company/session?userId=${encodeURIComponent(String(userId))}`, { method: "DELETE" }).catch(() => {});
     }
-  };
+  }, [user?.id]);
+
+  // Register session-expired handler: logout + redirect to /login
+  useEffect(() => {
+    setOnSessionExpired(() => {
+      logout();
+      window.location.href = "/login";
+    });
+    return () => setOnSessionExpired(() => {});
+  }, [logout]);
 
   const updateProfile = (data: Partial<User>) => {
     setUser((prev) => {
