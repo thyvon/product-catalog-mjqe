@@ -39,20 +39,13 @@ export default function EpurchaseItemCombobox({
   const [sessionError, setSessionError] = useState(false);
   const loadedRef = useRef(false);
   const syncDoneRef = useRef(false);
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadItems = useCallback(async (search?: string) => {
     setLoading(true);
     setSessionError(false);
     try {
       const data = await fetchEpurchaseItemCodes(search);
-      setItems((prev) => {
-        if (!search) return data;
-        // Merge: keep existing items, add/update new ones
-        const map = new Map(prev.map((i) => [i.code, i]));
-        for (const item of data) map.set(item.code, item);
-        return Array.from(map.values());
-      });
+      setItems(data);
       loadedRef.current = true;
     } catch {
       setItems([]);
@@ -88,17 +81,10 @@ export default function EpurchaseItemCombobox({
     }
   }, [items, value, onSelectItem]);
 
-  // Debounced server search when user types
+  // Debounced server search when user types (for items not in initial load)
   const handleInputChange = useCallback((v: string) => {
     setQuery(v);
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    const trimmed = v.trim();
-    if (trimmed.length >= 2) {
-      searchTimerRef.current = setTimeout(() => {
-        loadItems(trimmed);
-      }, 400);
-    }
-  }, [loadItems]);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
