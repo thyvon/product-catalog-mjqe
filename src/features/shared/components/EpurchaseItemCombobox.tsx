@@ -55,9 +55,9 @@ export default function EpurchaseItemCombobox({
     }
   }, []);
 
-  // Load items when combobox opens
+  // Load items when combobox opens (always, so search has full list)
   useEffect(() => {
-    if (open && !loadedRef.current) loadItems();
+    if (open) loadItems();
   }, [open, loadItems]);
 
   // If a value is pre-set (e.g. from URL), search for it specifically first
