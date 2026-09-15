@@ -769,7 +769,7 @@ export default function PmProductFormPage() {
               <div>
                 <FormLabel>Catalog Setup</FormLabel>
                 <div className="mt-2 space-y-4">
-                  <Field label="Product Type">
+                  <Field label="Product Type" horizontal>
                     <SelectField
                       value={productType}
                       onChange={(v) => {
@@ -779,7 +779,7 @@ export default function PmProductFormPage() {
                       options={PRODUCT_TYPES}
                     />
                   </Field>
-                  <Field label="Category">
+                  <Field label="Category" horizontal>
                     <div className="flex gap-1.5">
                       <div className="flex-1">
                         <SelectField
@@ -799,7 +799,7 @@ export default function PmProductFormPage() {
                     </div>
                   </Field>
                   {categoryId && (
-                    <Field label="Sub-Category">
+                    <Field label="Sub-Category" horizontal>
                       <div className="flex gap-1.5">
                         <div className="flex-1">
                           <SelectField
@@ -819,7 +819,7 @@ export default function PmProductFormPage() {
                       </div>
                     </Field>
                   )}
-                  <Field label="Product Group">
+                  <Field label="Product Group" horizontal>
                     <div className="flex gap-1.5">
                       <div className="flex-1">
                         <SelectField
@@ -835,7 +835,7 @@ export default function PmProductFormPage() {
                       </Button>
                     </div>
                   </Field>
-                  <Field label="Brand">
+                  <Field label="Brand" horizontal>
                     <div className="flex gap-1.5">
                       <div className="flex-1">
                         <SelectField
@@ -850,7 +850,7 @@ export default function PmProductFormPage() {
                       </Button>
                     </div>
                   </Field>
-                  <Field label="Model / Part">
+                  <Field label="Model / Part" horizontal>
                     <Input
                       value={modelOrPart}
                       onChange={(e) => setModelOrPart(e.target.value)}
@@ -860,7 +860,7 @@ export default function PmProductFormPage() {
                       id={`pm_model_${formId}`}
                     />
                   </Field>
-                  <Field label="Unit of Measure">
+                  <Field label="Unit of Measure" horizontal>
                     <div className="flex gap-1.5">
                       <div className="flex-1">
                         <SelectField
@@ -878,7 +878,7 @@ export default function PmProductFormPage() {
                       </Button>
                     </div>
                   </Field>
-                  <Field label="Sub-Unit">
+                  <Field label="Sub-Unit" horizontal>
                     <SelectField
                       value={subUnitId}
                       onChange={setSubUnitId}
@@ -891,7 +891,7 @@ export default function PmProductFormPage() {
                         }))}
                     />
                   </Field>
-                  <Field label="Status">
+                  <Field label="Status" horizontal>
                     <SelectField
                       value={status}
                       onChange={(v) => setStatus(v as "Active" | "Inactive")}
