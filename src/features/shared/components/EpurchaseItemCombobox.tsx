@@ -46,18 +46,19 @@ export default function EpurchaseItemCombobox({
     setSessionError(false);
     try {
       const data = await fetchEpurchaseItemCodes(search);
-      setItems(data);
+      setItems((prev) => {
+        if (!search) return data;
+        // Merge: keep existing items, add/update new ones
+        const map = new Map(prev.map((i) => [i.code, i]));
+        for (const item of data) map.set(item.code, item);
+        return Array.from(map.values());
+      });
       loadedRef.current = true;
     } catch {
       setItems([]);
       setSessionError(true);
     } finally {
       setLoading(false);
-      // Restore focus after re-render
-      requestAnimationFrame(() => {
-        const input = document.querySelector<HTMLInputElement>("[data-slot='combobox-input'] input");
-        input?.focus();
-      });
     }
   }, []);
 
