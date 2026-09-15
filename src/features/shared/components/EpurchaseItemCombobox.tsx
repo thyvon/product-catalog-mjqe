@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Combobox,
@@ -47,10 +47,8 @@ export default function EpurchaseItemCombobox({
     try {
       const data = await fetchEpurchaseItemCodes(search);
       if (!search) {
-        // Initial load: replace all items
         setItems(data);
       } else {
-        // Search: merge new results into existing items
         setItems((prev) => {
           const map = new Map(prev.map((i) => [i.code, i]));
           for (const item of data) map.set(item.code, item);
@@ -66,12 +64,10 @@ export default function EpurchaseItemCombobox({
     }
   }, []);
 
-  // Load items when combobox opens (always, so search has full list)
   useEffect(() => {
     if (open) loadItems();
   }, [open, loadItems]);
 
-  // If a value is pre-set (e.g. from URL), search for it specifically first
   useEffect(() => {
     if (value) loadItems(value);
   }, [loadItems, value]);
@@ -81,7 +77,6 @@ export default function EpurchaseItemCombobox({
     syncDoneRef.current = false;
   }, [value]);
 
-  // When items load and value exists, fire onSelectItem once so parent can auto-fill description
   useEffect(() => {
     if (loadedRef.current && value && onSelectItem && !syncDoneRef.current) {
       const matched = items.find((i) => i.code === value);
@@ -92,7 +87,6 @@ export default function EpurchaseItemCombobox({
     }
   }, [items, value, onSelectItem]);
 
-  // Debounced server search when user types
   const handleInputChange = useCallback((v: string) => {
     setQuery(v);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -103,16 +97,6 @@ export default function EpurchaseItemCombobox({
       }, 400);
     }
   }, [loadItems]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (item) =>
-        item.code.toLowerCase().includes(q) ||
-        item.description.toLowerCase().includes(q)
-    );
-  }, [items, query]);
 
   const queryValue = query.trim();
   const canType = queryValue.length > 0 && !items.some((i) => i.code.toLowerCase() === queryValue.toLowerCase());
@@ -127,10 +111,18 @@ export default function EpurchaseItemCombobox({
         const matched = items.find((i) => i.code === code);
         if (matched && onSelectItem) onSelectItem(matched);
       }}
+      itemToStringValue={(item) => {
+        const ep = item as unknown as EpurchaseItem;
+        return ep.code;
+      }}
       inputValue={query}
       onInputValueChange={(v) => handleInputChange(String(v ?? ""))}
-      items={filtered}
-      filter={null}
+      items={items}
+      filter={(item, q) => {
+        const ep = item as unknown as EpurchaseItem;
+        const search = q.toLowerCase();
+        return ep.code.toLowerCase().includes(search) || ep.description.toLowerCase().includes(search);
+      }}
       open={open}
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen);
@@ -151,16 +143,18 @@ export default function EpurchaseItemCombobox({
         </div>
       )}
       <ComboboxContent>
-        {sessionError && filtered.length === 0 && (
+        {sessionError && items.length === 0 && (
           <ComboboxEmpty>
             <span className="text-muted-foreground">Type an item code manually</span>
           </ComboboxEmpty>
         )}
-        {!sessionError && filtered.length === 0 && !loading && (
-          <ComboboxEmpty>No items found.</ComboboxEmpty>
+        {!sessionError && (
+          <ComboboxEmpty>
+            {loading ? "Searching..." : "No items found."}
+          </ComboboxEmpty>
         )}
         <ComboboxList>
-          {filtered.map((item) => (
+          {items.map((item) => (
             <ComboboxItem key={item.code} value={item.code}>
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
