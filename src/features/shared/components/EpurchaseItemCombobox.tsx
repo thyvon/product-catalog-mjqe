@@ -132,7 +132,7 @@ export default function EpurchaseItemCombobox({
           <Loader2 className="size-4 animate-spin text-muted-foreground" />
         </div>
       )}
-      <ComboboxContent className="min-w-80">
+      <ComboboxContent>
         {sessionError && filtered.length === 0 && (
           <ComboboxEmpty>
             <span className="text-muted-foreground">Type an item code manually</span>
