@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Pencil, RefreshCw } from "lucide-react";
+import { SquarePen, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import DataTable from "@/features/shared/components/DataTable";
@@ -125,7 +125,7 @@ export default function CompanyItemsPage() {
               navigate(`/product-management/products/new?epurchase_item_code=${encodeURIComponent(itemCode)}`);
             }}
           >
-            <Pencil className="size-4" />
+            <SquarePen className="size-4" />
           </Button>
         );
       },
