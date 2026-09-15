@@ -55,8 +55,9 @@ export default function EpurchaseItemCombobox({
   }, []);
 
   useEffect(() => {
-    loadItems();
-  }, [loadItems]);
+    // If a value is pre-set (e.g. from URL), search for it specifically first
+    loadItems(value || undefined);
+  }, [loadItems, value]);
 
   useEffect(() => {
     setQuery(value || "");
