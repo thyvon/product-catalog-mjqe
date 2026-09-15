@@ -38,6 +38,7 @@ export default function EpurchaseItemCombobox({
   const [sessionError, setSessionError] = useState(false);
   const loadedRef = useRef(false);
   const syncDoneRef = useRef(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadItems = useCallback(async (search?: string) => {
     setLoading(true);
@@ -54,9 +55,14 @@ export default function EpurchaseItemCombobox({
     }
   }, []);
 
+  // Load items when combobox opens
   useEffect(() => {
-    // If a value is pre-set (e.g. from URL), search for it specifically first
-    loadItems(value || undefined);
+    if (open && !loadedRef.current) loadItems();
+  }, [open, loadItems]);
+
+  // If a value is pre-set (e.g. from URL), search for it specifically first
+  useEffect(() => {
+    if (value) loadItems(value);
   }, [loadItems, value]);
 
   useEffect(() => {
@@ -74,6 +80,18 @@ export default function EpurchaseItemCombobox({
       }
     }
   }, [items, value, onSelectItem]);
+
+  // Debounced server search when user types
+  const handleInputChange = useCallback((v: string) => {
+    setQuery(v);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    const trimmed = v.trim();
+    if (trimmed.length >= 2) {
+      searchTimerRef.current = setTimeout(() => {
+        loadItems(trimmed);
+      }, 400);
+    }
+  }, [loadItems]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -99,7 +117,7 @@ export default function EpurchaseItemCombobox({
         if (matched && onSelectItem) onSelectItem(matched);
       }}
       inputValue={query}
-      onInputValueChange={(v) => setQuery(String(v ?? ""))}
+      onInputValueChange={(v) => handleInputChange(String(v ?? ""))}
       items={filtered}
       filter={null}
       open={open}

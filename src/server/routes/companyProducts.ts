@@ -191,7 +191,7 @@ router.get("/api/company/items/codes", async (req, res) => {
     if (!session) { res.status(401).json({ error: "Company session expired. Please log in again." }); return; }
 
     const searchValue = String(req.query.search || "").trim();
-    const result = await fetchCompanyItems(session, { start: "0", length: "200", search: searchValue });
+    const result = await fetchCompanyItems(session, { start: "0", length: searchValue ? "1000" : "200", search: searchValue });
     if (result.success === false) throw new Error(result.message || "Access denied");
 
     const items = (result.data ?? [])
