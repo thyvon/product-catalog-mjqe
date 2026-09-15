@@ -12,7 +12,7 @@ export function Field({ label, kh, children, wide = false, horizontal = false }:
   if (horizontal) {
     return (
       <label className={`flex items-center gap-3 ${wide ? "col-span-1 md:col-span-2" : ""}`}>
-        <span className="shrink-0 w-28 text-xs font-medium text-foreground text-right">
+        <span className="shrink-0 w-28 text-xs font-medium text-foreground">
           {kh ? (
             <>
               <span>{kh}</span>
