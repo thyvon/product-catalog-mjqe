@@ -674,7 +674,7 @@ export default function PmProductFormPage() {
               {/* Left: description */}
               <div>
                 <FormLabel>Product Description</FormLabel>
-                <div className="mt-2 space-y-5">
+                <div className="mt-2 space-y-4 rounded-lg border border-border bg-muted/20 p-4">
                   <Field label="Product Code" wide>
                     <EpurchaseItemCombobox
                       value={code}
@@ -768,7 +768,7 @@ export default function PmProductFormPage() {
               {/* Right: catalog setup */}
               <div>
                 <FormLabel>Catalog Setup</FormLabel>
-                <div className="mt-2 space-y-4">
+                <div className="mt-2 space-y-4 rounded-lg border border-border bg-muted/20 p-4">
                   <Field label="Product Type" horizontal>
                     <SelectField
                       value={productType}
