@@ -86,7 +86,7 @@ export default function DataTable<TData>({
   onSortingChange,
   rowClassName,
   aggregates,
-  tableLayout = "fixed",
+  tableLayout = "auto",
 }: DataTableProps<TData>) {
   const table = useReactTable({
     data,
