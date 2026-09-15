@@ -15,9 +15,10 @@ interface Props {
   onClose: () => void;
   products: PMProduct[];
   onMerged: () => void;
+  epurchaseItemCodes?: { productId: string; epurchaseItemCode: string }[];
 }
 
-export default function PmMergeVariationModal({ isOpen, onClose, products, onMerged }: Props) {
+export default function PmMergeVariationModal({ isOpen, onClose, products, onMerged, epurchaseItemCodes }: Props) {
   const { toast } = useToast();
   const [parentId, setParentId] = useState("");
   const [templates, setTemplates] = useState<PMVariationTemplate[]>([]);
@@ -90,6 +91,7 @@ export default function PmMergeVariationModal({ isOpen, onClose, products, onMer
         assignments: products
           .filter((p) => (values[p.id] ?? []).length === templateIds.length)
           .map((p) => ({ productId: p.id, valueIds: values[p.id] })),
+        epurchaseItemCodes,
       });
       toast.success("Products merged into a variation product.");
       onMerged();

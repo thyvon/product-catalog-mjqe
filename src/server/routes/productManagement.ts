@@ -893,6 +893,16 @@ router.post("/api/pm/products/merge-variation", async (req, res) => {
       return res.status(400).json({ error: "At least one product assignment is required." });
     }
 
+    // Optional: map of productId -> epurchase_item_code to preserve after merge
+    const epurchaseCodeMap: Record<string, string> = {};
+    if (Array.isArray(body.epurchaseItemCodes)) {
+      for (const item of body.epurchaseItemCodes) {
+        if (item.productId && item.epurchaseItemCode) {
+          epurchaseCodeMap[String(item.productId)] = String(item.epurchaseItemCode);
+        }
+      }
+    }
+
     const seenProducts = new Set<string>();
     for (const row of rows) {
       const pid = String(row?.productId || "");
@@ -1001,6 +1011,7 @@ router.post("/api/pm/products/merge-variation", async (req, res) => {
         id: variant?.id ?? newId("var"),
         product_id: parent.id,
         sku: String(variant?.sku || `${parent.code}-${randomCode()}`),
+        epurchase_item_code: epurchaseCodeMap[srcProductId] || variant?.epurchase_item_code || null,
         name: `${parent.name} — ${row.label}`.slice(0, 255),
         variation_value_ids: row.valueIds,
         status: "Active",

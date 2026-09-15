@@ -45,6 +45,7 @@ export const pmMergeVariation = (body: {
   parentId: string;
   templateIds: string[];
   assignments: { productId: string; valueIds: string[] }[];
+  epurchaseItemCodes?: { productId: string; epurchaseItemCode: string }[];
 }) => api.post<PMProduct>("/api/pm/products/merge-variation", body);
 export const pmImportProducts = (rows: Record<string, unknown>[]) => api.post<{ imported: number; skipped: number; errors?: string[] }>("/api/pm/products/import", rows);
 export const pmImportFile = (fileName: string, base64: string) =>

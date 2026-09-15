@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ColumnDef } from "@tanstack/react-table";
-import { SquarePen, RefreshCw } from "lucide-react";
+import { GitMerge, SquarePen, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/features/shared/components/Toast";
 import DataTable from "@/features/shared/components/DataTable";
 import PageContent from "@/features/shared/components/PageContent";
 import ListPageLayout from "@/features/shared/components/ListPageLayout";
+import PmMergeVariationModal from "@/features/product-management/components/PmMergeVariationModal";
 import type { CompanyItem } from "@/features/company-products/types";
+import type { PMProduct } from "@/features/shared/types";
 import { pmLinkedEpurchaseCodes, pmProducts } from "@/features/product-management/api";
 
 export default function CompanyItemsPage() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [rows, setRows] = useState<CompanyItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -21,6 +26,13 @@ export default function CompanyItemsPage() {
   const [pageSize, setPageSize] = useState(10);
   const abortRef = useRef<AbortController | null>(null);
   const [linkedCodes, setLinkedCodes] = useState<Set<string>>(new Set());
+
+  // Selection state
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeableProducts, setMergeableProducts] = useState<PMProduct[]>([]);
+  const [epurchaseCodeMap, setEpurchaseCodeMap] = useState<{ productId: string; epurchaseItemCode: string }[]>([]);
+  const [fetchingMerge, setFetchingMerge] = useState(false);
 
   // Debounce search input: 300ms after user stops typing
   useEffect(() => {
@@ -87,7 +99,83 @@ export default function CompanyItemsPage() {
       .catch(() => {});
   }, []);
 
+  // Selection helpers (same pattern as PmProductsTab)
+  const toggleSelect = (itemCode: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemCode)) next.delete(itemCode);
+      else next.add(itemCode);
+      return next;
+    });
+  };
+
+  const allOnPageSelected = rows.length > 0 && rows.every((r) => selected.has(r.ItemCode));
+
+  const selectedItems = useMemo(
+    () => rows.filter((r) => selected.has(r.ItemCode)),
+    [rows, selected]
+  );
+
+  const selectedLinkedCount = selectedItems.filter((r) => linkedCodes.has(r.ItemCode)).length;
+
+  // Fetch linked PM products for selected items and open merge modal
+  const handleMergeClick = async () => {
+    setFetchingMerge(true);
+    try {
+      const products: PMProduct[] = [];
+      const codeMap: { productId: string; epurchaseItemCode: string }[] = [];
+
+      for (const item of selectedItems) {
+        if (!linkedCodes.has(item.ItemCode)) continue;
+        try {
+          const result = await pmProducts({ search: item.ItemCode, pageSize: "10" });
+          const match = result.data.find((p) => p.epurchase_item_code === item.ItemCode);
+          if (match && match.product_type === "single") {
+            products.push(match);
+            codeMap.push({ productId: match.id, epurchaseItemCode: item.ItemCode });
+          }
+        } catch {
+          // Skip items that fail to fetch
+        }
+      }
+
+      if (products.length < 2) {
+        toast.error("Need at least 2 linked single products to merge.");
+        return;
+      }
+
+      setMergeableProducts(products);
+      setEpurchaseCodeMap(codeMap);
+      setMergeOpen(true);
+    } finally {
+      setFetchingMerge(false);
+    }
+  };
+
   const columns = useMemo<ColumnDef<CompanyItem, any>[]>(() => [
+    {
+      id: "select",
+      header: () => (
+        <Checkbox
+          checked={allOnPageSelected}
+          onCheckedChange={() => {
+            setSelected((prev) => {
+              const next = new Set(prev);
+              if (allOnPageSelected) rows.forEach((r) => next.delete(r.ItemCode));
+              else rows.forEach((r) => next.add(r.ItemCode));
+              return next;
+            });
+          }}
+          aria-label="Select all on page"
+        />
+      ),
+      meta: { width: "36px" },
+      cell: ({ row }) => (
+        <span onClick={(e) => e.stopPropagation()}>
+          <Checkbox checked={selected.has(row.original.ItemCode)} onCheckedChange={() => toggleSelect(row.original.ItemCode)} />
+        </span>
+      ),
+    },
     { accessorKey: "ItemCode", header: "Code", meta: { width: "100px" } },
     { accessorKey: "Description", header: "Description", meta: { width: "25%", className: "font-medium" } },
     { id: "category", header: "Category", meta: { width: "10%" }, cell: ({ row }) => row.original.category || "—" },
@@ -130,12 +218,12 @@ export default function CompanyItemsPage() {
         );
       },
     },
-  ], [linkedCodes, navigate]);
+  ], [linkedCodes, navigate, rows, selected, allOnPageSelected]);
 
   return (
     <PageContent>
       <ListPageLayout
-        title="Company Items"
+        title="E-Purchase Items"
         description={`${(total ?? 0).toLocaleString()} item${total !== 1 ? "s" : ""} found`}
         actions={
           <Button variant="outline" size="icon" onClick={load}>
@@ -146,6 +234,33 @@ export default function CompanyItemsPage() {
         onSearchChange={setInputValue}
         searchPlaceholder="Search by code or description..."
       >
+        {selected.size > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
+            <span className="text-sm font-medium text-foreground">
+              {selected.size} selected
+              {selectedLinkedCount !== selected.size && (
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                  ({selected.size - selectedLinkedCount} not linked — link products first to merge)
+                </span>
+              )}
+            </span>
+            <div className="ml-auto flex items-center gap-2">
+              <Button
+                size="sm"
+                disabled={selectedLinkedCount < 2 || fetchingMerge}
+                onClick={handleMergeClick}
+                title={selectedLinkedCount < 2 ? "Select at least 2 linked items to merge" : undefined}
+              >
+                <GitMerge />
+                {fetchingMerge ? "Loading..." : "Merge into Variation"}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+                <X />
+                Clear
+              </Button>
+            </div>
+          </div>
+        )}
         <DataTable<CompanyItem>
           columns={columns}
           data={rows}
@@ -161,6 +276,19 @@ export default function CompanyItemsPage() {
           }}
         />
       </ListPageLayout>
+
+      <PmMergeVariationModal
+        isOpen={mergeOpen}
+        onClose={() => setMergeOpen(false)}
+        products={mergeableProducts}
+        epurchaseItemCodes={epurchaseCodeMap}
+        onMerged={() => {
+          setSelected(new Set());
+          setMergeableProducts([]);
+          setEpurchaseCodeMap([]);
+          load();
+        }}
+      />
     </PageContent>
   );
 }
