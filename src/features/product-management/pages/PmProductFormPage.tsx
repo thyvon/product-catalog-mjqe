@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useId } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ImagePlus, Loader2, Plus, Save, Trash2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -166,6 +166,7 @@ export default function PmProductFormPage() {
 
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
+  const formId = useId();
 
   const [categoryId, setCategoryId] = useState("");
   const [subCategoryId, setSubCategoryId] = useState("");
@@ -695,12 +696,12 @@ export default function PmProductFormPage() {
                       placeholder="Khmer description..."
                       rows={3}
                       autoComplete="new-password"
-                      name="pm_kh_desc_no_autofill"
-                      id="pm_kh_desc_no_autofill"
+                      name={`pm_kh_${formId}`}
+                      id={`pm_kh_${formId}`}
                     />
                   </Field>
                   <Field label="EN Description" wide>
-                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="English description..." autoComplete="new-password" name="pm_en_desc_no_autofill" id="pm_en_desc_no_autofill" />
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="English description..." autoComplete="new-password" name={`pm_en_${formId}`} id={`pm_en_${formId}`} />
                   </Field>
                   {productType === "single" && (
                     <Field label="Product Image" wide>
