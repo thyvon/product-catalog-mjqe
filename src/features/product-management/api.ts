@@ -84,13 +84,15 @@ export const fetchEpurchaseItemCodes = async (search?: string): Promise<{ code: 
   const params = new URLSearchParams();
   if (search) params.set("search", search);
   const qs = params.toString();
-  const res = await fetch(`/api/company/items/codes${qs ? `?${qs}` : ""}`, {
-    headers: { "X-User-Id": String(userId || "") },
-  });
+  const headers: Record<string, string> = { "X-User-Id": String(userId || "") };
+  const jwt = localStorage.getItem("auth_jwt");
+  if (jwt) headers["Authorization"] = `Bearer ${jwt}`;
+  const res = await fetch(`/api/company/items/codes${qs ? `?${qs}` : ""}`, { headers });
   if (res.status === 401) {
     localStorage.removeItem("auth_user");
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_form_token");
+    localStorage.removeItem("auth_jwt");
     window.location.href = "/login";
     throw new Error("Session expired");
   }
