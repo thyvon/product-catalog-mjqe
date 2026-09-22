@@ -1,15 +1,20 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import helmet from "helmet";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
+import { getEnv } from "./config.js";
 import { initDb, checkDbConnection } from "./db.js";
+import { authenticate } from "./middleware/auth.js";
 import { isMinioEnabled, getObject, getLocalUploadsDir } from "./services/storage.js";
 import productsRouter from "./routes/products.js";
 import suppliersRouter from "./routes/suppliers.js";
 import stockRouter from "./routes/stock.js";
 import debitNotesRouter from "./routes/debitNotes.js";
 import settingsRouter from "./routes/settings.js";
-import usersRouter from "./routes/users.js";
+import { publicUsersRouter, protectedUsersRouter } from "./routes/users.js";
 import aiRouter from "./routes/ai.js";
 import productManagementRouter from "./routes/productManagement.js";
 import companyProductsRouter from "./routes/companyProducts.js";
@@ -26,18 +31,25 @@ const VISIT_WINDOW_MS = 5 * 60 * 1000;
 
 export async function createApp() {
   const app = express();
+  const env = getEnv();
+
+  // Security middleware
+  app.use(helmet());
+  app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+  app.use(rateLimit({ windowMs: env.RATE_LIMIT_WINDOW_MS, max: env.RATE_LIMIT_MAX }));
 
   app.use(express.json({ limit: "20mb" }));
   app.use(express.urlencoded({ limit: "20mb", extended: true }));
 
   await initDb();
 
-  app.get("/api/health", async (_req, res) => {
+  // Register public routes (no auth required)
+  app.use("/api/health", async (_req, res) => {
     const dbOk = await checkDbConnection();
     res.json({ status: dbOk ? "ok" : "degraded", database: dbOk ? "connected" : "unavailable" });
   });
 
-  // Visit tracking
+  // Visit tracking (public, rate-limited separately if needed)
   app.post("/api/visit/log", (req, res) => {
     const pagePath = req.body?.path || "/";
     const ip = (req.headers["x-forwarded-for"] as string || req.socket.remoteAddress || "unknown").split(",")[0].trim();
@@ -96,16 +108,19 @@ export async function createApp() {
     app.use("/uploads", express.static(uploadsDir));
   }
 
-  // Register routes
-  app.use(productsRouter);
-  app.use(suppliersRouter);
-  app.use(stockRouter);
-  app.use(debitNotesRouter);
-  app.use(settingsRouter);
-  app.use(usersRouter);
-  app.use(aiRouter);
-  app.use(productManagementRouter);
-  app.use(companyProductsRouter);
+  // Public API routes (login, sync)
+  app.use(publicUsersRouter);
+
+  // Protected API routes (require JWT)
+  app.use(authenticate, protectedUsersRouter);
+  app.use(authenticate, productsRouter);
+  app.use(authenticate, suppliersRouter);
+  app.use(authenticate, stockRouter);
+  app.use(authenticate, debitNotesRouter);
+  app.use(authenticate, settingsRouter);
+  app.use(authenticate, aiRouter);
+  app.use(authenticate, productManagementRouter);
+  app.use(authenticate, companyProductsRouter);
 
   // SPA fallback
   if (process.env.NODE_ENV === "production") {

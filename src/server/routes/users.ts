@@ -1,12 +1,21 @@
 import { Router } from "express";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 import type { RowDataPacket } from "mysql2/promise";
 import { getPool, assertDb } from "../db.js";
+import { getEnv } from "../config.js";
+import { hashPassword, comparePassword } from "../services/password.js";
+import { authenticate } from "../middleware/auth.js";
 
-const router = Router();
+// ─── Public routes (no auth) ───
+export const publicUsersRouter = Router();
 
-// ─── Sync company API user into local DB ───
-router.post("/api/users/sync", async (req, res) => {
+// ─── Protected routes (auth required) ───
+export const protectedUsersRouter = Router();
+protectedUsersRouter.use(authenticate);
+
+// ─── Sync company API user into local DB (public — called after external login) ───
+publicUsersRouter.post("/api/users/sync", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
@@ -26,10 +35,11 @@ router.post("/api/users/sync", async (req, res) => {
       );
     } else {
       const id = `usr-${crypto.randomUUID()}`;
+      const hashedPassword = await hashPassword(crypto.randomUUID());
       await p.execute(
         `INSERT INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, card_id, smtp_pass, createdAt, updatedAt)
-         VALUES (?, ?, '', 'User', ?, ?, '', ?, '', ?, '', ?, ?, ?)`,
-        [id, employeeId, name || "", email || "", position || "", avatarUrl || "", cardId || "", now, now]
+         VALUES (?, ?, ?, 'User', ?, ?, '', ?, '', ?, ?, ?, ?, ?)`,
+        [id, employeeId, hashedPassword, name || "", email || "", position || "", avatarUrl || "", cardId || "", now, now]
       );
     }
     const [rows] = await p.execute<RowDataPacket[]>(
@@ -43,8 +53,40 @@ router.post("/api/users/sync", async (req, res) => {
   }
 });
 
-// ─── List all users ───
-router.get("/api/users", async (_req, res) => {
+// ─── Login (DB-backed, public) ───
+publicUsersRouter.post("/api/users/login", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: "Username and password are required." });
+    }
+    const [rows] = await p.execute<RowDataPacket[]>(
+      "SELECT id, username, role, fullName, password FROM users WHERE username = ?",
+      [username]
+    );
+    if (rows.length === 0) {
+      return res.status(401).json({ error: "Invalid username or password." });
+    }
+    const user = rows[0];
+    const valid = await comparePassword(password, user.password);
+    if (!valid) {
+      return res.status(401).json({ error: "Invalid username or password." });
+    }
+    const token = jwt.sign(
+      { userId: user.id, username: user.username, role: user.role },
+      getEnv().JWT_SECRET,
+      { expiresIn: "24h" }
+    );
+    res.json({ id: user.id, username: user.username, role: user.role, fullName: user.fullName, token });
+  } catch {
+    res.status(500).json({ error: "Login failed." });
+  }
+});
+
+// ─── List all users (protected) ───
+protectedUsersRouter.get("/api/users", async (_req, res) => {
   try {
     assertDb();
     const p = getPool()!;
@@ -57,30 +99,8 @@ router.get("/api/users", async (_req, res) => {
   }
 });
 
-// ─── Login (DB-backed) ───
-router.post("/api/users/login", async (req, res) => {
-  try {
-    assertDb();
-    const p = getPool()!;
-    const { username, password } = req.body;
-    if (!username || !password) {
-      return res.status(400).json({ error: "Username and password are required." });
-    }
-    const [rows] = await p.execute<RowDataPacket[]>(
-      "SELECT id, username, role, fullName FROM users WHERE username = ? AND password = ?",
-      [username, password]
-    );
-    if (rows.length === 0) {
-      return res.status(401).json({ error: "Invalid username or password." });
-    }
-    res.json(rows[0]);
-  } catch {
-    res.status(500).json({ error: "Login failed." });
-  }
-});
-
-// ─── Get user profile by username (for auth/profile) ───
-router.get("/api/users/profile", async (req, res) => {
+// ─── Get user profile by username (protected) ───
+protectedUsersRouter.get("/api/users/profile", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
@@ -97,8 +117,8 @@ router.get("/api/users/profile", async (req, res) => {
   }
 });
 
-// ─── Update own profile ───
-router.put("/api/users/profile", async (req, res) => {
+// ─── Update own profile (protected) ───
+protectedUsersRouter.put("/api/users/profile", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
@@ -119,8 +139,8 @@ router.put("/api/users/profile", async (req, res) => {
   }
 });
 
-// ─── Create user ───
-router.post("/api/users", async (req, res) => {
+// ─── Create user (protected) ───
+protectedUsersRouter.post("/api/users", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
@@ -136,10 +156,11 @@ router.post("/api/users", async (req, res) => {
     }
     const id = `usr-${crypto.randomUUID()}`;
     const now = new Date().toISOString();
+    const hashedPassword = await hashPassword(password);
     await p.execute(
       `INSERT INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, smtp_pass, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)`,
-      [id, username, password, role || "User", fullName || "", email || "", phone || "", position || "", telegramId || "", smtp_pass || "", now, now]
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)`,
+      [id, username, hashedPassword, role || "User", fullName || "", email || "", phone || "", position || "", telegramId || "", smtp_pass || "", now, now]
     );
     const [rows] = await p.execute<RowDataPacket[]>(
       "SELECT id, username, role, fullName, email, phone, position, telegramId, avatarUrl, createdAt, updatedAt FROM users WHERE id = ?",
@@ -152,17 +173,18 @@ router.post("/api/users", async (req, res) => {
   }
 });
 
-// ─── Update user (admin) ───
-router.put("/api/users/:id", async (req, res) => {
+// ─── Update user (protected, admin) ───
+protectedUsersRouter.put("/api/users/:id", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
     const { role, fullName, email, phone, position, telegramId, password } = req.body;
     const now = new Date().toISOString();
     if (password) {
+      const hashedPassword = await hashPassword(password);
       await p.execute(
         "UPDATE users SET role = ?, fullName = ?, email = ?, phone = ?, position = ?, telegramId = ?, password = ?, updatedAt = ? WHERE id = ?",
-        [role || "User", fullName || "", email || "", phone || "", position || "", telegramId || "", password, now, req.params.id]
+        [role || "User", fullName || "", email || "", phone || "", position || "", telegramId || "", hashedPassword, now, req.params.id]
       );
     } else {
       await p.execute(
@@ -181,8 +203,8 @@ router.put("/api/users/:id", async (req, res) => {
   }
 });
 
-// ─── Delete user ───
-router.delete("/api/users/:id", async (req, res) => {
+// ─── Delete user (protected) ───
+protectedUsersRouter.delete("/api/users/:id", async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
@@ -200,5 +222,3 @@ router.delete("/api/users/:id", async (req, res) => {
     res.status(500).json({ error: message });
   }
 });
-
-export default router;

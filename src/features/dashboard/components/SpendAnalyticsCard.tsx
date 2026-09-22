@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { RefreshCw, Building2, Package, Coins, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { format, subDays } from "date-fns";
@@ -11,7 +12,6 @@ import SelectField from "@/features/shared/components/SelectField";
 import { FormLabel } from "@/features/shared/components/FormLabel";
 import { formatAmount } from "@/features/shared/utils/format";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
-import { useToast } from "@/features/shared/components/Toast";
 
 interface DimensionRow {
   key: string;
@@ -81,9 +81,6 @@ interface FilterValues {
 }
 
 export default function SpendAnalyticsCard() {
-  const { toast } = useToast();
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("campus");
 
   const [startDate, setStartDate] = useState(() => format(subDays(new Date(), 30), "yyyy-MM-dd"));
@@ -94,67 +91,58 @@ export default function SpendAnalyticsCard() {
   const [department, setDepartment] = useState("");
   const [campus, setCampus] = useState("");
   const [transactionType, setTransactionType] = useState("Issue");
-  const [filterValues, setFilterValues] = useState<FilterValues>({
-    warehouses: [],
-    departments: [],
-    divisions: [],
-    campuses: [],
-    transactionTypes: [],
-  });
+
+  const [debouncedFilters, setDebouncedFilters] = useState({ startDate, endDate, top, warehouse, division, department, campus, transactionType });
 
   useEffect(() => {
-    const fetchFilterValues = async () => {
-      try {
-        const res = await fetch("/api/stock-issue-items/filters/values");
-        if (res.ok) setFilterValues(await res.json());
-      } catch {
-        // ignore
-      }
-    };
-    fetchFilterValues();
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedFilters({ startDate, endDate, top, warehouse, division, department, campus, transactionType });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [startDate, endDate, top, warehouse, division, department, campus, transactionType]);
 
-  const fetchAnalytics = useCallback(async () => {
-    if (!startDate || !endDate) return;
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      params.set("startDate", startDate);
-      params.set("endDate", endDate);
-      const topNum = Math.max(1, Math.min(100, Number(top) || 10));
-      params.set("top", String(topNum));
-      if (warehouse) params.set("warehouse", warehouse);
-      if (division) params.set("division", division);
-      if (department) params.set("department", department);
-      if (campus) params.set("campus", campus);
-      if (transactionType) params.set("transactionType", transactionType);
-      const res = await fetch(`/api/stock-issue-items/analytics?${params}`);
-      if (!res.ok) throw new Error((await res.json()).error || "Failed to load analytics.");
+  const { data: filterValues } = useQuery({
+    queryKey: ["stock-filter-values"],
+    queryFn: async (): Promise<FilterValues> => {
+      const res = await fetch("/api/stock-issue-items/filters/values");
+      if (!res.ok) return { warehouses: [], departments: [], divisions: [], campuses: [], transactionTypes: [] };
+      return res.json();
+    },
+  });
+
+  const analyticsParams = useMemo(() => {
+    if (!debouncedFilters.startDate || !debouncedFilters.endDate) return "";
+    const params = new URLSearchParams();
+    params.set("startDate", debouncedFilters.startDate);
+    params.set("endDate", debouncedFilters.endDate);
+    const topNum = Math.max(1, Math.min(100, Number(debouncedFilters.top) || 10));
+    params.set("top", String(topNum));
+    if (debouncedFilters.warehouse) params.set("warehouse", debouncedFilters.warehouse);
+    if (debouncedFilters.division) params.set("division", debouncedFilters.division);
+    if (debouncedFilters.department) params.set("department", debouncedFilters.department);
+    if (debouncedFilters.campus) params.set("campus", debouncedFilters.campus);
+    if (debouncedFilters.transactionType) params.set("transactionType", debouncedFilters.transactionType);
+    return params.toString();
+  }, [debouncedFilters]);
+
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ["spend-analytics", analyticsParams],
+    queryFn: async (): Promise<AnalyticsData> => {
+      if (!analyticsParams) return { summary: { totalItems: 0, totalQuantity: 0, totalAmount: 0 }, previousSummary: { totalItems: 0, totalQuantity: 0, totalAmount: 0, startDate: "", endDate: "" }, trend: [], yoyCompare: [], byCampus: [], byDepartment: [], byDivision: [], byWarehouse: [], byRequester: [], byType: [], topByCount: [], topByAmount: [] };
+      const res = await fetch(`/api/stock-issue-items/analytics?${analyticsParams}`);
+      if (!res.ok) throw new Error("Failed to load analytics.");
       const json = await res.json();
-      setData({
+      return {
         ...json,
         summary: json.summary || { totalItems: 0, totalQuantity: 0, totalAmount: 0 },
         previousSummary: json.previousSummary || { totalItems: 0, totalQuantity: 0, totalAmount: 0, startDate: "", endDate: "" },
         trend: json.trend || [],
         yoyCompare: json.yoyCompare || [],
-      });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load analytics.");
-    } finally {
-      setLoading(false);
-    }
-  }, [startDate, endDate, top, warehouse, division, department, campus, transactionType, toast]);
-
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!startDate || !endDate) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(fetchAnalytics, 400);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [startDate, endDate, top, warehouse, division, department, campus, transactionType, fetchAnalytics]);
+      };
+    },
+    enabled: Boolean(analyticsParams),
+    placeholderData: (prev) => prev,
+  });
 
   const dimensionRows: DimensionRow[] = data
     ? (data[DIMENSION_TABS.find((t) => t.id === activeTab)?.dataKey as keyof AnalyticsData] as DimensionRow[])
@@ -284,7 +272,6 @@ export default function SpendAnalyticsCard() {
 
   return (
     <div className="space-y-4">
-      {/* Filters + KPIs */}
       <Card size="sm">
         <CardHeader className="flex-row items-center gap-2 space-y-0 px-3 pt-1 pb-0.5">
           <Coins className="w-4 h-4 text-foreground shrink-0" />
@@ -293,7 +280,6 @@ export default function SpendAnalyticsCard() {
             variant="ghost"
             size="icon"
             className="ml-auto h-7 w-7"
-            onClick={fetchAnalytics}
             disabled={loading}
           >
             <RefreshCw className={loading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
@@ -315,23 +301,23 @@ export default function SpendAnalyticsCard() {
             </div>
             <div>
               <FormLabel>Warehouse</FormLabel>
-              <SelectField value={warehouse} onChange={setWarehouse} placeholder="All" options={option(filterValues.warehouses)} />
+              <SelectField value={warehouse} onChange={setWarehouse} placeholder="All" options={option(filterValues?.warehouses ?? [])} />
             </div>
             <div>
               <FormLabel>Department</FormLabel>
-              <SelectField value={department} onChange={setDepartment} placeholder="All" options={option(filterValues.departments)} />
+              <SelectField value={department} onChange={setDepartment} placeholder="All" options={option(filterValues?.departments ?? [])} />
             </div>
             <div>
               <FormLabel>Division</FormLabel>
-              <SelectField value={division} onChange={setDivision} placeholder="All" options={option(filterValues.divisions)} />
+              <SelectField value={division} onChange={setDivision} placeholder="All" options={option(filterValues?.divisions ?? [])} />
             </div>
             <div>
               <FormLabel>Campus</FormLabel>
-              <SelectField value={campus} onChange={setCampus} placeholder="All" options={option(filterValues.campuses)} />
+              <SelectField value={campus} onChange={setCampus} placeholder="All" options={option(filterValues?.campuses ?? [])} />
             </div>
             <div>
               <FormLabel>Type</FormLabel>
-              <SelectField value={transactionType} onChange={setTransactionType} placeholder="All Types" options={[{ value: "", label: "All Types" }, ...option(filterValues.transactionTypes)]} />
+              <SelectField value={transactionType} onChange={setTransactionType} placeholder="All Types" options={[{ value: "", label: "All Types" }, ...option(filterValues?.transactionTypes ?? [])]} />
             </div>
           </div>
 
@@ -369,7 +355,6 @@ export default function SpendAnalyticsCard() {
         </CardContent>
       </Card>
 
-      {/* Year-over-Year comparison */}
       {data && data.yoyCompare.length > 0 && (
         <Card size="sm">
           <CardHeader className="flex-row items-center gap-2 space-y-0 px-3 pt-2 pb-1">
@@ -413,7 +398,6 @@ export default function SpendAnalyticsCard() {
         </Card>
       )}
 
-      {/* Breakdown by dimension */}
       <Card size="sm">
         <CardHeader className="flex-row items-center gap-2 space-y-0 px-3 pt-2 pb-1">
           <Building2 className="w-4 h-4 text-foreground shrink-0" />
@@ -436,7 +420,6 @@ export default function SpendAnalyticsCard() {
         </CardContent>
       </Card>
 
-      {/* Top lists */}
       {data && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card size="sm">

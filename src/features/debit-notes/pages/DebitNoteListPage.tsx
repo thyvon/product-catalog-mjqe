@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useConfirmModal } from "@/features/shared/hooks";
 import { Button } from "@/components/ui/button";
@@ -19,24 +20,7 @@ import SelectField from "@/features/shared/components/SelectField";
 import ConfirmModal from "@/features/shared/components/ConfirmModal";
 import { formatAmount, formatDisplayDate } from "@/features/shared/utils/format";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-
-interface DebitNote {
-  id: string;
-  referenceNumber: string;
-  warehouse: string;
-  department: string;
-  campus: string;
-  division: string;
-  startDate: string;
-  endDate: string;
-  sendDate: string | null;
-  status: string;
-  createdBy: string;
-  itemCount: number;
-  totalAmount: number;
-  debitNoteEmail: { receiverName: string; sendToEmail: string[]; ccToEmail: string[] } | null;
-  createdAt: string;
-}
+import { debitNotesApi, type DebitNote } from "@/features/debit-notes/api";
 
 interface EmailProgress {
   status: string;
@@ -49,9 +33,7 @@ interface EmailProgress {
 export default function DebitNoteListPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [notes, setNotes] = useState<DebitNote[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   // Filters
   const [warehouse, setWarehouse] = useState("");
@@ -72,62 +54,39 @@ export default function DebitNoteListPage() {
   const [sendingEmails, setSendingEmails] = useState(false);
 
   // Preview modal
-  const [previewNote, setPreviewNote] = useState<any>(null);
+  const [previewNote, setPreviewNote] = useState<DebitNote | null>(null);
   const [showPreview, setShowPreview] = useState(false);
 
   const { confirmState, confirm, closeConfirm } = useConfirmModal();
 
-  // Filter dropdown values
-  const fetchIdRef = useRef(0);
-
-  const [filterValues, setFilterValues] = useState<{ warehouses: string[]; departments: string[]; campuses: string[]; statuses: string[] }>({
-    warehouses: [], departments: [], campuses: [], statuses: [],
+  const { data: filterValues } = useQuery({
+    queryKey: ["debit-note-filter-values"],
+    queryFn: debitNotesApi.getFilterValues,
   });
 
-  const fetchNotes = useCallback(async () => {
-    const id = ++fetchIdRef.current;
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (warehouse) params.set("warehouse", warehouse);
-      if (department) params.set("department", department);
-      if (campus) params.set("campus", campus);
-      if (statusFilter) params.set("status", statusFilter);
-      if (startDate) params.set("startDate", startDate);
-      if (endDate) params.set("endDate", endDate);
-      if (searchQuery) params.set("search", searchQuery);
-      params.set("page", String(currentPage));
-      params.set("pageSize", String(pageSize));
-
-      const res = await fetch(`/api/debit-notes?${params}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (id !== fetchIdRef.current) return;
-      setNotes(data.data || []);
-      setTotal(data.total || 0);
-    } catch { } finally { if (id === fetchIdRef.current) setLoading(false); }
+  const queryParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (warehouse) params.warehouse = warehouse;
+    if (department) params.department = department;
+    if (campus) params.campus = campus;
+    if (statusFilter) params.status = statusFilter;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    if (searchQuery) params.search = searchQuery;
+    params.page = String(currentPage);
+    params.pageSize = String(pageSize);
+    return params;
   }, [warehouse, department, campus, statusFilter, startDate, endDate, searchQuery, currentPage, pageSize]);
 
-  const fetchFilterValues = async () => {
-    try {
-      const res = await fetch("/api/debit-notes/filters/values");
-      if (res.ok) {
-        const nextValues = await res.json();
-        setFilterValues({
-          warehouses: nextValues?.warehouses ?? [],
-          departments: nextValues?.departments ?? [],
-          campuses: nextValues?.campuses ?? [],
-          statuses: nextValues?.statuses ?? [],
-        });
-      }
-    } catch { }
-  };
+  const { data: notesData, isLoading: loading } = useQuery({
+    queryKey: ["debit-notes", queryParams],
+    queryFn: () => debitNotesApi.list(queryParams),
+  });
 
-  useEffect(() => { fetchNotes(); }, [fetchNotes]);
-  useEffect(() => { fetchFilterValues(); }, []);
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [warehouse, department, campus, statusFilter, startDate, endDate, searchQuery]);
+  const notes = notesData?.data ?? [];
+  const total = notesData?.total ?? 0;
+
+  useEffect(() => { setCurrentPage(1); }, [warehouse, department, campus, statusFilter, startDate, endDate, searchQuery]);
 
   // Poll email progress
   useEffect(() => {
@@ -141,15 +100,24 @@ export default function DebitNoteListPage() {
           if (data.finished) {
             setSendingEmails(false);
             clearInterval(interval);
-            fetchNotes();
+            queryClient.invalidateQueries({ queryKey: ["debit-notes"] });
           }
         }
-      } catch { }
+      } catch { /* poll error ignored */ }
     }, 1000);
     return () => clearInterval(interval);
-  }, [sendingEmails, fetchNotes, user]);
+  }, [sendingEmails, queryClient, user]);
 
-  const handleSendEmails = useCallback(async () => {
+  const deleteMutation = useMutation({
+    mutationFn: debitNotesApi.remove,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["debit-notes"] });
+      toast.success("Debit note deleted.");
+    },
+    onError: () => toast.error("Failed to delete."),
+  });
+
+  const handleSendEmails = useCallback(() => {
     confirm(
       "Share Debit Notes",
       "Send emails for all pending debit notes with the current filters?",
@@ -158,23 +126,13 @@ export default function DebitNoteListPage() {
         setSendingEmails(true);
         setProgress({ status: "Starting...", finished: false });
         try {
-          const res = await fetch("/api/debit-notes/send-emails", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              warehouse: warehouse || undefined,
-              department: department || undefined,
-              campus: campus || undefined,
-              startDate: startDate || undefined,
-              endDate: endDate || undefined,
-              user: user?.username || "anonymous",
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            setSendingEmails(false);
-            toast.error(data.error || "Failed to send emails.");
-          }
+          const filterParams: Record<string, string> = {};
+          if (warehouse) filterParams.warehouse = warehouse;
+          if (department) filterParams.department = department;
+          if (campus) filterParams.campus = campus;
+          if (startDate) filterParams.startDate = startDate;
+          if (endDate) filterParams.endDate = endDate;
+          await debitNotesApi.sendEmails([user?.username || "anonymous"]);
         } catch {
           setSendingEmails(false);
           toast.error("Failed to send emails.");
@@ -182,7 +140,7 @@ export default function DebitNoteListPage() {
       },
       "Send",
     );
-  }, [warehouse, department, campus, startDate, endDate, user, toast, fetchNotes, confirm, closeConfirm]);
+  }, [warehouse, department, campus, startDate, endDate, user, toast, confirm, closeConfirm]);
 
   const handleResend = useCallback((note: DebitNote) => {
     const isPending = note.status === "pending";
@@ -198,16 +156,7 @@ export default function DebitNoteListPage() {
         setSendingEmails(true);
         setProgress({ status: "Starting...", finished: false });
         try {
-          const res = await fetch(`/api/debit-notes/${note.id}/resend`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user: user?.username || "anonymous" }),
-          });
-          if (!res.ok) {
-            setSendingEmails(false);
-            const data = await res.json();
-            toast.error(data.error || "Failed to resend.");
-          }
+          await debitNotesApi.resendEmails([note.id]);
         } catch {
           setSendingEmails(false);
           toast.error("Failed to resend.");
@@ -215,7 +164,7 @@ export default function DebitNoteListPage() {
       },
       isPending ? "Send" : "Resend",
     );
-  }, [user, toast, confirm, closeConfirm]);
+  }, [toast, confirm, closeConfirm]);
 
   const handleExport = useCallback(async (id: string) => {
     try {
@@ -232,21 +181,21 @@ export default function DebitNoteListPage() {
     } catch {
       toast.error("Failed to export.");
     }
-  }, []);
+  }, [toast]);
 
-  const handleBulkExport = async () => {
+  const handleBulkExport = useCallback(async () => {
     try {
+      const filterParams: Record<string, string> = {};
+      if (warehouse) filterParams.warehouse = warehouse;
+      if (department) filterParams.department = department;
+      if (campus) filterParams.campus = campus;
+      if (statusFilter) filterParams.status = statusFilter;
+      if (startDate) filterParams.startDate = startDate;
+      if (endDate) filterParams.endDate = endDate;
       const res = await fetch("/api/debit-notes/export-bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          warehouse: warehouse || undefined,
-          department: department || undefined,
-          campus: campus || undefined,
-          status: statusFilter || undefined,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-        }),
+        body: JSON.stringify(filterParams),
       });
       if (res.ok) {
         const blob = await res.blob();
@@ -260,25 +209,19 @@ export default function DebitNoteListPage() {
     } catch {
       toast.error("Failed to bulk export.");
     }
-  };
+  }, [warehouse, department, campus, statusFilter, startDate, endDate, toast]);
 
   const handleDelete = useCallback((id: string) => {
     confirm(
       "Delete Debit Note",
       "Delete this debit note? This action cannot be undone.",
-      async () => {
+      () => {
         closeConfirm();
-        try {
-          const res = await fetch(`/api/debit-notes/${id}`, { method: "DELETE" });
-          if (res.ok) fetchNotes();
-          else toast.error("Failed to delete.");
-        } catch {
-          toast.error("Failed to delete.");
-        }
+        deleteMutation.mutate(id);
       },
       "Delete",
     );
-  }, [fetchNotes, toast, confirm, closeConfirm]);
+  }, [confirm, closeConfirm, deleteMutation]);
 
   const hasActiveFilters = useMemo(
     () => Boolean(warehouse || department || campus || statusFilter || startDate || endDate || searchQuery),
@@ -310,7 +253,7 @@ export default function DebitNoteListPage() {
             const deleted = data.count ?? total;
             toast.success(`Deleted ${deleted} debit note${deleted !== 1 ? "s" : ""}.`);
             setCurrentPage(1);
-            fetchNotes();
+            queryClient.invalidateQueries({ queryKey: ["debit-notes"] });
           } else {
             const data = await res.json();
             toast.error(data.error || "Failed to delete debit notes.");
@@ -321,7 +264,7 @@ export default function DebitNoteListPage() {
       },
       "Delete All",
     );
-  }, [hasActiveFilters, total, confirm, closeConfirm, warehouse, department, campus, statusFilter, startDate, endDate, searchQuery, fetchNotes, toast]);
+  }, [hasActiveFilters, total, confirm, closeConfirm, warehouse, department, campus, statusFilter, startDate, endDate, searchQuery, queryClient, toast]);
 
   const handlePreview = useCallback(async (id: string) => {
     try {
@@ -333,7 +276,7 @@ export default function DebitNoteListPage() {
     } catch {
       toast.error("Failed to load details.");
     }
-  }, []);
+  }, [toast]);
 
   const statusBadge = useCallback((status: string) => {
     const variants: Record<string, string> = {
@@ -443,7 +386,7 @@ export default function DebitNoteListPage() {
             <TooltipTrigger render={<Button
             variant="outline"
             size="icon"
-            onClick={fetchNotes}
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["debit-notes"] })}
           >
             <RefreshCw className={loading ? "animate-spin" : ""} />
           </Button>} />
@@ -488,21 +431,21 @@ export default function DebitNoteListPage() {
             onChange={setWarehouse}
             placeholder="All Warehouses"
             containerClassName="min-w-[140px]"
-            options={buildFilterOptions(filterValues.warehouses, "All Warehouses")}
+            options={buildFilterOptions(filterValues?.warehouses ?? [], "All Warehouses")}
           />
           <SelectField
             value={department}
             onChange={setDepartment}
             placeholder="All Departments"
             containerClassName="min-w-[140px]"
-            options={buildFilterOptions(filterValues.departments, "All Departments")}
+            options={buildFilterOptions(filterValues?.departments ?? [], "All Departments")}
           />
           <SelectField
             value={campus}
             onChange={setCampus}
             placeholder="All Campuses"
             containerClassName="min-w-[140px]"
-            options={buildFilterOptions(filterValues.campuses, "All Campuses")}
+            options={buildFilterOptions(filterValues?.campuses ?? [], "All Campuses")}
           />
           <SelectField
             value={statusFilter}
@@ -511,7 +454,7 @@ export default function DebitNoteListPage() {
             containerClassName="min-w-[140px]"
             options={[
               { value: "", label: "All Statuses" },
-              ...filterValues.statuses.map((value) => ({ value, label: value.charAt(0).toUpperCase() + value.slice(1) })),
+              ...(filterValues?.statuses ?? []).map((value) => ({ value, label: value.charAt(0).toUpperCase() + value.slice(1) })),
             ]}
           />
           {(warehouse || department || campus || statusFilter || startDate || endDate || searchQuery) && (
@@ -561,7 +504,7 @@ export default function DebitNoteListPage() {
         }}
       />
 
-      <DebitNoteGenerateModal isOpen={showGenerate} onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); fetchNotes(); }} />
+      <DebitNoteGenerateModal isOpen={showGenerate} onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); queryClient.invalidateQueries({ queryKey: ["debit-notes"] }); }} />
       <DebitNotePreviewModal isOpen={showPreview} onClose={() => setShowPreview(false)} previewNote={previewNote} />
 
       {/* Failed notes alert */}

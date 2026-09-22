@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import type { ColumnDef } from "@tanstack/react-table";
 import { GitMerge, SquarePen, RefreshCw, X } from "lucide-react";
@@ -15,19 +16,26 @@ import type { PMProduct } from "@/features/shared/types";
 import { pmLinkedEpurchaseCodes, pmProducts } from "@/features/product-management/api";
 import { useAuth } from "@/features/auth/AuthContext";
 
+const companyItemsApi = {
+  list: async (params: URLSearchParams, userId: string): Promise<{ data: CompanyItem[]; recordsFiltered: number; recordsTotal: number }> => {
+    const res = await fetch(`/api/company/items?${params.toString()}`, {
+      headers: { "X-User-Id": String(userId) },
+    });
+    if (res.status === 401) throw new Error("UNAUTHORIZED");
+    if (!res.ok) throw new Error("Failed to fetch company items.");
+    return res.json();
+  },
+};
+
 export default function CompanyItemsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { logout } = useAuth();
-  const [rows, setRows] = useState<CompanyItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const abortRef = useRef<AbortController | null>(null);
-  const [linkedCodes, setLinkedCodes] = useState<Set<string>>(new Set());
 
   // Selection state
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -36,7 +44,6 @@ export default function CompanyItemsPage() {
   const [epurchaseCodeMap, setEpurchaseCodeMap] = useState<{ productId: string; epurchaseItemCode: string }[]>([]);
   const [fetchingMerge, setFetchingMerge] = useState(false);
 
-  // Debounce search input: 300ms after user stops typing
   useEffect(() => {
     const timer = setTimeout(() => {
       setSearchQuery(inputValue);
@@ -45,69 +52,50 @@ export default function CompanyItemsPage() {
     return () => clearTimeout(timer);
   }, [inputValue]);
 
-  const load = useCallback(async () => {
-    abortRef.current?.abort("new request");
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setLoading(true);
-    try {
-      const userId = JSON.parse(localStorage.getItem("auth_user") || "{}")?.id;
-      if (!userId) return;
-
-      const params = new URLSearchParams({
-        draw: "1",
-        start: String((currentPage - 1) * pageSize),
-        length: String(pageSize),
-        "search[value]": searchQuery,
-        "search[regex]": "false",
-        "order[0][column]": "11",
-        "order[0][dir]": "desc",
-      });
-
-      const res = await fetch(`/api/company/items?${params.toString()}`, {
-        headers: { "X-User-Id": String(userId) },
-        signal: controller.signal,
-      });
-
-      if (controller.signal.aborted) return;
-
-      const json = await res.json();
-
-      if (res.status === 401) {
-        logout();
-        navigate("/login");
-        return;
-      }
-
-      if (!res.ok || json.error) {
-        setRows([]);
-        setTotal(0);
-        return;
-      }
-
-      setRows(json.data ?? []);
-      setTotal(json.recordsFiltered ?? json.recordsTotal ?? 0);
-    } catch {
-      if (controller.signal.aborted) return;
-      setRows([]);
-      setTotal(0);
-    } finally {
-      if (!controller.signal.aborted) {
-        setLoading(false);
-      }
-    }
-  }, [currentPage, pageSize, searchQuery]);
-
-  useEffect(() => { load(); }, [load]);
-
-  useEffect(() => {
-    pmLinkedEpurchaseCodes()
-      .then((codes) => setLinkedCodes(new Set(codes)))
-      .catch(() => {});
+  const userId = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("auth_user") || "{}")?.id; } catch { return undefined; }
   }, []);
 
-  // Selection helpers (same pattern as PmProductsTab)
+  const queryParams = useMemo(() => {
+    const params = new URLSearchParams({
+      draw: "1",
+      start: String((currentPage - 1) * pageSize),
+      length: String(pageSize),
+      "search[value]": searchQuery,
+      "search[regex]": "false",
+      "order[0][column]": "11",
+      "order[0][dir]": "desc",
+    });
+    return params.toString();
+  }, [currentPage, pageSize, searchQuery]);
+
+  const { data, isLoading: loading, refetch } = useQuery({
+    queryKey: ["company-items", queryParams, userId],
+    queryFn: async () => {
+      if (!userId) return { data: [], recordsFiltered: 0, recordsTotal: 0 };
+      return companyItemsApi.list(new URLSearchParams(queryParams), userId);
+    },
+    placeholderData: (prev) => prev,
+  });
+
+  const rows = useMemo(() => data?.data ?? [], [data]);
+  const total = data?.recordsFiltered ?? data?.recordsTotal ?? 0;
+
+  useEffect(() => {
+    if (data === undefined) return;
+    if ((data as unknown as { error?: string }).error) {
+      logout();
+      navigate("/login");
+    }
+  }, [data, logout, navigate]);
+
+  const { data: linkedCodesData } = useQuery({
+    queryKey: ["pm-linked-codes"],
+    queryFn: pmLinkedEpurchaseCodes,
+  });
+
+  const linkedCodes = useMemo(() => new Set(linkedCodesData ?? []), [linkedCodesData]);
+
   const toggleSelect = (itemCode: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -126,7 +114,6 @@ export default function CompanyItemsPage() {
 
   const selectedLinkedCount = selectedItems.filter((r) => linkedCodes.has(r.ItemCode)).length;
 
-  // Fetch linked PM products for selected items and open merge modal
   const handleMergeClick = async () => {
     setFetchingMerge(true);
     try {
@@ -160,7 +147,7 @@ export default function CompanyItemsPage() {
     }
   };
 
-  const columns = useMemo<ColumnDef<CompanyItem, any>[]>(() => [
+  const columns = useMemo<ColumnDef<CompanyItem, unknown>[]>(() => [
     {
       id: "select",
       header: () => (
@@ -234,7 +221,7 @@ export default function CompanyItemsPage() {
         title="E-Purchase Items"
         description={`${(total ?? 0).toLocaleString()} item${total !== 1 ? "s" : ""} found`}
         actions={
-          <Button variant="outline" size="icon" onClick={load}>
+          <Button variant="outline" size="icon" onClick={() => refetch()}>
             <RefreshCw className={loading ? "animate-spin" : ""} />
           </Button>
         }
@@ -294,7 +281,7 @@ export default function CompanyItemsPage() {
           setSelected(new Set());
           setMergeableProducts([]);
           setEpurchaseCodeMap([]);
-          load();
+          queryClient.invalidateQueries({ queryKey: ["company-items"] });
         }}
       />
     </PageContent>

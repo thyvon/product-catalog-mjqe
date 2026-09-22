@@ -15,6 +15,10 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   MAIL_FROM: z.string().optional(),
   COMPANY_API_URL: z.string().default("http://esign.mjqe.com.kh"),
+  JWT_SECRET: z.string().default("dev-jwt-secret-change-in-production-min-32-chars!!"),
+  CORS_ORIGIN: z.string().default("http://localhost:3000"),
+  RATE_LIMIT_WINDOW_MS: z.coerce.number().default(15 * 60 * 1000),
+  RATE_LIMIT_MAX: z.coerce.number().default(100),
 });
 
 export type Env = z.infer<typeof envSchema>;

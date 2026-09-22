@@ -9,6 +9,22 @@ ensureDebitNoteLogo();
 const tryListen = (port: number) => {
   createApp().then((app) => {
     const server = createHttpServer(app);
+
+    const shutdown = () => {
+      console.log("Shutting down gracefully...");
+      server.close(() => {
+        console.log("Server closed.");
+        process.exit(0);
+      });
+      setTimeout(() => {
+        console.error("Forced shutdown after timeout.");
+        process.exit(1);
+      }, 10000);
+    };
+
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
+
     server.once("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE") {
         const fallbackPort = port + 1;

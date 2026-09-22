@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PageContent from "@/features/shared/components/PageContent";
-import { useToast } from "@/features/shared/components/Toast";
 import { pmRefs } from "@/features/product-management/api";
 import type { PMRefs } from "@/features/shared/types";
 import PmProductsTab from "@/features/product-management/components/PmProductsTab";
@@ -40,21 +40,15 @@ const TABS = [
 type TabValue = (typeof TABS)[number]["value"];
 
 export default function ProductManagementPage() {
-  const { toast } = useToast();
-  const [refs, setRefs] = useState<PMRefs>(EMPTY_REFS);
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabValue>("products");
 
-  const refreshRefs = useCallback(async () => {
-    try {
-      setRefs(await pmRefs());
-    } catch (err: any) {
-      toast.error(err.message);
-    }
-  }, [toast]);
+  const { data: refs = EMPTY_REFS } = useQuery({
+    queryKey: ["pm-refs"],
+    queryFn: pmRefs,
+  });
 
-  useEffect(() => {
-    refreshRefs();
-  }, [refreshRefs]);
+  const refreshRefs = () => queryClient.invalidateQueries({ queryKey: ["pm-refs"] });
 
   return (
     <PageContent>

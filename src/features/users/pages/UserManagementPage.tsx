@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, RefreshCw, Pencil, Trash2, Shield, ShieldOff } from "lucide-react";
@@ -15,29 +16,15 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { Navigate } from "react-router-dom";
 import { FormLabel } from "@/features/shared/components/FormLabel";
 import { Badge } from "@/components/ui/badge";
-
-interface User {
-  id: string;
-  username: string;
-  role: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  position: string;
-  telegramId: string;
-  avatarUrl: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import { usersApi, type User, type CreateUserInput } from "@/features/users/api";
 
 const ROLES = ["Admin", "Procurement", "User"];
 
 export default function UserManagementPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { confirmState, confirm, closeConfirm } = useConfirmModal();
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -54,15 +41,30 @@ export default function UserManagementPage() {
     telegramId: "",
   });
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/users");
-      if (res.ok) setUsers(await res.json());
-    } catch { /* ignored */ } finally { setLoading(false); }
-  }, []);
+  const { data: users = [], isLoading: loading } = useQuery({
+    queryKey: ["users"],
+    queryFn: usersApi.list,
+  });
 
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+  const saveMutation = useMutation({
+    mutationFn: (data: { id?: string; values: Record<string, string> }) =>
+      data.id ? usersApi.update({ id: data.id, ...data.values }) : usersApi.create(data.values as unknown as CreateUserInput),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast.success(editing ? "User updated." : "User created.");
+      setShowForm(false);
+    },
+    onError: (err: Error) => toast.error(err.message || "An error occurred"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: usersApi.remove,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast.success("User deleted.");
+    },
+    onError: (err: Error) => toast.error(err.message || "Failed to delete"),
+  });
 
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -71,8 +73,6 @@ export default function UserManagementPage() {
       [u.username, u.fullName, u.email, u.role, u.position].some((v) => v?.toLowerCase().includes(q))
     );
   }, [users, searchQuery]);
-
-  useEffect(() => { setCurrentPage(1); }, [searchQuery]);
 
   const paginatedUsers = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -100,7 +100,7 @@ export default function UserManagementPage() {
     setShowForm(true);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!formData.username) {
       toast.error("Username is required.");
       return;
@@ -109,67 +109,34 @@ export default function UserManagementPage() {
       toast.error("Password is required for new users.");
       return;
     }
-    try {
-      if (editing) {
-        const body: Record<string, string> = {
-          role: formData.role,
-          fullName: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          position: formData.position,
-          telegramId: formData.telegramId,
-        };
-        if (formData.password) body.password = formData.password;
-        const res = await fetch(`/api/users/${editing.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) {
-          const d = await res.json().catch(() => ({}));
-          throw new Error(d.error || "Failed to update");
-        }
-        toast.success("User updated.");
-      } else {
-        const res = await fetch("/api/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        });
-        if (!res.ok) {
-          const d = await res.json().catch(() => ({}));
-          throw new Error(d.error || "Failed to create");
-        }
-        toast.success("User created.");
-      }
-      setShowForm(false);
-      fetchUsers();
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "An error occurred");
+    const values: Record<string, string> = {
+      role: formData.role,
+      fullName: formData.fullName,
+      email: formData.email,
+      phone: formData.phone,
+      position: formData.position,
+      telegramId: formData.telegramId,
+    };
+    if (!editing) {
+      values.username = formData.username;
+      values.password = formData.password;
+    } else if (formData.password) {
+      values.password = formData.password;
     }
+    saveMutation.mutate({ id: editing?.id, values });
   };
 
-  const handleDelete = (user: User) => {
+  const handleDelete = useCallback((user: User) => {
     confirm(
       "Delete User",
       `Delete "${user.username}" (${user.fullName || "no name"})? This cannot be undone.`,
-      async () => {
+      () => {
         closeConfirm();
-        try {
-          const res = await fetch(`/api/users/${user.id}`, { method: "DELETE" });
-          if (!res.ok) {
-            const d = await res.json().catch(() => ({}));
-            throw new Error(d.error || "Failed to delete");
-          }
-          toast.success("User deleted.");
-          fetchUsers();
-        } catch (err: unknown) {
-          toast.error(err instanceof Error ? err.message : "Failed to delete");
-        }
+        deleteMutation.mutate(user.id);
       },
       "Delete",
     );
-  };
+  }, [confirm, closeConfirm, deleteMutation]);
 
   const columns = useMemo<ColumnDef<User>[]>(() => [
     {
@@ -220,7 +187,7 @@ export default function UserManagementPage() {
         </div>
       ),
     },
-  ], []);
+  ], [handleDelete]);
 
   if (user?.role !== "Admin") {
     return <Navigate to="/" replace />;
@@ -233,7 +200,7 @@ export default function UserManagementPage() {
         description={`${filtered.length} user${filtered.length !== 1 ? "s" : ""} found`}
         actions={
           <>
-            <Button variant="outline" size="icon" onClick={fetchUsers}>
+            <Button variant="outline" size="icon" onClick={() => queryClient.invalidateQueries({ queryKey: ["users"] })}>
               <RefreshCw className={loading ? "animate-spin" : ""} />
             </Button>
             <Button onClick={openCreate}>
@@ -242,7 +209,7 @@ export default function UserManagementPage() {
           </>
         }
         searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchChange={(v) => { setSearchQuery(v); setCurrentPage(1); }}
         searchPlaceholder="Search users..."
       >
         <ConfirmModal
@@ -336,7 +303,9 @@ export default function UserManagementPage() {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-              <Button onClick={handleSave}>{editing ? "Update" : "Create"}</Button>
+              <Button onClick={handleSave} disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? "Saving..." : editing ? "Update" : "Create"}
+              </Button>
             </div>
           </div>
         </BaseModal>

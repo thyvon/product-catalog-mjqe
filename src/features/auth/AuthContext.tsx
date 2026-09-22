@@ -29,10 +29,19 @@ interface LoginResponse {
   userPhoto?: string;
 }
 
+interface LocalLoginResponse {
+  id: string;
+  username: string;
+  role: string;
+  fullName: string;
+  token: string;
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
   formToken: string | null;
+  jwt: string | null;
   login: (employeeId: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
@@ -55,9 +64,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem("auth_form_token");
   });
 
+  const [jwt, setJwt] = useState<string | null>(() => {
+    return localStorage.getItem("auth_jwt");
+  });
+
   useEffect(() => {
     if (user && !user.role) {
-      api.get<{ role: string; fullName: string }>(`/api/users/profile?username=${encodeURIComponent(user.username)}`)
+      const localToken = localStorage.getItem("auth_jwt");
+      const headers: Record<string, string> = {};
+      if (localToken) headers["Authorization"] = `Bearer ${localToken}`;
+      fetch(`/api/users/profile?username=${encodeURIComponent(user.username)}`, { headers })
+        .then((res) => res.json())
         .then((profile) => {
           const updated = { ...user };
           if (profile.role) updated.role = profile.role;
@@ -89,9 +106,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch { /* sync failed, continue with login */ }
 
       let role = "User";
+      let localJwt = "";
       try {
-        const profile = await api.get<{ role: string }>(`/api/users/profile?username=${encodeURIComponent(data.user.username)}`);
-        if (profile.role) role = profile.role;
+        const localLoginRes = await fetch("/api/users/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: data.user.username, password }),
+        });
+        if (localLoginRes.ok) {
+          const localData: LocalLoginResponse = await localLoginRes.json();
+          if (localData.role) role = localData.role;
+          localJwt = localData.token;
+        }
       } catch { /* use default role */ }
 
       const u: User = {
@@ -109,10 +135,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(u);
       setToken(data.data);
       setFormToken(data.formToken);
+      setJwt(localJwt);
 
       localStorage.setItem("auth_user", JSON.stringify(u));
       localStorage.setItem("auth_token", data.data);
       localStorage.setItem("auth_form_token", data.formToken);
+      localStorage.setItem("auth_jwt", localJwt);
 
       // Create server session + background prefetch all items
       api.post("/api/company/session", {
@@ -132,9 +160,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setToken(null);
     setFormToken(null);
+    setJwt(null);
     localStorage.removeItem("auth_user");
     localStorage.removeItem("auth_token");
     localStorage.removeItem("auth_form_token");
+    localStorage.removeItem("auth_jwt");
     if (userId) {
       fetch(`/api/company/session?userId=${encodeURIComponent(String(userId))}`, { method: "DELETE" }).catch(() => {});
     }
@@ -159,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, formToken, login, logout, updateProfile, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, token, formToken, jwt, login, logout, updateProfile, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

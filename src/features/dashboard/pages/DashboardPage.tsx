@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/features/auth/AuthContext";
 import { CheckCircle, XCircle, RefreshCw, Layers, Globe, Users, Eye, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,19 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
-import type { CatalogStats } from "@/features/shared/types";
 import { FormLabel } from "@/features/shared/components/FormLabel";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import PageContent from "@/features/shared/components/PageContent";
 import SpendAnalyticsCard from "@/features/dashboard/components/SpendAnalyticsCard";
-
-interface VisitStats {
-  liveVisitors: number;
-  totalVisits: number;
-  paths: { path: string; count: number }[];
-  recent: { path: string; time: number }[];
-  timeline: { time: string; visits: number; visitors: number }[];
-}
+import { productsApi } from "@/features/products/api";
+import { dashboardApi } from "@/features/dashboard/api";
 
 const chartConfig = {
   visits: { label: "Visits", color: "var(--color-primary)" },
@@ -27,47 +20,17 @@ const chartConfig = {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<CatalogStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [visitStats, setVisitStats] = useState<VisitStats | null>(null);
-  const [visitLoading, setVisitLoading] = useState(true);
 
-  const fetchStats = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/products/stats");
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: stats, isLoading: loading } = useQuery({
+    queryKey: ["products", "stats"],
+    queryFn: productsApi.getStats,
+  });
 
-  const fetchVisitStats = async () => {
-    setVisitLoading(true);
-    try {
-      const res = await fetch("/api/visit/stats");
-      if (res.ok) {
-        const data = await res.json();
-        setVisitStats(data);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setVisitLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchStats();
-    fetchVisitStats();
-    const interval = setInterval(fetchVisitStats, 15000);
-    return () => clearInterval(interval);
-  }, []);
+  const { data: visitStats, isLoading: visitLoading } = useQuery({
+    queryKey: ["visit-stats"],
+    queryFn: dashboardApi.getVisitStats,
+    refetchInterval: 15000,
+  });
 
   const statCards = [
     {
@@ -78,13 +41,13 @@ export default function DashboardPage() {
     },
     {
       label: "Active",
-      value: stats?.activeCount ?? 0,
+      value: stats?.activeProducts ?? 0,
       icon: CheckCircle,
       color: "bg-muted text-foreground",
     },
     {
       label: "Inactive",
-      value: stats?.inactiveCount ?? 0,
+      value: (stats?.totalProducts ?? 0) - (stats?.activeProducts ?? 0),
       icon: XCircle,
       color: "bg-muted text-muted-foreground",
     },
@@ -130,7 +93,6 @@ export default function DashboardPage() {
           <TooltipTrigger render={<Button
           variant="outline"
           size="icon"
-          onClick={() => { fetchStats(); fetchVisitStats(); }}
         >
           <RefreshCw className={loading || visitLoading ? "animate-spin" : ""} />
         </Button>} />

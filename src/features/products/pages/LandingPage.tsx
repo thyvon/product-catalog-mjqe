@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   RefreshCw as Refresh,
   AlertCircle as DangerCircle,
@@ -30,13 +31,14 @@ import ListPageLayout from "@/features/shared/components/ListPageLayout";
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96];
 
-export default function LandingPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [total, setTotal] = useState(0);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+interface CatalogResponse {
+  data: Product[];
+  total: number;
+  categories: string[];
+  uoms: string[];
+}
 
+export default function LandingPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("active");
@@ -48,47 +50,44 @@ export default function LandingPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const buildParams = useCallback((overrides: Record<string, any> = {}) => {
-    const p = { page: currentPage, pageSize, search: searchQuery, category: selectedCategory, status: statusFilter, sort: sortBy, ...overrides };
-    return new URLSearchParams(
-      Object.entries(p).filter(([, v]) => v !== "" && v !== undefined && v !== "all").map(([k, v]) => [k, String(v)])
-    ).toString();
-  }, [currentPage, pageSize, searchQuery, selectedCategory, statusFilter, sortBy]);
-
-  const fetchCatalog = useCallback(async (overrides: Record<string, any> = {}) => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/products?${buildParams(overrides)}`);
-      if (!res.ok) throw new Error("Could not load products catalog.");
-      const data = await res.json();
-      setProducts(data.data ?? []);
-      setTotal(data.total ?? 0);
-      setCategories(data.categories ?? []);
-    } catch (err: any) {
-      setError(err.message || "Failed to load catalog.");
-    } finally {
-      setLoading(false);
-    }
-  }, [buildParams]);
-
   useEffect(() => {
     fetch("/api/visit/log", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ path: "/product-list" }) }).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => fetchCatalog(), 300);
-    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
-  }, [fetchCatalog]);
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, statusFilter, sortBy]);
 
-  const resetPage = () => setCurrentPage(1);
+  const queryParams = useMemo(() => {
+    const p: Record<string, string | number> = { page: currentPage, pageSize, status: statusFilter, sort: sortBy };
+    if (searchQuery) p.search = searchQuery;
+    if (selectedCategory) p.category = selectedCategory;
+    return new URLSearchParams(
+      Object.entries(p).filter(([, v]) => v !== "" && v !== undefined && v !== "all").map(([k, v]) => [k, String(v)])
+    ).toString();
+  }, [currentPage, pageSize, searchQuery, selectedCategory, statusFilter, sortBy]);
+
+  const { data, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["catalog-landing", queryParams],
+    queryFn: async (): Promise<CatalogResponse> => {
+      const res = await fetch(`/api/products?${queryParams}`);
+      if (!res.ok) throw new Error("Could not load products catalog.");
+      return res.json();
+    },
+    placeholderData: (prev) => prev,
+  });
+
+  const products = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const categories = data?.categories ?? [];
+  const error = queryError ? (queryError as Error).message : "";
 
   const triggerExportCSV = useCallback(async () => {
     try {
-      const res = await fetch(`/api/products?${buildParams({ page: 1, pageSize: 0 })}`);
+      const exportParams = new URLSearchParams({ page: "1", pageSize: "0", status: statusFilter, sort: sortBy });
+      if (searchQuery) exportParams.set("search", searchQuery);
+      if (selectedCategory) exportParams.set("category", selectedCategory);
+      const res = await fetch(`/api/products?${exportParams}`);
       if (!res.ok) return;
       const data = await res.json();
       const all: Product[] = data.data;
@@ -110,7 +109,7 @@ export default function LandingPage() {
       link.click();
       document.body.removeChild(link);
     } catch { /* ignore */ }
-  }, [buildParams]);
+  }, [searchQuery, selectedCategory, statusFilter, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -131,7 +130,7 @@ export default function LandingPage() {
         actions={(
           <>
             <Tooltip>
-              <TooltipTrigger render={<Button variant="outline" size="icon" onClick={() => fetchCatalog()}>
+              <TooltipTrigger render={<Button variant="outline" size="icon" onClick={() => refetch()}>
                 <Refresh className={loading ? "animate-spin" : ""} />
               </Button>} />
               <TooltipContent>Reload catalog</TooltipContent>
@@ -142,12 +141,12 @@ export default function LandingPage() {
           </>
         )}
         searchValue={searchQuery}
-        onSearchChange={(v) => { setSearchQuery(v); resetPage(); }}
+        onSearchChange={(v) => setSearchQuery(v)}
         searchPlaceholder="Search by SKU code or name..."
         activeFilterCount={[selectedCategory, statusFilter !== "active" ? statusFilter : ""].filter(Boolean).length}
         filters={(
           <>
-            <Select value={selectedCategory} onValueChange={(v) => { setSelectedCategory(v); resetPage(); }}>
+            <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v)}>
               <SelectTrigger className="min-w-[160px]">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
@@ -158,7 +157,7 @@ export default function LandingPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={(v: "all" | "active" | "inactive") => { setStatusFilter(v); resetPage(); }}>
+            <Select value={statusFilter} onValueChange={(v: "all" | "active" | "inactive") => setStatusFilter(v)}>
               <SelectTrigger className="min-w-[130px]">
                 <SelectValue placeholder="All Lifecycles" />
               </SelectTrigger>
@@ -168,7 +167,7 @@ export default function LandingPage() {
                 <SelectItem value="inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={sortBy} onValueChange={(v: "name" | "code") => { setSortBy(v); resetPage(); }}>
+            <Select value={sortBy} onValueChange={(v: "name" | "code") => setSortBy(v)}>
               <SelectTrigger className="min-w-[150px]">
                 <SelectValue placeholder="Sort: Name (A-Z)" />
               </SelectTrigger>
@@ -193,7 +192,7 @@ export default function LandingPage() {
             <DangerCircle className="w-10 h-10 text-destructive mx-auto animate-bounce" />
             <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-destructive">Connection Interrupted</h3>
             <p className="text-xs text-destructive leading-relaxed font-medium">{error}</p>
-            <Button onClick={() => fetchCatalog()}>Try Again</Button>
+            <Button onClick={() => refetch()}>Try Again</Button>
           </div>
         ) : !loading && total === 0 ? (
           <div className="text-center py-20 bg-card border border-border rounded-3xl max-w-xl mx-auto mt-8 p-8 space-y-4 shadow-sm">

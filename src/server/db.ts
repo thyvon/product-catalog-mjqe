@@ -1,5 +1,6 @@
 import mysql, { type RowDataPacket } from "mysql2/promise";
 import { getEnv } from "./config.js";
+import { hashPassword } from "./services/password.js";
 
 let pool: mysql.Pool | null = null;
 let dbReady = false;
@@ -274,9 +275,10 @@ async function createTables(p: mysql.Pool) {
   const [adminRows] = await p.query<RowDataPacket[]>("SELECT id FROM users WHERE username = 'admin'");
   if (adminRows.length === 0) {
     const now = new Date().toISOString();
+    const adminHash = await hashPassword("admin");
     await p.query(
       "INSERT INTO users (id, username, password, role, fullName, email, position, avatarUrl, smtp_pass, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?)",
-      ["usr-admin", "admin", "admin", "Admin", "Administrator", "admin@mjqe.edu.kh", "System Administrator", "", now, now]
+      ["usr-admin", "admin", adminHash, "Admin", "Administrator", "admin@mjqe.edu.kh", "System Administrator", "", now, now]
     );
   }
 
@@ -562,18 +564,32 @@ async function migrateSchema(p: mysql.Pool) {
   for (const col of ["can_purchase", "can_stock", "can_issue", "can_sell"]) {
     try { await p.query(`ALTER TABLE pm_product_variant_uoms DROP COLUMN ${col}`); } catch {}
   }
+
+  // Hash any existing plaintext passwords (migration from plaintext to bcrypt)
+  try {
+    const [users] = await p.query<RowDataPacket[]>("SELECT id, password FROM users");
+    for (const user of users) {
+      if (user.password && !user.password.startsWith("$2")) {
+        const hashed = await hashPassword(user.password);
+        await p.execute("UPDATE users SET password = ? WHERE id = ?", [hashed, user.id]);
+      }
+    }
+  } catch {}
 }
 
 async function seedDefaults(p: mysql.Pool) {
   const now = new Date().toISOString();
 
+  const adminPassword = await hashPassword("admin");
+  const procurementPassword = await hashPassword("procurement");
+
   await p.execute(
     `INSERT IGNORE INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ["usr-001", "admin", "admin", "Admin", "System Administrator", "", "", "", "", "", now, now]
+    ["usr-001", "admin", adminPassword, "Admin", "System Administrator", "", "", "", "", "", now, now]
   );
   await p.execute(
     `INSERT IGNORE INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ["usr-002", "procurement", "procurement", "Procurement", "Procurement Officer", "", "", "", "", "", now, now]
+    ["usr-002", "procurement", procurementPassword, "Procurement", "Procurement Officer", "", "", "", "", "", now, now]
   );
 
   await p.execute(

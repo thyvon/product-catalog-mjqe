@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useMemo, useState, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useConfirmModal } from "@/features/shared/hooks";
 import { RefreshCw, Trash2, Upload, FileText, PlusCircle, Pencil, Download } from "lucide-react";
@@ -15,32 +16,11 @@ import StockItemFormModal from "@/features/stock/components/StockItemFormModal";
 import { formatAmount } from "@/features/shared/utils/format";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
-
-interface StockIssueItem {
-  id: string;
-  itemCode: string;
-  description: string;
-  quantity: number;
-  uom: string;
-  unitPrice: number;
-  totalPrice: number;
-  transactionDate: string;
-  warehouse: string;
-  division: string;
-  department: string;
-  campus: string;
-  requesterName: string;
-  referenceNo: string;
-  transactionType: string;
-  accountCode: string;
-  remarks: string;
-}
+import { stockApi, type StockIssueItem } from "@/features/stock/api";
 
 export default function StockIssueItemsPage() {
   const { toast } = useToast();
-  const [items, setItems] = useState<StockIssueItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [warehouseFilter, setWarehouseFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
@@ -56,76 +36,80 @@ export default function StockIssueItemsPage() {
   const [editItem, setEditItem] = useState<(StockIssueItem & { id: string }) | null>(null);
   const { confirmState, confirm, closeConfirm } = useConfirmModal();
 
-  const fetchIdRef = useRef(0);
-
-  const [filterValues, setFilterValues] = useState<{ warehouses: string[]; departments: string[]; campuses: string[]; transactionTypes: string[] }>({
-    warehouses: [],
-    departments: [],
-    campuses: [],
-    transactionTypes: [],
+  const { data: filterValues } = useQuery({
+    queryKey: ["stock-filter-values"],
+    queryFn: stockApi.getFilterValues,
   });
 
+  const queryParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (warehouseFilter) params.warehouse = warehouseFilter;
+    if (departmentFilter) params.department = departmentFilter;
+    if (campusFilter) params.campus = campusFilter;
+    if (transactionTypeFilter) params.transactionType = transactionTypeFilter;
+    if (startDate) params.startDate = startDate;
+    if (endDate) params.endDate = endDate;
+    if (search) params.search = search;
+    params.page = String(currentPage);
+    params.pageSize = String(pageSize);
+    return params;
+  }, [search, warehouseFilter, departmentFilter, campusFilter, transactionTypeFilter, startDate, endDate, currentPage, pageSize]);
+
+  const { data: stockData, isLoading: loading } = useQuery({
+    queryKey: ["stock-items", queryParams],
+    queryFn: () => stockApi.list(queryParams),
+  });
+
+  const items = useMemo(() => {
+    if (!stockData) return [];
+    if (Array.isArray(stockData)) return stockData;
+    const d = stockData as unknown as Record<string, unknown>;
+    return (d.data as StockIssueItem[]) || (d.items as StockIssueItem[]) || [];
+  }, [stockData]);
+
+  const total = useMemo(() => {
+    if (!stockData) return 0;
+    if (Array.isArray(stockData)) return stockData.length;
+    const d = stockData as unknown as Record<string, unknown>;
+    return (d.total as number) ?? 0;
+  }, [stockData]);
+
   const warehouseOptions = useMemo(() => {
-    return [{ value: "", label: "All Warehouses" }, ...filterValues.warehouses.map((v) => ({ value: v, label: v }))];
-  }, [filterValues.warehouses]);
+    return [{ value: "", label: "All Warehouses" }, ...((filterValues?.warehouses ?? []).map((v) => ({ value: v, label: v })))];
+  }, [filterValues?.warehouses]);
 
   const departmentOptions = useMemo(() => {
-    return [{ value: "", label: "All Departments" }, ...filterValues.departments.map((v) => ({ value: v, label: v }))];
-  }, [filterValues.departments]);
+    return [{ value: "", label: "All Departments" }, ...((filterValues?.departments ?? []).map((v) => ({ value: v, label: v })))];
+  }, [filterValues?.departments]);
 
   const campusOptions = useMemo(() => {
-    return [{ value: "", label: "All Campuses" }, ...filterValues.campuses.map((v) => ({ value: v, label: v }))];
-  }, [filterValues.campuses]);
+    return [{ value: "", label: "All Campuses" }, ...((filterValues?.campuses ?? []).map((v) => ({ value: v, label: v })))];
+  }, [filterValues?.campuses]);
 
   const transactionTypeOptions = useMemo(() => {
-    return [{ value: "", label: "All Types" }, ...filterValues.transactionTypes.map((v) => ({ value: v, label: v }))];
-  }, [filterValues.transactionTypes]);
-
-  useEffect(() => {
-    const fetchFilterValues = async () => {
-      try {
-        const res = await fetch("/api/stock-issue-items/filters/values");
-        if (res.ok) setFilterValues(await res.json());
-      } catch {}
-    };
-    fetchFilterValues();
-  }, []);
+    return [{ value: "", label: "All Types" }, ...((filterValues?.transactionTypes ?? []).map((v) => ({ value: v, label: v })))];
+  }, [filterValues?.transactionTypes]);
 
   const hasActiveFilters = warehouseFilter || departmentFilter || campusFilter || transactionTypeFilter || startDate || endDate || search;
 
-  const fetchItems = useCallback(async () => {
-    const id = ++fetchIdRef.current;
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (warehouseFilter) params.set("warehouse", warehouseFilter);
-      if (departmentFilter) params.set("department", departmentFilter);
-      if (campusFilter) params.set("campus", campusFilter);
-      if (transactionTypeFilter) params.set("transactionType", transactionTypeFilter);
-      if (startDate) params.set("startDate", startDate);
-      if (endDate) params.set("endDate", endDate);
-      if (search) params.set("search", search);
-      params.set("page", String(currentPage));
-      params.set("pageSize", String(pageSize));
-      const res = await fetch(`/api/stock-issue-items?${params}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (id !== fetchIdRef.current) return;
-      if (Array.isArray(data)) {
-        setItems(data);
-        setTotal(data.length);
-      } else {
-        setItems(data.items || []);
-        setTotal(data.total ?? 0);
-      }
-    } catch {} finally {
-      if (id === fetchIdRef.current) setLoading(false);
-    }
-  }, [search, warehouseFilter, departmentFilter, campusFilter, transactionTypeFilter, startDate, endDate, currentPage, pageSize]);
+  const deleteMutation = useMutation({
+    mutationFn: stockApi.remove,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-items"] });
+      toast.success("Item deleted.");
+    },
+    onError: () => toast.error("Failed to delete item."),
+  });
 
-  useEffect(() => { fetchItems(); }, [fetchItems]);
-
-  useEffect(() => { setCurrentPage(1); }, [search, warehouseFilter, departmentFilter, campusFilter, transactionTypeFilter, startDate, endDate]);
+  const bulkDeleteMutation = useMutation({
+    mutationFn: stockApi.bulkRemove,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-items"] });
+      toast.success(`Deleted items.`);
+      setCurrentPage(1);
+    },
+    onError: () => toast.error("Failed to delete items."),
+  });
 
   const clearFilters = () => {
     setWarehouseFilter("");
@@ -141,65 +125,52 @@ export default function StockIssueItemsPage() {
     confirm(
       "Delete Stock Issue Item",
       "Are you sure you want to delete this stock issue item? This cannot be undone.",
-      async () => {
+      () => {
         closeConfirm();
-        try {
-          const res = await fetch(`/api/stock-issue-items/${id}`, { method: "DELETE" });
-          if (res.ok) { toast.success("Item deleted."); fetchItems(); }
-          else toast.error("Failed to delete item.");
-        } catch { toast.error("Failed to delete item."); }
+        deleteMutation.mutate(id);
       },
     );
-  }, [confirm, closeConfirm, fetchItems]);
+  }, [confirm, closeConfirm, deleteMutation]);
 
   const handleBulkDelete = useCallback(() => {
     if (!hasActiveFilters) {
       toast.error("Apply at least one filter before deleting all items.");
       return;
     }
+    const filterParams: Record<string, string> = {};
+    if (warehouseFilter) filterParams.warehouse = warehouseFilter;
+    if (departmentFilter) filterParams.department = departmentFilter;
+    if (campusFilter) filterParams.campus = campusFilter;
+    if (transactionTypeFilter) filterParams.transactionType = transactionTypeFilter;
+    if (startDate) filterParams.startDate = startDate;
+    if (endDate) filterParams.endDate = endDate;
+    if (search) filterParams.search = search;
     confirm(
       "Delete All Filtered Items",
-      `Delete all ${total} item${total !== 1 ? "s" : ""} matching current filters? This cannot be undone.`,
-      async () => {
+      `Delete all items matching current filters? This cannot be undone.`,
+      () => {
         closeConfirm();
-        try {
-          const params = new URLSearchParams();
-          if (warehouseFilter) params.set("warehouse", warehouseFilter);
-          if (departmentFilter) params.set("department", departmentFilter);
-          if (campusFilter) params.set("campus", campusFilter);
-          if (transactionTypeFilter) params.set("transactionType", transactionTypeFilter);
-          if (startDate) params.set("startDate", startDate);
-          if (endDate) params.set("endDate", endDate);
-          if (search) params.set("search", search);
-          const res = await fetch(`/api/stock-issue-items/bulk?${params}`, { method: "DELETE" });
-          if (res.ok) {
-            toast.success(`Deleted ${total} item${total !== 1 ? "s" : ""}.`);
-            setCurrentPage(1);
-            fetchItems();
-          } else toast.error("Failed to delete items.");
-        } catch { toast.error("Failed to delete items."); }
+        bulkDeleteMutation.mutate(Object.values(filterParams));
       },
     );
-  }, [hasActiveFilters, total, confirm, closeConfirm, warehouseFilter, departmentFilter, campusFilter, transactionTypeFilter, startDate, endDate, search, fetchItems]);
+  }, [hasActiveFilters, confirm, closeConfirm, bulkDeleteMutation, warehouseFilter, departmentFilter, campusFilter, transactionTypeFilter, startDate, endDate, search, toast]);
 
   const [exporting, setExporting] = useState(false);
 
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
-      const params = new URLSearchParams();
-      if (warehouseFilter) params.set("warehouse", warehouseFilter);
-      if (departmentFilter) params.set("department", departmentFilter);
-      if (campusFilter) params.set("campus", campusFilter);
-      if (transactionTypeFilter) params.set("transactionType", transactionTypeFilter);
-      if (startDate) params.set("startDate", startDate);
-      if (endDate) params.set("endDate", endDate);
-      if (search) params.set("search", search);
+      const params: Record<string, string> = {};
+      if (warehouseFilter) params.warehouse = warehouseFilter;
+      if (departmentFilter) params.department = departmentFilter;
+      if (campusFilter) params.campus = campusFilter;
+      if (transactionTypeFilter) params.transactionType = transactionTypeFilter;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      if (search) params.search = search;
 
-      const res = await fetch(`/api/stock-issue-items?${params}`);
-      if (!res.ok) throw new Error("Failed to fetch stock issue items.");
-      const data = await res.json();
-      const rows: any[] = Array.isArray(data) ? data : (data.items || []);
+      const raw = await stockApi.list(params);
+      const rows: StockIssueItem[] = Array.isArray(raw) ? raw : ((raw as unknown as Record<string, unknown>).data as StockIssueItem[]) || ((raw as unknown as Record<string, unknown>).items as StockIssueItem[]) || [];
 
       const XLSX = await import("xlsx");
       const parseExcelDate = (value: string | null | undefined): Date | null => {
@@ -214,7 +185,7 @@ export default function StockIssueItemsPage() {
         "Requester", "Campus", "Division", "Department", "Description/ Purpose",
         "Ref.No", "Transaction Type", "Account Code", "Warehouse"
       ];
-      const sheetRows = rows.map((i) => [
+      const sheetRows = rows.map((i: StockIssueItem) => [
         parseExcelDate(i.transactionDate) ?? "",
         i.itemCode || "",
         i.description || "",
@@ -392,7 +363,7 @@ export default function StockIssueItemsPage() {
           <>
             <Tooltip>
               <TooltipTrigger render={
-                <Button variant="outline" size="icon" onClick={fetchItems}>
+                <Button variant="outline" size="icon" onClick={() => queryClient.invalidateQueries({ queryKey: ["stock-items"] })}>
                   <RefreshCw className={loading ? "animate-spin" : ""} />
                 </Button>
               } />
@@ -415,7 +386,7 @@ export default function StockIssueItemsPage() {
           </>
         )}
         searchValue={search}
-        onSearchChange={setSearch}
+        onSearchChange={(v) => { setSearch(v); setCurrentPage(1); }}
         searchPlaceholder="Search by code, description, requester, or reference..."
         activeFilterCount={[warehouseFilter, departmentFilter, campusFilter, transactionTypeFilter, startDate, endDate].filter(Boolean).length}
         filters={(
@@ -454,11 +425,11 @@ export default function StockIssueItemsPage() {
           <>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground whitespace-nowrap">From</span>
-              <DatePicker value={startDate} onChange={setStartDate} placeholder="Start date" containerClassName="w-36" />
+              <DatePicker value={startDate} onChange={(v) => { setStartDate(v); setCurrentPage(1); }} placeholder="Start date" containerClassName="w-36" />
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground whitespace-nowrap">To</span>
-              <DatePicker value={endDate} onChange={setEndDate} placeholder="End date" containerClassName="w-36" />
+              <DatePicker value={endDate} onChange={(v) => { setEndDate(v); setCurrentPage(1); }} placeholder="End date" containerClassName="w-36" />
             </div>
             {hasActiveFilters && (
               <Button variant="ghost" onClick={clearFilters}>
@@ -481,13 +452,13 @@ export default function StockIssueItemsPage() {
         <StockImportModal
           isOpen={showImport}
           onClose={() => setShowImport(false)}
-          onImportComplete={() => { setShowImport(false); fetchItems(); }}
+          onImportComplete={() => { setShowImport(false); queryClient.invalidateQueries({ queryKey: ["stock-items"] }); }}
         />
 
         <StockItemFormModal
           isOpen={showForm}
           onClose={() => setShowForm(false)}
-          onSaved={() => { setShowForm(false); setEditItem(null); fetchItems(); }}
+          onSaved={() => { setShowForm(false); setEditItem(null); queryClient.invalidateQueries({ queryKey: ["stock-items"] }); }}
           editItem={editItem}
         />
 

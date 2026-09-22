@@ -39,6 +39,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (body) headers["Content-Type"] = "application/json";
   if (extraHeaders) Object.assign(headers, extraHeaders);
 
+  const token = localStorage.getItem("auth_jwt");
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   const res = await fetch(url, {
     method,
     headers: Object.keys(headers).length > 0 ? headers : undefined,

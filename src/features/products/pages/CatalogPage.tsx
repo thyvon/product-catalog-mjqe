@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   PlusCircle as AddCircle,
   RefreshCw as Refresh,
@@ -38,9 +39,25 @@ import ListPageLayout from "@/features/shared/components/ListPageLayout";
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96];
 
+interface CatalogResponse {
+  data: Product[];
+  total: number;
+  categories: string[];
+  uoms: string[];
+}
+
+const catalogApi = {
+  fetch: async (params: string): Promise<CatalogResponse> => {
+    const res = await fetch(`/api/products?${params}`);
+    if (!res.ok) throw new Error("Could not load products catalog from database server APIs.");
+    return res.json();
+  },
+};
+
 export default function CatalogPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const isAdmin = user?.role === "Admin";
 
   const [viewMode, setViewMode] = useState<"gallery" | "list">("gallery");
@@ -51,13 +68,6 @@ export default function CatalogPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [total, setTotal] = useState(0);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [allUoms, setAllUoms] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -65,54 +75,76 @@ export default function CatalogPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
 
   const { confirmState, confirm, closeConfirm } = useConfirmModal();
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const buildParams = useCallback((overrides: Record<string, any> = {}) => {
-    const p = {
-      page: currentPage,
-      pageSize,
-      search: searchQuery,
-      category: selectedCategory,
-      status: statusFilter,
-      sort: sortBy,
-      ...overrides,
-    };
-    return new URLSearchParams(
-      Object.entries(p).filter(([, v]) => v !== "" && v !== undefined && v !== "all").map(([k, v]) => [k, String(v)])
-    ).toString();
+  const queryParams = useMemo(() => {
+    const p: Record<string, string | number> = { page: currentPage, pageSize, status: statusFilter, sort: sortBy };
+    if (searchQuery) p.search = searchQuery;
+    if (selectedCategory) p.category = selectedCategory;
+    return Object.entries(p)
+      .filter(([, v]) => v !== "" && v !== undefined && v !== "all")
+      .map(([k, v]) => [k, String(v)]);
   }, [currentPage, pageSize, searchQuery, selectedCategory, statusFilter, sortBy]);
 
-  const fetchCatalog = useCallback(async (overrides: Record<string, any> = {}) => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await fetch(`/api/products?${buildParams(overrides)}`);
-      if (!res.ok) throw new Error("Could not load products catalog from database server APIs.");
-      const data = await res.json();
-      setProducts(data.data ?? []);
-      setTotal(data.total ?? 0);
-      setCategories(data.categories ?? []);
-      setAllUoms(data.uoms ?? []);
-    } catch (err: any) {
-      setError(err.message || "Failed to establish real-time link with catalog databases.");
-    } finally {
-      setLoading(false);
-    }
-  }, [buildParams]);
+  const paramsString = useMemo(() => new URLSearchParams(queryParams).toString(), [queryParams]);
 
-  // Refetch on filter/page/sort changes; debounce search
+  const { data, isLoading: loading, error: queryError, refetch } = useQuery({
+    queryKey: ["catalog", paramsString],
+    queryFn: () => catalogApi.fetch(paramsString),
+    placeholderData: (prev) => prev,
+  });
+
+  const products = useMemo(() => data?.data ?? [], [data]);
+  const total = data?.total ?? 0;
+  const categories = useMemo(() => data?.categories ?? [], [data]);
+  const allUoms = useMemo(() => data?.uoms ?? [], [data]);
+  const error = queryError ? (queryError as Error).message : "";
+
   useEffect(() => {
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => fetchCatalog(), 300);
-    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
-  }, [fetchCatalog]);
-
-  const handleSearchChange = (v: string) => {
-    setSearchQuery(v);
     setCurrentPage(1);
-  };
+  }, [searchQuery, selectedCategory, statusFilter, sortBy]);
 
-  const resetPage = () => setCurrentPage(1);
+  const saveMutation = useMutation({
+    mutationFn: async (productData: ProductInput | Product) => {
+      const isEdit = "id" in productData;
+      const url = isEdit ? `/api/products/${(productData as Product).id}` : "/api/products";
+      const method = isEdit ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(productData),
+      });
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.error || "Failed to save product.");
+      }
+      return res.json();
+    },
+    onSuccess: async (_res, productData) => {
+      const isEdit = "id" in productData;
+      queryClient.invalidateQueries({ queryKey: ["catalog"] });
+      setIsFormOpen(false);
+      setEditingProduct(null);
+      toast.success(isEdit ? "Product has been updated." : "Product has been created.");
+    },
+    onError: (err: Error) => {
+      toast.error(`Error submitting product: ${err.message}`);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (productId: string) => {
+      const res = await fetch(`/api/products/${productId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Unable to delete product.");
+      return res.json();
+    },
+    onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: ["catalog"] });
+      toast.success("Product has been deleted.");
+    },
+    onError: (err: Error) => {
+      toast.error(`Error removing product: ${err.message}`);
+    },
+  });
 
   const handleOpenDetailModal = useCallback((product: Product) => {
     setSelectedProduct(product);
@@ -125,51 +157,28 @@ export default function CatalogPage() {
   }, []);
 
   const handleAddEditProduct = useCallback(async (productData: ProductInput | Product) => {
-    try {
-      const isEdit = "id" in productData;
-      const url = isEdit ? `/api/products/${(productData as Product).id}` : "/api/products";
-      const method = isEdit ? "PUT" : "POST";
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(productData),
-      });
-      if (!response.ok) {
-        const errJson = await response.json();
-        throw new Error(errJson.error || "Failed to persist catalog product changes.");
-      }
-      setIsFormOpen(false);
-      setEditingProduct(null);
-      await fetchCatalog();
-      toast.success(isEdit ? "Product has been updated." : "Product has been created.");
-    } catch (err: any) {
-      toast.error(`Error submitting product details config: ${err.message}`);
-    }
-  }, [fetchCatalog, toast]);
+    saveMutation.mutate(productData);
+  }, [saveMutation]);
 
-  const handleDeleteProduct = useCallback(async (productId: string) => {
+  const handleDeleteProduct = useCallback((productId: string) => {
     const target = products.find((p) => p.id === productId);
     if (!target) return;
     confirm(
       "Confirm Deletion",
       `Are you sure you want to permanently delete SKU "${target.productCode}" (${target.name}) from catalog database?`,
-      async () => {
+      () => {
         closeConfirm();
-        try {
-          const response = await fetch(`/api/products/${productId}`, { method: "DELETE" });
-          if (!response.ok) throw new Error("Unable to execute delete commands on the server.");
-          await fetchCatalog();
-          toast.success("Product has been deleted.");
-        } catch (err: any) {
-          toast.error(`Error removing SKU from database: ${err.message}`);
-        }
+        deleteMutation.mutate(productId);
       },
     );
-  }, [products, fetchCatalog, confirm, closeConfirm, toast]);
+  }, [products, confirm, closeConfirm, deleteMutation]);
 
   const triggerExportCSV = useCallback(async () => {
     try {
-      const res = await fetch(`/api/products?${buildParams({ page: 1, pageSize: 0 })}`);
+      const exportParams = new URLSearchParams({ page: "1", pageSize: "0", status: statusFilter, sort: sortBy });
+      if (searchQuery) exportParams.set("search", searchQuery);
+      if (selectedCategory) exportParams.set("category", selectedCategory);
+      const res = await fetch(`/api/products?${exportParams}`);
       if (!res.ok) return;
       const data = await res.json();
       const all: Product[] = data.data;
@@ -191,7 +200,7 @@ export default function CatalogPage() {
       link.click();
       document.body.removeChild(link);
     } catch { /* ignore */ }
-  }, [buildParams]);
+  }, [searchQuery, selectedCategory, statusFilter, sortBy]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -213,7 +222,7 @@ export default function CatalogPage() {
         actions={(
           <>
             <Tooltip>
-              <TooltipTrigger render={<Button onClick={() => fetchCatalog()} variant="outline" size="icon">
+              <TooltipTrigger render={<Button onClick={() => refetch()} variant="outline" size="icon">
                 <Refresh className={loading ? "animate-spin" : ""} />
               </Button>} />
               <TooltipContent>Reload catalog</TooltipContent>
@@ -234,12 +243,12 @@ export default function CatalogPage() {
           </>
         )}
         searchValue={searchQuery}
-        onSearchChange={handleSearchChange}
+        onSearchChange={(v) => setSearchQuery(v)}
         searchPlaceholder="Search products by SKU Code or name specifications..."
         activeFilterCount={[selectedCategory, statusFilter !== "active" ? statusFilter : ""].filter(Boolean).length}
         filters={(
           <>
-            <Select value={selectedCategory} onValueChange={(v) => { setSelectedCategory(v); resetPage(); }}>
+            <Select value={selectedCategory} onValueChange={(v) => setSelectedCategory(v)}>
               <SelectTrigger className="min-w-[160px]">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
@@ -251,7 +260,7 @@ export default function CatalogPage() {
               </SelectContent>
             </Select>
 
-            <Select value={statusFilter} onValueChange={(v: "all" | "active" | "inactive") => { setStatusFilter(v); resetPage(); }}>
+            <Select value={statusFilter} onValueChange={(v: "all" | "active" | "inactive") => setStatusFilter(v)}>
               <SelectTrigger className="min-w-[140px]">
                 <SelectValue placeholder="All Lifecycles" />
               </SelectTrigger>
@@ -262,7 +271,7 @@ export default function CatalogPage() {
               </SelectContent>
             </Select>
 
-            <Select value={sortBy} onValueChange={(v: "name" | "code") => { setSortBy(v); resetPage(); }}>
+            <Select value={sortBy} onValueChange={(v: "name" | "code") => setSortBy(v)}>
               <SelectTrigger className="min-w-[160px]">
                 <SelectValue placeholder="Sort: Name (A-Z)" />
               </SelectTrigger>
@@ -287,7 +296,7 @@ export default function CatalogPage() {
             <DangerCircle className="w-10 h-10 text-destructive mx-auto animate-bounce" />
             <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-destructive">Connection Interrupted</h3>
             <p className="text-xs text-destructive leading-relaxed font-medium">{error}</p>
-            <Button onClick={() => fetchCatalog()} variant="outline">Retry</Button>
+            <Button onClick={() => refetch()} variant="outline">Retry</Button>
           </div>
         ) : !loading && total === 0 ? (
           <div className="text-center py-20 bg-card border border-border rounded-3xl max-w-xl mx-auto mt-8 p-8 space-y-4 shadow-sm">
@@ -409,7 +418,7 @@ export default function CatalogPage() {
           onClose={() => setIsImportOpen(false)}
           onImportComplete={async () => {
             setIsImportOpen(false);
-            await fetchCatalog();
+            queryClient.invalidateQueries({ queryKey: ["catalog"] });
             toast.success("Products imported successfully.");
           }}
         />

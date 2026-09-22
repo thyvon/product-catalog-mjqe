@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useConfirmModal } from "@/features/shared/hooks";
 import {
@@ -8,7 +9,6 @@ import {
   SquarePen,
   Trash2,
   Eye,
-  FileText,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,17 +25,40 @@ import BaseModal from "@/features/shared/components/BaseModal";
 import { DetailRow } from "@/features/shared/components/DetailRow";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
+const suppliersApi = {
+  list: async (): Promise<Supplier[]> => {
+    const res = await fetch("/api/suppliers");
+    if (!res.ok) throw new Error("Failed to fetch suppliers.");
+    return res.json();
+  },
+  getFilterValues: async () => {
+    const res = await fetch("/api/suppliers/filters/values");
+    if (!res.ok) return { statuses: [], applicationTypes: [] };
+    return res.json();
+  },
+  create: async (data: SupplierInput) => {
+    const res = await fetch("/api/suppliers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Failed to create supplier."); }
+    return res.json();
+  },
+  update: async (id: string, data: SupplierInput) => {
+    const res = await fetch(`/api/suppliers/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Failed to update supplier."); }
+    return res.json();
+  },
+  remove: async (id: string) => {
+    const res = await fetch(`/api/suppliers/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete supplier.");
+    return res.json();
+  },
+};
+
 export default function SupplierRegisterPage() {
   const { toast } = useToast();
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
-  const [filterValues, setFilterValues] = useState<{ statuses: string[]; applicationTypes: string[] }>({
-    statuses: [],
-    applicationTypes: [],
-  });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -47,79 +70,53 @@ export default function SupplierRegisterPage() {
 
   const { confirmState, confirm, closeConfirm } = useConfirmModal();
 
-  const fetchSuppliers = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/suppliers");
-      if (!res.ok) throw new Error("Failed to fetch suppliers.");
-      const data = await res.json();
-      setSuppliers(data);
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: suppliers = [], isLoading: loading } = useQuery({
+    queryKey: ["suppliers"],
+    queryFn: suppliersApi.list,
+  });
 
-  const fetchFilterValues = async () => {
-    try {
-      const res = await fetch("/api/suppliers/filters/values");
-      if (res.ok) {
-        setFilterValues(await res.json());
-      }
-    } catch {}
-  };
+  const { data: filterValues } = useQuery({
+    queryKey: ["supplier-filter-values"],
+    queryFn: suppliersApi.getFilterValues,
+  });
 
-  useEffect(() => {
-    fetchSuppliers();
-    fetchFilterValues();
-  }, []);
-
-  const handleSubmit = async (data: SupplierInput) => {
-    try {
-      const isEdit = !!editingSupplier;
-      const url = isEdit ? `/api/suppliers/${editingSupplier!.id}` : "/api/suppliers";
-      const method = isEdit ? "PUT" : "POST";
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to save supplier.");
-      }
-
+  const saveMutation = useMutation({
+    mutationFn: (args: { id?: string; data: SupplierInput }) =>
+      args.id ? suppliersApi.update(args.id, args.data) : suppliersApi.create(args.data),
+    onSuccess: async (_res, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
       setIsFormOpen(false);
       setEditingSupplier(null);
-      await fetchSuppliers();
-      toast.success(isEdit ? "Supplier has been updated." : "Supplier has been registered.");
-    } catch (err: any) {
-      toast.error(err.message);
-    }
+      toast.success(variables.id ? "Supplier has been updated." : "Supplier has been registered.");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: suppliersApi.remove,
+    onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const handleSubmit = async (data: SupplierInput) => {
+    saveMutation.mutate({ id: editingSupplier?.id, data });
   };
 
   const handleDelete = (supplier: Supplier) => {
     confirm(
       "Delete Supplier",
       `Are you sure you want to delete "${supplier.companyName}"? This action cannot be undone.`,
-      async () => {
+      () => {
         closeConfirm();
-        try {
-          const res = await fetch(`/api/suppliers/${supplier.id}`, { method: "DELETE" });
-          if (!res.ok) throw new Error("Failed to delete supplier.");
-          await fetchSuppliers();
-          toast.success(`Supplier "${supplier.companyName}" has been deleted.`);
-        } catch (err: any) {
-          toast.error(err.message);
-        }
+        deleteMutation.mutate(supplier.id);
+        toast.success(`Supplier "${supplier.companyName}" has been deleted.`);
       },
     );
   };
 
-  const filtered = suppliers.filter((s) => {
+  const filtered = useMemo(() => suppliers.filter((s) => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || (
       s.companyName.toLowerCase().includes(q) ||
@@ -133,13 +130,11 @@ export default function SupplierRegisterPage() {
     const matchesStatus = !statusFilter || s.status === statusFilter;
     const matchesType = !typeFilter || s.applicationType === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
-  });
+  }), [suppliers, searchQuery, statusFilter, typeFilter]);
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
+    if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, filtered.length, pageSize]);
 
   useEffect(() => {
@@ -151,15 +146,17 @@ export default function SupplierRegisterPage() {
     return filtered.slice(startIndex, startIndex + pageSize);
   }, [currentPage, filtered, pageSize]);
 
+  const fv = useMemo(() => (filterValues as Record<string, string[]>) ?? {}, [filterValues]);
+
   const statusOptions = useMemo(() => [
     { value: "", label: "All Status" },
-    ...filterValues.statuses.map((status) => ({ value: status, label: status })),
-  ], [filterValues.statuses]);
+    ...((fv.statuses ?? []) as string[]).map((status) => ({ value: status, label: status })),
+  ], [fv]);
 
   const typeOptions = useMemo(() => [
     { value: "", label: "All Types" },
-    ...filterValues.applicationTypes.map((type) => ({ value: type, label: type === "update" ? "Update" : "New" })),
-  ], [filterValues.applicationTypes]);
+    ...((fv.applicationTypes ?? []) as string[]).map((type) => ({ value: type, label: type === "update" ? "Update" : "New" })),
+  ], [fv]);
 
   return (
     <PageContent>
@@ -172,7 +169,7 @@ export default function SupplierRegisterPage() {
             <TooltipTrigger render={<Button
             variant="outline"
             size="icon"
-            onClick={fetchSuppliers}
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["suppliers"] })}
           >
             <RefreshCw className={loading ? "animate-spin" : ""} />
           </Button>} />
@@ -317,7 +314,6 @@ export default function SupplierRegisterPage() {
       >
         {viewingSupplier && (
           <div className="flex min-h-0 flex-1 flex-col">
-            {/* Document header */}
             <div className="shrink-0 border-b border-border bg-card py-4 text-center">
               <h3 className="text-sm font-bold uppercase tracking-wide text-foreground">Vendor Registration Application Form</h3>
               <p className="mt-1 text-lg font-semibold text-foreground">{viewingSupplier.companyName}</p>
@@ -334,7 +330,6 @@ export default function SupplierRegisterPage() {
               </div>
             </div>
 
-            {/* Scrollable body */}
             <div className="min-h-0 flex-1 overflow-y-auto p-5 space-y-6">
               <ViewSection title="Supplier Information" kh="ព័ត៌មានអ្នកផ្គត់ផ្គង់">
                 <DetailRow label="Company Name (Khmer)" value={viewingSupplier.companyNameKhmer || "—"} />

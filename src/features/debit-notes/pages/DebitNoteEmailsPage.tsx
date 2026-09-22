@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ColumnDef } from "@tanstack/react-table";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, RefreshCw, Pencil, Trash2, Mail, Upload, Download, Copy } from "lucide-react";
 import DataTable from "@/features/shared/components/DataTable";
@@ -14,54 +14,72 @@ import { useConfirmModal } from "@/features/shared/hooks";
 import DebitNoteEmailImportModal from "@/features/debit-notes/components/DebitNoteEmailImportModal";
 import { FormLabel } from "@/features/shared/components/FormLabel";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
 import MultiSelectCombobox from "@/features/shared/components/MultiSelectCombobox";
-
-interface Contact { id: string; email: string; name: string; }
-
-interface EmailConfig {
-  id: string;
-  warehouse: string;
-  department: string;
-  campus: string;
-  division: string;
-  receiverName: string;
-  sendToEmail: string[];
-  ccToEmail: string[];
-  createdAt: string;
-  updatedAt: string;
-}
+import { debitNotesApi, type DebitNoteEmailConfig, type DnContact } from "@/features/debit-notes/api";
 
 export default function DebitNoteEmailsPage() {
   const { toast } = useToast();
   const { confirmState, confirm, closeConfirm } = useConfirmModal();
-  const [configs, setConfigs] = useState<EmailConfig[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<EmailConfig | null>(null);
+  const [editing, setEditing] = useState<DebitNoteEmailConfig | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [warehouseFilter, setWarehouseFilter] = useState("");
   const [divisionFilter, setDivisionFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [campusFilter, setCampusFilter] = useState("");
-  const [filterValues, setFilterValues] = useState<{ warehouses: string[]; divisions: string[]; departments: string[]; campuses: string[] }>({
-    warehouses: [],
-    divisions: [],
-    departments: [],
-    campuses: [],
-  });
   const [showImportModal, setShowImportModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [contacts, setContacts] = useState<Contact[]>([]);
 
-  const fetchContacts = async (q?: string) => {
-    try {
-      const url = q ? `/api/dn-contacts?q=${encodeURIComponent(q)}` : "/api/dn-contacts";
-      const res = await fetch(url);
-      if (res.ok) setContacts(await res.json());
-    } catch { /* ignored */ }
-  };
+  const { data: configs = [], isLoading: loading } = useQuery({
+    queryKey: ["dn-email-configs"],
+    queryFn: debitNotesApi.emailConfigs.list,
+  });
+
+  const { data: filterValues } = useQuery({
+    queryKey: ["dn-email-config-filter-values"],
+    queryFn: debitNotesApi.emailConfigs.getFilterValues,
+  });
+
+  const { data: contacts = [] } = useQuery({
+    queryKey: ["dn-contacts"],
+    queryFn: () => debitNotesApi.contacts.list(),
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (args: { id?: string; data: Record<string, unknown> }) =>
+      args.id
+        ? debitNotesApi.emailConfigs.update(args.id, args.data)
+        : debitNotesApi.emailConfigs.create(args.data),
+    onSuccess: async (_res, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["dn-email-configs"] });
+      setShowForm(false);
+      toast.success(variables.id ? "Email configuration updated." : "Email configuration created.");
+    },
+    onError: async () => {
+      toast.error("Failed to save.");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => debitNotesApi.emailConfigs.remove(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dn-email-configs"] });
+      toast.success("Email configuration deleted.");
+    },
+    onError: () => toast.error("Failed to delete."),
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (ids: string[]) => debitNotesApi.emailConfigs.bulkRemove(ids),
+    onSuccess: async () => {
+      queryClient.invalidateQueries({ queryKey: ["dn-email-configs"] });
+      toast.success("Email configs deleted.");
+      setCurrentPage(1);
+    },
+    onError: () => toast.error("Failed to delete email configs."),
+  });
 
   const [formData, setFormData] = useState({
     warehouse: "",
@@ -73,133 +91,69 @@ export default function DebitNoteEmailsPage() {
     ccToEmail: [] as string[],
   });
 
-  const fetchConfigs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/debit-note/emails");
-      if (res.ok) setConfigs(await res.json());
-    } catch { /* ignored */ } finally { setLoading(false); }
-  }, []);
-
-  const fetchFilterValues = async () => {
-    try {
-      const res = await fetch("/api/debit-note/emails/filters/values");
-      if (res.ok) {
-        setFilterValues(await res.json());
-      }
-    } catch { /* ignored */ }
-  };
-
-  useEffect(() => { fetchConfigs(); fetchFilterValues(); fetchContacts(); }, [fetchConfigs]);
-
   const openCreate = () => {
     setEditing(null);
     setFormData({ warehouse: "", department: "", campus: "", division: "", receiverName: "", sendToEmail: [], ccToEmail: [] });
     setShowForm(true);
   };
 
-  const openEdit = (config: EmailConfig) => {
+  const openEdit = (config: DebitNoteEmailConfig) => {
     setEditing(config);
+    const sendTo = (config.contacts ?? []).filter((c) => c.type === "sendTo").map((c) => c.email);
+    const ccTo = (config.contacts ?? []).filter((c) => c.type === "cc").map((c) => c.email);
     setFormData({
       warehouse: config.warehouse,
       department: config.department,
       campus: config.campus,
       division: config.division || "",
       receiverName: config.receiverName,
-      sendToEmail: parseEmailList(config.sendToEmail),
-      ccToEmail: parseEmailList(config.ccToEmail),
+      sendToEmail: sendTo,
+      ccToEmail: ccTo,
     });
     setShowForm(true);
   };
 
-  const openDuplicate = (config: EmailConfig) => {
+  const openDuplicate = (config: DebitNoteEmailConfig) => {
     setEditing(null);
+    const sendTo = (config.contacts ?? []).filter((c) => c.type === "sendTo").map((c) => c.email);
+    const ccTo = (config.contacts ?? []).filter((c) => c.type === "cc").map((c) => c.email);
     setFormData({
       warehouse: config.warehouse,
       department: config.department,
       campus: config.campus,
       division: config.division || "",
       receiverName: config.receiverName,
-      sendToEmail: parseEmailList(config.sendToEmail),
-      ccToEmail: parseEmailList(config.ccToEmail),
+      sendToEmail: sendTo,
+      ccToEmail: ccTo,
     });
     setShowForm(true);
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!formData.warehouse || !formData.department || !formData.campus || !formData.receiverName) {
       toast.error("Warehouse, Department, Campus, and Receiver Name are required.");
       return;
     }
-
     const sendToEmails = formData.sendToEmail.filter(Boolean);
-    const ccToEmails = formData.ccToEmail.filter(Boolean);
-
     if (sendToEmails.length === 0) {
       toast.error("At least one send-to email is required.");
       return;
     }
-
-    const payload = {
-      warehouse: formData.warehouse,
-      department: formData.department,
-      campus: formData.campus,
-      division: formData.division,
-      receiverName: formData.receiverName,
-      sendToEmail: sendToEmails,
-      ccToEmail: ccToEmails,
-    };
-
-    try {
-      let res;
-      if (editing) {
-        res = await fetch(`/api/debit-note/emails/${editing.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      } else {
-        res = await fetch("/api/debit-note/emails", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      }
-
-      if (res.ok) {
-        setShowForm(false);
-        fetchConfigs();
-        toast.success(editing ? "Email configuration updated." : "Email configuration created.");
-      } else {
-        const err = await res.json();
-        toast.error(err.error || "Failed to save.");
-      }
-    } catch {
-      toast.error("Failed to save email config.");
-    }
+    saveMutation.mutate({ id: editing?.id, data: formData as unknown as Record<string, unknown> });
   };
 
   const handleDelete = (id: string) => {
     confirm(
       "Delete Email Config",
       "Are you sure you want to delete this email configuration?",
-      async () => {
-        closeConfirm();
-        try {
-          const res = await fetch(`/api/debit-note/emails/${id}`, { method: "DELETE" });
-          if (res.ok) { fetchConfigs(); toast.success("Email configuration deleted."); }
-          else toast.error("Failed to delete.");
-        } catch {
-          toast.error("Failed to delete.");
-        }
-      },
+      () => { closeConfirm(); deleteMutation.mutate(id); },
       "Delete",
     );
   };
 
   const hasActiveFilters = Boolean(searchQuery || warehouseFilter || divisionFilter || departmentFilter || campusFilter);
 
-  const filtered = configs.filter((c) => {
+  const filtered = useMemo(() => (configs as DebitNoteEmailConfig[]).filter((c) => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || [c.warehouse, c.department, c.campus, c.division, c.receiverName].some((value) => value.toLowerCase().includes(q));
     const matchesWarehouse = !warehouseFilter || c.warehouse === warehouseFilter;
@@ -207,50 +161,28 @@ export default function DebitNoteEmailsPage() {
     const matchesDepartment = !departmentFilter || c.department === departmentFilter;
     const matchesCampus = !campusFilter || c.campus === campusFilter;
     return matchesSearch && matchesWarehouse && matchesDivision && matchesDepartment && matchesCampus;
-  });
+  }), [configs, searchQuery, warehouseFilter, divisionFilter, departmentFilter, campusFilter]);
 
   const handleBulkDelete = useCallback(() => {
     const ids = filtered.map((c) => c.id);
     confirm(
       "Delete All Filtered Email Configs",
       `Delete all ${ids.length} email config${ids.length !== 1 ? "s" : ""} matching current filters? This cannot be undone.`,
-      async () => {
-        closeConfirm();
-        try {
-          const res = await fetch("/api/debit-note/emails/bulk-delete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ids }),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            toast.success(`Deleted ${data.count} email config${data.count !== 1 ? "s" : ""}.`);
-            setCurrentPage(1);
-            fetchConfigs();
-          } else {
-            const data = await res.json();
-            toast.error(data.error || "Failed to delete email configs.");
-          }
-        } catch {
-          toast.error("Failed to delete email configs.");
-        }
-      },
+      () => { closeConfirm(); bulkDeleteMutation.mutate(ids); },
       "Delete All",
     );
-  }, [filtered, confirm, closeConfirm, fetchConfigs, toast]);
+  }, [filtered, confirm, closeConfirm, bulkDeleteMutation]);
 
   const handleExport = useCallback(async () => {
     try {
       const XLSX = await import("xlsx");
-      const columns = ["Warehouse", "Division", "Department", "Campus", "Receiver Name", "Send To Emails", "CC Emails"];
+      const columns = ["Warehouse", "Division", "Department", "Campus", "Receiver Name"];
       const rows = filtered.map((c) => [
         c.warehouse,
         c.department,
         c.campus,
         c.division,
         c.receiverName,
-        parseEmailList(c.sendToEmail).join(";"),
-        parseEmailList(c.ccToEmail).join(";"),
       ]);
       const ws = XLSX.utils.aoa_to_sheet([columns, ...rows]);
       const wb = XLSX.utils.book_new();
@@ -276,34 +208,47 @@ export default function DebitNoteEmailsPage() {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, filtered.length, pageSize]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, warehouseFilter, departmentFilter, campusFilter]);
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, warehouseFilter, departmentFilter, campusFilter]);
 
   const paginatedConfigs = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     return filtered.slice(startIndex, startIndex + pageSize);
   }, [currentPage, filtered, pageSize]);
 
+  const fv = useMemo(() => (filterValues as unknown as Record<string, string[]>) ?? {}, [filterValues]);
+
   const warehouseOptions = useMemo(() => [
     { value: "", label: "All Warehouses" },
-    ...filterValues.warehouses.map((w) => ({ value: w, label: w })),
-  ], [filterValues.warehouses]);
+    ...((fv.warehouses ?? []) as string[]).map((w) => ({ value: w, label: w })),
+  ], [fv]);
 
   const divisionOptions = useMemo(() => [
     { value: "", label: "All Divisions" },
-    ...filterValues.divisions.map((d) => ({ value: d, label: d })),
-  ], [filterValues.divisions]);
+    ...((fv.divisions ?? []) as string[]).map((d) => ({ value: d, label: d })),
+  ], [fv]);
 
   const departmentOptions = useMemo(() => [
     { value: "", label: "All Departments" },
-    ...filterValues.departments.map((d) => ({ value: d, label: d })),
-  ], [filterValues.departments]);
+    ...((fv.departments ?? []) as string[]).map((d) => ({ value: d, label: d })),
+  ], [fv]);
 
   const campusOptions = useMemo(() => [
     { value: "", label: "All Campuses" },
-    ...filterValues.campuses.map((c) => ({ value: c, label: c })),
-  ], [filterValues.campuses]);
+    ...((fv.campuses ?? []) as string[]).map((c) => ({ value: c, label: c })),
+  ], [fv]);
+
+  const contactOptions = useMemo(() =>
+    (contacts as DnContact[]).map((c) => ({ id: c.email, label: c.name ? `${c.name} <${c.email}>` : c.email })),
+  [contacts]);
+
+  const handleAddContact = async (label: string, field: "sendToEmail" | "ccToEmail") => {
+    const email = label.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    if (formData[field].includes(email)) return;
+    await debitNotesApi.contacts.create({ email, name: "" });
+    queryClient.invalidateQueries({ queryKey: ["dn-contacts"] });
+    setFormData({ ...formData, [field]: [...formData[field], email] });
+  };
 
   return (
     <PageContent>
@@ -321,7 +266,7 @@ export default function DebitNoteEmailsPage() {
               <span>Export</span>
             </Button>
             <Tooltip>
-              <TooltipTrigger render={<Button variant="outline" size="icon" onClick={fetchConfigs}>
+              <TooltipTrigger render={<Button variant="outline" size="icon" onClick={() => queryClient.invalidateQueries({ queryKey: ["dn-email-configs"] })}>
                 <RefreshCw className={loading ? "animate-spin" : ""} />
               </Button>} />
               <TooltipContent>Refresh</TooltipContent>
@@ -376,7 +321,7 @@ export default function DebitNoteEmailsPage() {
         <DebitNoteEmailImportModal
           isOpen={showImportModal}
           onClose={() => setShowImportModal(false)}
-          onImportComplete={fetchConfigs}
+          onImportComplete={() => queryClient.invalidateQueries({ queryKey: ["dn-email-configs"] })}
         />
 
         <ConfirmModal
@@ -420,55 +365,33 @@ export default function DebitNoteEmailsPage() {
             <div>
               <FormLabel required>Send To</FormLabel>
               <MultiSelectCombobox
-                options={contacts.map((c) => ({ id: c.email, label: c.name ? `${c.name} <${c.email}>` : c.email }))}
+                options={contactOptions}
                 value={formData.sendToEmail}
                 onValueChange={(ids) => setFormData({ ...formData, sendToEmail: ids })}
                 placeholder="Search or type email..."
                 emptyMessage="Press Enter to add"
-                onCreate={async (label) => {
-                  const email = label.trim();
-                  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
-                  if (formData.sendToEmail.includes(email)) return;
-                  await fetch("/api/dn-contacts", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email, name: "" }),
-                  });
-                  await fetchContacts();
-                  setFormData({ ...formData, sendToEmail: [...formData.sendToEmail, email] });
-                }}
+                onCreate={async (label) => handleAddContact(label, "sendToEmail")}
               />
             </div>
             <div>
               <FormLabel>CC</FormLabel>
               <MultiSelectCombobox
-                options={contacts.map((c) => ({ id: c.email, label: c.name ? `${c.name} <${c.email}>` : c.email }))}
+                options={contactOptions}
                 value={formData.ccToEmail}
                 onValueChange={(ids) => setFormData({ ...formData, ccToEmail: ids })}
                 placeholder="Search or type email..."
                 emptyMessage="Press Enter to add"
-                onCreate={async (label) => {
-                  const email = label.trim();
-                  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
-                  if (formData.ccToEmail.includes(email)) return;
-                  await fetch("/api/dn-contacts", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ email, name: "" }),
-                  });
-                  await fetchContacts();
-                  setFormData({ ...formData, ccToEmail: [...formData.ccToEmail, email] });
-                }}
+                onCreate={async (label) => handleAddContact(label, "ccToEmail")}
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-              <Button onClick={handleSave}>{editing ? "Update" : "Create"}</Button>
+              <Button onClick={handleSave} disabled={saveMutation.isPending}>{editing ? "Update" : "Create"}</Button>
             </div>
           </div>
         </BaseModal>
 
-        <DataTable<EmailConfig>
+        <DataTable<DebitNoteEmailConfig>
           tableLayout="auto"
           columns={[
             { accessorKey: "warehouse", header: "Warehouse", meta: { width: "120px", className: "font-bold text-foreground" } },
@@ -476,28 +399,6 @@ export default function DebitNoteEmailsPage() {
             { accessorKey: "department", header: "Department", meta: { width: "110px", className: "text-muted-foreground" } },
             { accessorKey: "campus", header: "Campus", meta: { width: "80px", className: "text-muted-foreground" } },
             { accessorKey: "receiverName", header: "Receiver", meta: { width: "120px", className: "font-medium text-foreground" } },
-            {
-              accessorKey: "sendToEmail",
-              header: "Send To",
-              cell: ({ row }) => (
-                <div className="flex flex-wrap gap-1">
-                  {parseEmailList(row.original.sendToEmail).map((email) => (
-                    <Badge key={email} variant="outline" className="text-emerald-600 border-emerald-300 bg-emerald-50/50 dark:text-emerald-400 dark:border-emerald-700">{email}</Badge>
-                  ))}
-                </div>
-              ),
-            },
-            {
-              accessorKey: "ccToEmail",
-              header: "CC",
-              cell: ({ row }) => (
-                <div className="flex flex-wrap gap-1">
-                  {parseEmailList(row.original.ccToEmail).map((email) => (
-                    <Badge key={email} variant="outline" className="text-amber-600 border-amber-300 bg-amber-50/50 dark:text-amber-400 dark:border-amber-700">{email}</Badge>
-                  ))}
-                </div>
-              ),
-            },
             {
               id: "actions",
               header: "Actions",
@@ -522,7 +423,7 @@ export default function DebitNoteEmailsPage() {
                 );
               },
             },
-          ] satisfies ColumnDef<EmailConfig>[]}
+          ]}
           data={paginatedConfigs}
           loading={loading}
           emptyIcon={<Mail className="w-8 h-8" />}
@@ -542,15 +443,4 @@ export default function DebitNoteEmailsPage() {
       </ListPageLayout>
     </PageContent>
   );
-}
-
-function parseEmailList(value: string[] | string | null | undefined): string[] {
-  if (Array.isArray(value)) return value.filter(Boolean);
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [parsed].filter(Boolean);
-  } catch {
-    return String(value).split(",").map((item) => item.trim()).filter(Boolean);
-  }
 }
