@@ -34,6 +34,10 @@ export async function createApp() {
   const app = express();
   const env = getEnv();
 
+  // Behind Caddy: trust the first X-Forwarded-For hop so rate limiting keys
+  // on the real client IP instead of the proxy's IP (shared budget).
+  app.set("trust proxy", 1);
+
   // Security middleware (full CSP in production; Vite dev needs inline
   // scripts and an HMR websocket, so CSP is relaxed only in development)
   app.use(helmet(env.NODE_ENV === "production" ? undefined : { contentSecurityPolicy: false }));
