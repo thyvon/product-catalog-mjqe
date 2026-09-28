@@ -177,12 +177,12 @@ async function createTables(p: mysql.Pool) {
     receiverName VARCHAR(255) NOT NULL DEFAULT '',
     createdAt VARCHAR(40) NOT NULL,
     updatedAt VARCHAR(40) NOT NULL,
-    UNIQUE KEY dn_emails_unique (warehouse, division, department, campus)
+    UNIQUE KEY dn_emails_unique (warehouse(100), division(100), department(100), campus(100))
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
 
   try { await p.query("ALTER TABLE debit_note_emails ADD COLUMN division VARCHAR(255) NOT NULL DEFAULT '' AFTER campus"); } catch {}
   try { await p.query("ALTER TABLE debit_note_emails DROP INDEX dn_emails_unique"); } catch {}
-  try { await p.query("ALTER TABLE debit_note_emails ADD UNIQUE KEY dn_emails_unique (warehouse, division, department, campus)"); } catch {}
+  try { await p.query("ALTER TABLE debit_note_emails ADD UNIQUE KEY dn_emails_unique (warehouse(100), division(100), department(100), campus(100))"); } catch {}
   try { await p.query("ALTER TABLE debit_note_emails DROP COLUMN sendToEmail"); } catch {}
   try { await p.query("ALTER TABLE debit_note_emails DROP COLUMN ccToEmail"); } catch {}
 
@@ -260,6 +260,7 @@ async function createTables(p: mysql.Pool) {
     username VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL DEFAULT 'User',
+    card_id VARCHAR(64) NULL,
     fullName VARCHAR(255) NOT NULL DEFAULT '',
     email VARCHAR(255) NOT NULL DEFAULT '',
     phone VARCHAR(50) NOT NULL DEFAULT '',
@@ -525,6 +526,7 @@ async function migrateSchema(p: mysql.Pool) {
   try { await p.query("ALTER TABLE users ADD COLUMN position VARCHAR(255) NOT NULL DEFAULT '' AFTER phone"); } catch {}
   try { await p.query("ALTER TABLE users ADD COLUMN telegramId VARCHAR(100) NOT NULL DEFAULT '' AFTER position"); } catch {}
   try { await p.query("ALTER TABLE users ADD COLUMN smtp_pass VARCHAR(255) NOT NULL DEFAULT '' AFTER avatarUrl"); } catch {}
+  try { await p.query("ALTER TABLE users ADD COLUMN card_id VARCHAR(64) NULL AFTER role"); } catch {}
   try { await p.query("ALTER TABLE suppliers ADD COLUMN countryOfOrigin VARCHAR(150) NOT NULL DEFAULT '' AFTER foreignTradeOperator"); } catch {}
 
   // Product Management module migrations
