@@ -15,6 +15,7 @@ import stockRouter from "./routes/stock.js";
 import debitNotesRouter from "./routes/debitNotes.js";
 import settingsRouter from "./routes/settings.js";
 import { publicUsersRouter, protectedUsersRouter } from "./routes/users.js";
+import { publicAuthRouter } from "./routes/auth.js";
 import aiRouter from "./routes/ai.js";
 import productManagementRouter from "./routes/productManagement.js";
 import companyProductsRouter from "./routes/companyProducts.js";
@@ -33,10 +34,12 @@ export async function createApp() {
   const app = express();
   const env = getEnv();
 
-  // Security middleware
-  app.use(helmet());
+  // Security middleware (full CSP in production; Vite dev needs inline
+  // scripts and an HMR websocket, so CSP is relaxed only in development)
+  app.use(helmet(env.NODE_ENV === "production" ? undefined : { contentSecurityPolicy: false }));
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
-  app.use(rateLimit({ windowMs: env.RATE_LIMIT_WINDOW_MS, max: env.RATE_LIMIT_MAX }));
+  // Rate-limit API traffic only (page/asset requests must not consume the budget)
+  app.use("/api", rateLimit({ windowMs: env.RATE_LIMIT_WINDOW_MS, max: env.RATE_LIMIT_MAX }));
 
   app.use(express.json({ limit: "20mb" }));
   app.use(express.urlencoded({ limit: "20mb", extended: true }));
@@ -108,19 +111,30 @@ export async function createApp() {
     app.use("/uploads", express.static(uploadsDir));
   }
 
-  // Public API routes (login, sync)
+  // Public API routes (login — no auth required, rate-limited per route)
+  app.use(publicAuthRouter);
   app.use(publicUsersRouter);
 
-  // Protected API routes (require JWT)
-  app.use(authenticate, protectedUsersRouter);
-  app.use(authenticate, productsRouter);
-  app.use(authenticate, suppliersRouter);
-  app.use(authenticate, stockRouter);
-  app.use(authenticate, debitNotesRouter);
-  app.use(authenticate, settingsRouter);
-  app.use(authenticate, aiRouter);
-  app.use(authenticate, productManagementRouter);
-  app.use(authenticate, companyProductsRouter);
+  // Protected API routes (require JWT).
+  // Scoped to /api paths only: a pathless authenticate mount would reject
+  // every HTML/asset request with 401 before it reaches the SPA below.
+  const apiAuthenticate: express.RequestHandler = (req, res, next) => {
+    if (req.path === "/api" || req.path.startsWith("/api/")) {
+      authenticate(req, res, next);
+    } else {
+      next();
+    }
+  };
+
+  app.use(apiAuthenticate, protectedUsersRouter);
+  app.use(apiAuthenticate, productsRouter);
+  app.use(apiAuthenticate, suppliersRouter);
+  app.use(apiAuthenticate, stockRouter);
+  app.use(apiAuthenticate, debitNotesRouter);
+  app.use(apiAuthenticate, settingsRouter);
+  app.use(apiAuthenticate, aiRouter);
+  app.use(apiAuthenticate, productManagementRouter);
+  app.use(apiAuthenticate, companyProductsRouter);
 
   // SPA fallback
   if (process.env.NODE_ENV === "production") {

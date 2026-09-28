@@ -5,56 +5,16 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getPool, assertDb } from "../db.js";
 import { getEnv } from "../config.js";
 import { hashPassword, comparePassword } from "../services/password.js";
-import { authenticate } from "../middleware/auth.js";
+import { loginLimiter } from "../middleware/loginLimiter.js";
 
 // ─── Public routes (no auth) ───
 export const publicUsersRouter = Router();
 
-// ─── Protected routes (auth required) ───
+// ─── Protected routes (auth required — mounted behind authenticate in app.ts) ───
 export const protectedUsersRouter = Router();
-protectedUsersRouter.use(authenticate);
-
-// ─── Sync company API user into local DB (public — called after external login) ───
-publicUsersRouter.post("/api/users/sync", async (req, res) => {
-  try {
-    assertDb();
-    const p = getPool()!;
-    const { employeeId, cardId, name, email, position, avatarUrl } = req.body;
-    if (!employeeId) {
-      return res.status(400).json({ error: "employeeId is required." });
-    }
-    const now = new Date().toISOString();
-    const [existing] = await p.execute<RowDataPacket[]>(
-      "SELECT id FROM users WHERE username = ? OR (card_id IS NOT NULL AND card_id != '' AND card_id = ?)",
-      [employeeId, cardId || ""]
-    );
-    if (existing.length > 0) {
-      await p.execute(
-        "UPDATE users SET username = ?, fullName = ?, email = ?, position = ?, avatarUrl = ?, card_id = ?, updatedAt = ? WHERE id = ?",
-        [employeeId, name || "", email || "", position || "", avatarUrl || "", cardId || "", now, existing[0].id]
-      );
-    } else {
-      const id = `usr-${crypto.randomUUID()}`;
-      const hashedPassword = await hashPassword(crypto.randomUUID());
-      await p.execute(
-        `INSERT INTO users (id, username, password, role, fullName, email, phone, position, telegramId, avatarUrl, card_id, smtp_pass, createdAt, updatedAt)
-         VALUES (?, ?, ?, 'User', ?, ?, '', ?, '', ?, ?, ?, ?, ?)`,
-        [id, employeeId, hashedPassword, name || "", email || "", position || "", avatarUrl || "", cardId || "", now, now]
-      );
-    }
-    const [rows] = await p.execute<RowDataPacket[]>(
-      "SELECT id, username, role, fullName, email, phone, position, telegramId, avatarUrl, card_id, smtp_pass, createdAt, updatedAt FROM users WHERE username = ?",
-      [employeeId]
-    );
-    res.json(rows[0] || { success: true });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to sync user.";
-    res.status(500).json({ error: message });
-  }
-});
 
 // ─── Login (DB-backed, public) ───
-publicUsersRouter.post("/api/users/login", async (req, res) => {
+publicUsersRouter.post("/api/users/login", loginLimiter, async (req, res) => {
   try {
     assertDb();
     const p = getPool()!;
@@ -63,7 +23,7 @@ publicUsersRouter.post("/api/users/login", async (req, res) => {
       return res.status(400).json({ error: "Username and password are required." });
     }
     const [rows] = await p.execute<RowDataPacket[]>(
-      "SELECT id, username, role, fullName, password FROM users WHERE username = ?",
+      "SELECT id, username, role, fullName, email, phone, position, avatarUrl, card_id, password FROM users WHERE username = ?",
       [username]
     );
     if (rows.length === 0) {
@@ -79,7 +39,18 @@ publicUsersRouter.post("/api/users/login", async (req, res) => {
       getEnv().JWT_SECRET,
       { expiresIn: "24h" }
     );
-    res.json({ id: user.id, username: user.username, role: user.role, fullName: user.fullName, token });
+    res.json({
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      position: user.position,
+      avatarUrl: user.avatarUrl,
+      card_id: user.card_id,
+      token,
+    });
   } catch {
     res.status(500).json({ error: "Login failed." });
   }

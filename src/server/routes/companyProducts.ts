@@ -1,85 +1,16 @@
-import { Router } from "express";
-import https from "https";
-import http from "http";
+import { Router, type Request, type Response } from "express";
 import { getEnv } from "../config.js";
+import {
+  fetchJson,
+  getCompanySession,
+  touchCompanySession,
+  deleteCompanySession,
+  type CompanySession,
+} from "../services/companySession.js";
 
 const router = Router();
 
-interface CompanyLoginResponse {
-  result: string;
-  data: string;
-  formToken: string;
-  user: { id: number; username: string; name: string };
-}
-
-interface CachedSession {
-  token: string;
-  formToken: string;
-  cookie: string;
-  expiresAt: number;
-}
-
-const sessionCache = new Map<string, CachedSession>();
-const SESSION_TTL_MS = 30 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
-
-function getSessionForUser(userId: string): CachedSession | null {
-  const session = sessionCache.get(userId);
-  if (!session) return null;
-  if (Date.now() > session.expiresAt) {
-    sessionCache.delete(userId);
-    return null;
-  }
-  return session;
-}
-
-interface FetchResult<T> {
-  data: T;
-  cookies: string[];
-}
-
-function fetchWithCookies<T>(url: string, options: { method?: string; headers?: Record<string, string>; body?: string; timeout?: number } = {}): Promise<FetchResult<T>> {
-  return new Promise((resolve, reject) => {
-    const parsedUrl = new URL(url);
-    const isHttps = parsedUrl.protocol === "https:";
-    const client = isHttps ? https : http;
-    const req = client.request(parsedUrl, {
-      method: options.method || "GET",
-      headers: { ...options.headers },
-      timeout: options.timeout ?? FETCH_TIMEOUT_MS,
-    }, (res) => {
-      let data = "";
-      res.on("data", (chunk: string) => { data += chunk; });
-      res.on("end", () => {
-        const setCookieHeader = res.headers["set-cookie"];
-        const cookies: string[] = [];
-        if (setCookieHeader) {
-          for (const c of setCookieHeader) cookies.push(c.split(";")[0]);
-        }
-        try { resolve({ data: JSON.parse(data), cookies }); }
-        catch { reject(new Error(`Failed to parse JSON: ${data.substring(0, 200)}`)); }
-      });
-    });
-    req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
-    req.on("error", reject);
-    if (options.body) req.write(options.body);
-    req.end();
-  });
-}
-
-function fetchJson<T>(url: string, options: { method?: string; headers?: Record<string, string>; body?: string; timeout?: number } = {}): Promise<T> {
-  return fetchWithCookies<T>(url, options).then((r) => r.data);
-}
-
-async function loginToCompany(employeeId: string, password: string) {
-  const env = getEnv();
-  const result = await fetchWithCookies<CompanyLoginResponse>(
-    `${env.COMPANY_API_URL}/api/default_user_access/login`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ employee_id: employeeId, password }) }
-  );
-  if (result.data.result !== "success") throw new Error("Company login failed");
-  return { token: result.data.data, formToken: result.data.formToken, cookie: result.cookies.join("; ") };
-}
 
 function buildColumnsQuery(): string {
   const cols = [
@@ -111,7 +42,7 @@ function buildColumnsQuery(): string {
   ].join("&")).join("&");
 }
 
-async function fetchCompanyItems(session: CachedSession, opts: { start: string; length: string; search?: string; timeout?: number } = { start: "0", length: "10" }) {
+async function fetchCompanyItems(session: CompanySession, opts: { start: string; length: string; search?: string; timeout?: number } = { start: "0", length: "10" }) {
   const env = getEnv();
   const columnsQuery = buildColumnsQuery();
   const params = new URLSearchParams();
@@ -139,34 +70,35 @@ function isValidItem(item: Record<string, unknown>): boolean {
   return code.length > 0 || desc.length > 0;
 }
 
-// POST /api/company/session
-router.post("/api/company/session", async (req, res) => {
-  try {
-    const { employeeId, password, userId } = req.body as { employeeId?: string; password?: string; userId?: string };
-    if (!employeeId || !password || !userId) { res.status(400).json({ error: "employeeId, password, and userId are required" }); return; }
-    const { token, formToken, cookie } = await loginToCompany(employeeId, password);
-    sessionCache.set(userId, { token, formToken, cookie, expiresAt: Date.now() + SESSION_TTL_MS });
-    res.json({ success: true });
-  } catch (err: unknown) {
-    res.status(401).json({ error: err instanceof Error ? err.message : "Company session failed" });
+// Resolves the caller's E-Purchase session from the verified JWT identity
+// (never trusted from client-supplied headers).
+function resolveCompanySession(req: Request, res: Response): { userId: string; session: CompanySession } | null {
+  const userId = req.user?.userId;
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required." });
+    return null;
   }
-});
+  const session = getCompanySession(userId);
+  if (!session) {
+    res.status(401).json({ error: "E-Purchase session required. Please log in with E-Purchase.", code: "EPURCHASE_REQUIRED" });
+    return null;
+  }
+  return { userId, session };
+}
 
-// DELETE /api/company/session
+// DELETE /api/company/session — clears the caller's cached E-Purchase session on logout
 router.delete("/api/company/session", (req, res) => {
-  const userId = (req.query.userId as string) || "";
-  if (userId) sessionCache.delete(userId);
+  const userId = req.user?.userId;
+  if (userId) deleteCompanySession(userId);
   res.json({ success: true });
 });
 
 // GET /api/company/items — proxy to company API with server-side search
 router.get("/api/company/items", async (req, res) => {
   try {
-    const userId = (req.headers["x-user-id"] as string) || "";
-    if (!userId) { res.status(401).json({ error: "User ID not provided" }); return; }
-
-    const session = getSessionForUser(userId);
-    if (!session) { res.status(401).json({ error: "Company session expired. Please log in again." }); return; }
+    const resolved = resolveCompanySession(req, res);
+    if (!resolved) return;
+    const { userId, session } = resolved;
 
     const start = String(Number(req.query.start as string) || 0);
     const length = String(Number(req.query.length as string) || 10);
@@ -174,6 +106,7 @@ router.get("/api/company/items", async (req, res) => {
 
     const result = await fetchCompanyItems(session, { start, length, search: searchValue });
     if (result.success === false) throw new Error(result.message || "Access denied");
+    touchCompanySession(userId);
     const data = (result.data ?? []).filter(isValidItem);
     res.json({ ...result, data });
   } catch (err: unknown) {
@@ -184,15 +117,14 @@ router.get("/api/company/items", async (req, res) => {
 // GET /api/company/items/codes — returns ItemCode + Description pairs for dropdowns
 router.get("/api/company/items/codes", async (req, res) => {
   try {
-    const userId = (req.headers["x-user-id"] as string) || "";
-    if (!userId) { res.status(401).json({ error: "User ID not provided" }); return; }
-
-    const session = getSessionForUser(userId);
-    if (!session) { res.status(401).json({ error: "Company session expired. Please log in again." }); return; }
+    const resolved = resolveCompanySession(req, res);
+    if (!resolved) return;
+    const { userId, session } = resolved;
 
     const searchValue = String(req.query.search || "").trim();
     const result = await fetchCompanyItems(session, { start: "0", length: searchValue ? "1000" : "1000", search: searchValue });
     if (result.success === false) throw new Error(result.message || "Access denied");
+    touchCompanySession(userId);
 
     const items = (result.data ?? [])
       .filter(isValidItem)

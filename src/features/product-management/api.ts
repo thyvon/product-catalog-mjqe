@@ -80,19 +80,19 @@ export const pmDeleteStandardItem = (id: string) => api.delete(`/api/pm/standard
 export const pmLinkedEpurchaseCodes = () => api.get<string[]>("/api/pm/products/linked-epurchase-codes");
 
 export const fetchEpurchaseItemCodes = async (search?: string): Promise<{ code: string; description: string }[]> => {
-  const userId = JSON.parse(localStorage.getItem("auth_user") || "{}")?.id;
   const params = new URLSearchParams();
   if (search) params.set("search", search);
   const qs = params.toString();
-  const headers: Record<string, string> = { "X-User-Id": String(userId || "") };
+  const headers: Record<string, string> = {};
   const jwt = localStorage.getItem("auth_jwt");
   if (jwt) headers["Authorization"] = `Bearer ${jwt}`;
   const res = await fetch(`/api/company/items/codes${qs ? `?${qs}` : ""}`, { headers });
   if (res.status === 401) {
-    localStorage.removeItem("auth_user");
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_form_token");
-    localStorage.removeItem("auth_jwt");
+    const body = await res.json().catch(() => ({}));
+    if (body?.code === "EPURCHASE_REQUIRED") {
+      throw new Error("EPURCHASE_REQUIRED");
+    }
+    ["auth_user", "auth_jwt", "auth_mode", "auth_token", "auth_form_token"].forEach((k) => localStorage.removeItem(k));
     window.location.href = "/login";
     throw new Error("Session expired");
   }

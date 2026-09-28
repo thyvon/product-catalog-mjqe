@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import { api, setOnSessionExpired } from "@/features/shared/api/client";
+import { setOnSessionExpired } from "@/features/shared/api/client";
 
 interface User {
-  id: number;
+  id: string;
   card_id: string;
   username: string;
   name: string;
@@ -13,36 +13,37 @@ interface User {
   role?: string;
 }
 
-interface LoginResponse {
-  result: string;
-  msg: string;
-  data: string;
-  formToken: string;
-  user: {
-    id: number;
-    card_id: string;
-    name: string;
-    username: string;
-    email: string;
-    real_position: string;
-  };
-  userPhoto?: string;
-}
+export type AuthMode = "local" | "epurchase";
 
 interface LocalLoginResponse {
   id: string;
   username: string;
   role: string;
   fullName: string;
+  email?: string;
+  phone?: string;
+  position?: string;
+  avatarUrl?: string;
+  card_id?: string;
   token: string;
+}
+
+interface EpurchaseLoginResponse {
+  token: string;
+  user: User;
+}
+
+export interface LoginResult {
+  ok: boolean;
+  error?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
-  formToken: string | null;
   jwt: string | null;
-  login: (employeeId: string, password: string) => Promise<boolean>;
+  authMode: AuthMode | null;
+  loginLocal: (username: string, password: string) => Promise<LoginResult>;
+  loginEpurchase: (employeeId: string, password: string) => Promise<LoginResult>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
   isAuthenticated: boolean;
@@ -50,32 +51,50 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const SESSION_KEYS = ["auth_user", "auth_jwt", "auth_mode"];
+const LEGACY_KEYS = ["auth_token", "auth_form_token"];
+
+async function readError(res: Response, fallback: string): Promise<string> {
+  const body = await res.json().catch(() => ({}));
+  return (body as { error?: string }).error || fallback;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem("auth_user");
     return stored ? JSON.parse(stored) : null;
   });
 
-  const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem("auth_token");
-  });
-
-  const [formToken, setFormToken] = useState<string | null>(() => {
-    return localStorage.getItem("auth_form_token");
-  });
-
   const [jwt, setJwt] = useState<string | null>(() => {
     return localStorage.getItem("auth_jwt");
   });
 
+  const [authMode, setAuthMode] = useState<AuthMode | null>(() => {
+    const stored = localStorage.getItem("auth_mode");
+    return stored === "epurchase" ? "epurchase" : stored === "local" ? "local" : null;
+  });
+
+  const persistSession = useCallback((u: User, token: string, mode: AuthMode) => {
+    setUser(u);
+    setJwt(token);
+    setAuthMode(mode);
+    localStorage.setItem("auth_user", JSON.stringify(u));
+    localStorage.setItem("auth_jwt", token);
+    localStorage.setItem("auth_mode", mode);
+    // Clean up legacy keys that used to hold the raw E-Purchase tokens
+    LEGACY_KEYS.forEach((k) => localStorage.removeItem(k));
+  }, []);
+
+  // Backfill role/fullName for sessions created before role was persisted
   useEffect(() => {
     if (user && !user.role) {
       const localToken = localStorage.getItem("auth_jwt");
       const headers: Record<string, string> = {};
       if (localToken) headers["Authorization"] = `Bearer ${localToken}`;
       fetch(`/api/users/profile?username=${encodeURIComponent(user.username)}`, { headers })
-        .then((res) => res.json())
+        .then((res) => (res.ok ? res.json() : null))
         .then((profile) => {
+          if (!profile) return;
           const updated = { ...user };
           if (profile.role) updated.role = profile.role;
           if (profile.fullName) updated.fullName = profile.fullName;
@@ -86,89 +105,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = async (employeeId: string, password: string): Promise<boolean> => {
+  // Login with "My System" — local account, local DB credentials only.
+  const loginLocal = useCallback(async (username: string, password: string): Promise<LoginResult> => {
     try {
-      const data = await api.companyPost<LoginResponse>("/default_user_access/login", {
-        employee_id: employeeId,
-        password,
+      const res = await fetch("/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
       });
-      if (data.result !== "success") return false;
-
-      try {
-        await api.post("/api/users/sync", {
-          employeeId: data.user.username,
-          cardId: data.user.card_id,
-          name: data.user.name,
-          email: data.user.email,
-          position: data.user.real_position,
-          avatarUrl: data.userPhoto || "",
-        });
-      } catch { /* sync failed, continue with login */ }
-
-      let role = "User";
-      let localJwt = "";
-      try {
-        const localLoginRes = await fetch("/api/users/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: data.user.username, password }),
-        });
-        if (localLoginRes.ok) {
-          const localData: LocalLoginResponse = await localLoginRes.json();
-          if (localData.role) role = localData.role;
-          localJwt = localData.token;
-        }
-      } catch { /* use default role */ }
-
+      if (!res.ok) {
+        return { ok: false, error: await readError(res, "Invalid username or password.") };
+      }
+      const data: LocalLoginResponse = await res.json();
       const u: User = {
-        id: data.user.id,
-        card_id: data.user.card_id,
-        username: data.user.username,
-        name: data.user.name,
-        email: data.user.email,
-        real_position: data.user.real_position,
-        avatarUrl: data.userPhoto || undefined,
-        fullName: data.user.name,
-        role,
+        id: String(data.id),
+        card_id: data.card_id || "",
+        username: data.username,
+        name: data.fullName || data.username,
+        email: data.email || "",
+        real_position: data.position || "",
+        avatarUrl: data.avatarUrl || undefined,
+        fullName: data.fullName || data.username,
+        role: data.role || "User",
       };
-
-      setUser(u);
-      setToken(data.data);
-      setFormToken(data.formToken);
-      setJwt(localJwt);
-
-      localStorage.setItem("auth_user", JSON.stringify(u));
-      localStorage.setItem("auth_token", data.data);
-      localStorage.setItem("auth_form_token", data.formToken);
-      localStorage.setItem("auth_jwt", localJwt);
-
-      // Create server session + background prefetch all items
-      api.post("/api/company/session", {
-        employeeId,
-        password,
-        userId: String(data.user.id),
-      }).catch(() => {});
-
-      return true;
+      persistSession(u, data.token, "local");
+      return { ok: true };
     } catch {
-      return false;
+      return { ok: false, error: "Login failed. Please try again." };
     }
-  };
+  }, [persistSession]);
+
+  // Login with "E-Purchase" — credentials are verified against the E-Purchase
+  // system exactly once and never stored anywhere in this app.
+  const loginEpurchase = useCallback(async (employeeId: string, password: string): Promise<LoginResult> => {
+    try {
+      const res = await fetch("/api/auth/epurchase-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeId, password }),
+      });
+      if (!res.ok) {
+        return { ok: false, error: await readError(res, "Invalid employee ID or password.") };
+      }
+      const data: EpurchaseLoginResponse = await res.json();
+      if (!data.token || !data.user) {
+        return { ok: false, error: "Login failed. Please try again." };
+      }
+      persistSession({ ...data.user, id: String(data.user.id) }, data.token, "epurchase");
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "Login failed. Please try again." };
+    }
+  }, [persistSession]);
 
   const logout = useCallback(() => {
-    const userId = user?.id;
+    const currentJwt = localStorage.getItem("auth_jwt");
+    const currentMode = localStorage.getItem("auth_mode");
     setUser(null);
-    setToken(null);
-    setFormToken(null);
     setJwt(null);
-    localStorage.removeItem("auth_user");
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_form_token");
-    localStorage.removeItem("auth_jwt");
-    if (userId) {
-      fetch(`/api/company/session?userId=${encodeURIComponent(String(userId))}`, { method: "DELETE" }).catch(() => {});
+    setAuthMode(null);
+    [...SESSION_KEYS, ...LEGACY_KEYS].forEach((k) => localStorage.removeItem(k));
+    // Drop the server-side E-Purchase proxy session (authenticated by our JWT)
+    if (currentMode === "epurchase" && currentJwt) {
+      fetch("/api/company/session", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${currentJwt}` },
+      }).catch(() => {});
     }
-  }, [user?.id]);
+  }, []);
 
   // Register session-expired handler: logout + redirect to /login
   useEffect(() => {
@@ -189,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, formToken, jwt, login, logout, updateProfile, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, jwt, authMode, loginLocal, loginEpurchase, logout, updateProfile, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

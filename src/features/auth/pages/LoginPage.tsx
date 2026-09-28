@@ -1,42 +1,60 @@
 import React, { useState } from "react";
-import { useAuth } from "@/features/auth/AuthContext";
-import { useNavigate } from "react-router-dom";
-import { PackageOpen, Eye, EyeOff } from "lucide-react";
+import { useAuth, type AuthMode } from "@/features/auth/AuthContext";
+import { useLocation, useNavigate } from "react-router-dom";
+import { PackageOpen, Eye, EyeOff, Monitor, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormLabel } from "@/features/shared/components/FormLabel";
 
+const MODE_TABS: { mode: AuthMode; label: string; icon: React.ReactNode }[] = [
+  { mode: "local", label: "My System", icon: <Monitor className="w-3.5 h-3.5" /> },
+  { mode: "epurchase", label: "E-Purchase", icon: <ShoppingCart className="w-3.5 h-3.5" /> },
+];
+
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { loginLocal, loginEpurchase } = useAuth();
   const navigate = useNavigate();
-  const [employeeId, setEmployeeId] = useState("");
+  const location = useLocation();
+  const [mode, setMode] = useState<AuthMode>("local");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
   const [loading, setLoading] = useState(false);
 
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || "/";
+
+  const switchMode = (next: AuthMode) => {
+    if (next === mode) return;
+    setMode(next);
+    setError("");
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!employeeId.trim() || !password.trim()) {
-      setError("Please enter employee ID and password.");
+    if (!identifier.trim() || !password.trim()) {
+      setError(
+        mode === "local"
+          ? "Please enter your username and password."
+          : "Please enter employee ID and password."
+      );
       return;
     }
 
     setLoading(true);
-    try {
-      const success = await login(employeeId, password);
-      if (success) {
-        navigate("/", { replace: true });
-      } else {
-        setError("Invalid employee ID or password.");
-      }
-    } catch {
-      setError("Login failed. Please try again.");
-    } finally {
-      setLoading(false);
+    const result =
+      mode === "local"
+        ? await loginLocal(identifier.trim(), password)
+        : await loginEpurchase(identifier.trim(), password);
+    setLoading(false);
+
+    if (result.ok) {
+      navigate(from, { replace: true });
+    } else {
+      setError(result.error || "Login failed. Please try again.");
     }
   };
 
@@ -56,6 +74,24 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className="bg-card rounded-2xl shadow-xl p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-1 p-1 bg-muted rounded-xl">
+            {MODE_TABS.map((tab) => (
+              <button
+                key={tab.mode}
+                type="button"
+                onClick={() => switchMode(tab.mode)}
+                className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+                  mode === tab.mode
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
           {error && (
             <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-xs text-destructive font-medium">
               {error}
@@ -63,12 +99,12 @@ export default function LoginPage() {
           )}
 
           <div>
-            <FormLabel variant="mono">Employee ID</FormLabel>
+            <FormLabel variant="mono">{mode === "local" ? "Username" : "Employee ID"}</FormLabel>
             <Input
               type="text"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              placeholder="Enter your employee ID"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder={mode === "local" ? "Enter your username" : "Enter your employee ID"}
               autoFocus
             />
           </div>
@@ -99,7 +135,9 @@ export default function LoginPage() {
           </Button>
 
           <p className="text-xs text-center text-muted-foreground font-mono">
-            Contact admin for account access
+            {mode === "local"
+              ? "Contact admin for account access"
+              : "Verified securely with E-Purchase — your password is never stored"}
           </p>
         </form>
       </div>

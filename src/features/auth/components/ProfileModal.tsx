@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/features/auth/AuthContext";
+import { api } from "@/features/shared/api/client";
 import BaseModal from "@/features/shared/components/BaseModal";
 import TextField from "@/features/shared/components/TextField";
 import { useToast } from "@/features/shared/components/Toast";
@@ -36,14 +37,8 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     setProfile(null);
     setLoading(true);
     if (!user?.username) { setLoading(false); return; }
-    fetch(`/api/users/profile?username=${encodeURIComponent(user.username)}`)
-      .then(async (r) => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(body.error || `API error (${r.status})`);
-        }
-        return r.json();
-      })
+    api
+      .get<ProfileData>("/api/users/profile", { username: user.username })
       .then((data) => setProfile(data))
       .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false));
@@ -53,24 +48,15 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     if (!profile) return;
     setSaving(true);
     try {
-      const r = await fetch("/api/users/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: profile.username,
-          fullName: profile.fullName,
-          email: profile.email,
-          phone: profile.phone,
-          position: profile.position,
-          telegramId: profile.telegramId,
-          smtp_pass: profile.smtp_pass,
-        }),
+      const data = await api.put<ProfileData>("/api/users/profile", {
+        username: profile.username,
+        fullName: profile.fullName,
+        email: profile.email,
+        phone: profile.phone,
+        position: profile.position,
+        telegramId: profile.telegramId,
+        smtp_pass: profile.smtp_pass,
       });
-      if (!r.ok) {
-        const body = await r.json().catch(() => ({}));
-        throw new Error(body.error || "Failed to save");
-      }
-      const data = await r.json();
       setProfile(data);
       updateProfile({ fullName: data.fullName });
       toast.success("Profile updated successfully");

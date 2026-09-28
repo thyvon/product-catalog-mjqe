@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import type { ColumnDef } from "@tanstack/react-table";
-import { GitMerge, SquarePen, RefreshCw, X } from "lucide-react";
+import { GitMerge, SquarePen, RefreshCw, X, Lock as LockIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,20 +17,27 @@ import { pmLinkedEpurchaseCodes, pmProducts } from "@/features/product-managemen
 import { useAuth } from "@/features/auth/AuthContext";
 
 const companyItemsApi = {
-  list: async (params: URLSearchParams, userId: string): Promise<{ data: CompanyItem[]; recordsFiltered: number; recordsTotal: number }> => {
-    const res = await fetch(`/api/company/items?${params.toString()}`, {
-      headers: { "X-User-Id": String(userId) },
-    });
-    if (res.status === 401) throw new Error("UNAUTHORIZED");
+  list: async (params: URLSearchParams): Promise<{ data: CompanyItem[]; recordsFiltered: number; recordsTotal: number }> => {
+    const headers: Record<string, string> = {};
+    const jwt = localStorage.getItem("auth_jwt");
+    if (jwt) headers["Authorization"] = `Bearer ${jwt}`;
+    const res = await fetch(`/api/company/items?${params.toString()}`, { headers });
+    if (res.status === 401) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.code === "EPURCHASE_REQUIRED" ? "EPURCHASE_REQUIRED" : "UNAUTHORIZED");
+    }
     if (!res.ok) throw new Error("Failed to fetch company items.");
     return res.json();
   },
 };
 
+const isAuthError = (err: unknown): boolean =>
+  err instanceof Error && (err.message === "EPURCHASE_REQUIRED" || err.message === "UNAUTHORIZED");
+
 export default function CompanyItemsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { logout } = useAuth();
+  const { logout, authMode } = useAuth();
   const queryClient = useQueryClient();
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,10 +59,6 @@ export default function CompanyItemsPage() {
     return () => clearTimeout(timer);
   }, [inputValue]);
 
-  const userId = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem("auth_user") || "{}")?.id; } catch { return undefined; }
-  }, []);
-
   const queryParams = useMemo(() => {
     const params = new URLSearchParams({
       draw: "1",
@@ -69,25 +72,27 @@ export default function CompanyItemsPage() {
     return params.toString();
   }, [currentPage, pageSize, searchQuery]);
 
-  const { data, isLoading: loading, refetch } = useQuery({
-    queryKey: ["company-items", queryParams, userId],
-    queryFn: async () => {
-      if (!userId) return { data: [], recordsFiltered: 0, recordsTotal: 0 };
-      return companyItemsApi.list(new URLSearchParams(queryParams), userId);
-    },
+  const { data, isLoading: loading, isError, error, refetch } = useQuery({
+    queryKey: ["company-items", queryParams],
+    queryFn: () => companyItemsApi.list(new URLSearchParams(queryParams)),
     placeholderData: (prev) => prev,
+    retry: (failureCount, err) => (isAuthError(err) ? false : failureCount < 1),
   });
 
   const rows = useMemo(() => data?.data ?? [], [data]);
   const total = data?.recordsFiltered ?? data?.recordsTotal ?? 0;
 
+  const errKind = isError && error instanceof Error ? error.message : null;
+  const requiresEpurchaseLogin = errKind === "EPURCHASE_REQUIRED" && authMode !== "epurchase";
+  const epurchaseSessionExpired = errKind === "EPURCHASE_REQUIRED" && authMode === "epurchase";
+
+  // Local JWT expired/invalid — end the session like any other protected route
   useEffect(() => {
-    if (data === undefined) return;
-    if ((data as unknown as { error?: string }).error) {
+    if (errKind === "UNAUTHORIZED") {
       logout();
       navigate("/login");
     }
-  }, [data, logout, navigate]);
+  }, [errKind, logout, navigate]);
 
   const { data: linkedCodesData } = useQuery({
     queryKey: ["pm-linked-codes"],
@@ -229,47 +234,82 @@ export default function CompanyItemsPage() {
         onSearchChange={setInputValue}
         searchPlaceholder="Search by code or description..."
       >
-        {selected.size > 0 && (
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
-            <span className="text-sm font-medium text-foreground">
-              {selected.size} selected
-              {selectedLinkedCount !== selected.size && (
-                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                  ({selected.size - selectedLinkedCount} not linked — link products first to merge)
-                </span>
-              )}
-            </span>
-            <div className="ml-auto flex items-center gap-2">
-              <Button
-                size="sm"
-                disabled={selectedLinkedCount < 2 || fetchingMerge}
-                onClick={handleMergeClick}
-                title={selectedLinkedCount < 2 ? "Select at least 2 linked items to merge" : undefined}
-              >
-                <GitMerge />
-                {fetchingMerge ? "Loading..." : "Merge into Variation"}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
-                <X />
-                Clear
-              </Button>
-            </div>
+        {requiresEpurchaseLogin ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <LockIcon className="w-8 h-8 text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-foreground">This page requires an E-Purchase login</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+              You signed in with My System. Sign out and choose the E-Purchase option to view E-Purchase items.
+            </p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => { logout(); navigate("/login"); }}>
+              Switch account
+            </Button>
           </div>
+        ) : epurchaseSessionExpired ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <RefreshCw className="w-8 h-8 text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-foreground">Your E-Purchase session has expired</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+              Please sign in with E-Purchase again to continue viewing E-Purchase items.
+            </p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => { logout(); navigate("/login"); }}>
+              Sign in again
+            </Button>
+          </div>
+        ) : errKind ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-sm font-medium text-destructive">
+              {error instanceof Error ? error.message : "Failed to fetch E-Purchase items."}
+            </p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <>
+            {selected.size > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5">
+                <span className="text-sm font-medium text-foreground">
+                  {selected.size} selected
+                  {selectedLinkedCount !== selected.size && (
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                      ({selected.size - selectedLinkedCount} not linked — link products first to merge)
+                    </span>
+                  )}
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    disabled={selectedLinkedCount < 2 || fetchingMerge}
+                    onClick={handleMergeClick}
+                    title={selectedLinkedCount < 2 ? "Select at least 2 linked items to merge" : undefined}
+                  >
+                    <GitMerge />
+                    {fetchingMerge ? "Loading..." : "Merge into Variation"}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+                    <X />
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            )}
+            <DataTable<CompanyItem>
+              columns={columns}
+              data={rows}
+              loading={loading}
+              getRowId={(r) => String(r.id)}
+              pagination={{
+                currentPage,
+                pageSize,
+                total,
+                onPageChange: setCurrentPage,
+                onPageSizeChange: setPageSize,
+                pageSizeOptions: [10, 25, 50, 100],
+              }}
+            />
+          </>
         )}
-        <DataTable<CompanyItem>
-          columns={columns}
-          data={rows}
-          loading={loading}
-          getRowId={(r) => String(r.id)}
-          pagination={{
-            currentPage,
-            pageSize,
-            total,
-            onPageChange: setCurrentPage,
-            onPageSizeChange: setPageSize,
-            pageSizeOptions: [10, 25, 50, 100],
-          }}
-        />
       </ListPageLayout>
 
       <PmMergeVariationModal
