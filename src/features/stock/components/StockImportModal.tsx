@@ -6,6 +6,7 @@ import BaseModal from "@/features/shared/components/BaseModal";
 import { useToast } from "@/features/shared/components/Toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FormLabel } from "@/features/shared/components/FormLabel";
+import { authFetch } from "@/features/shared/api/client";
 
 const IMPORT_COLUMNS = [
   "Date", "Code", "Description", "Qty", "UoM", "Unit Price", "Total Amount",
@@ -114,7 +115,7 @@ export default function StockImportModal({ isOpen, onClose, onImportComplete }: 
     if (parsedRows.length === 0) return;
     setImportLoading(true);
     try {
-      const res = await fetch("/api/stock-issue-items/import", {
+      const res = await authFetch("/api/stock-issue-items/import", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(parsedRows),
       });
       if (!res.ok) {

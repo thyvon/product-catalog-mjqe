@@ -9,6 +9,7 @@ import SelectField from "@/features/shared/components/SelectField";
 import TextField from "@/features/shared/components/TextField";
 import { useToast } from "@/features/shared/components/Toast";
 import { FormLabel } from "@/features/shared/components/FormLabel";
+import { authFetch } from "@/features/shared/api/client";
 
 interface StockItemFormData {
   itemCode: string;
@@ -92,7 +93,7 @@ export default function StockItemFormModal({ isOpen, onClose, onSaved, editItem 
     try {
       const url = isEdit ? `/api/stock-issue-items/${editItem!.id}` : "/api/stock-issue-items";
       const method = isEdit ? "PUT" : "POST";
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const res = await authFetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
       if (res.ok) {
         toast.success(isEdit ? "Stock issue item updated." : "Stock issue item created.");
         onSaved();

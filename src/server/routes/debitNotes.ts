@@ -254,6 +254,9 @@ router.put("/api/debit-note/emails/:id", async (req, res) => {
     const { warehouse, department, campus, division, receiverName, sendToEmail, ccToEmail } = req.body;
     const sendTo = Array.isArray(sendToEmail) ? sendToEmail : null;
     const ccTo = Array.isArray(ccToEmail) ? ccToEmail : null;
+    if (sendTo !== null && sendTo.length === 0) {
+      return res.status(400).json({ error: "At least one send-to email is required." });
+    }
 
     const now = new Date().toISOString();
     await p.execute(

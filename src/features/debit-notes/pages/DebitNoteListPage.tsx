@@ -21,6 +21,7 @@ import ConfirmModal from "@/features/shared/components/ConfirmModal";
 import { formatAmount, formatDisplayDate } from "@/features/shared/utils/format";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { debitNotesApi, type DebitNote } from "@/features/debit-notes/api";
+import { authFetch } from "@/features/shared/api/client";
 
 interface EmailProgress {
   status: string;
@@ -93,7 +94,7 @@ export default function DebitNoteListPage() {
     if (!sendingEmails) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/debit-notes/email-progress?user=${encodeURIComponent(user?.username || "anonymous")}`);
+        const res = await authFetch(`/api/debit-notes/email-progress?user=${encodeURIComponent(user?.username || "anonymous")}`);
         if (res.ok) {
           const data = await res.json();
           setProgress(data);
@@ -168,7 +169,7 @@ export default function DebitNoteListPage() {
 
   const handleExport = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/debit-notes/${id}/export`);
+      const res = await authFetch(`/api/debit-notes/${id}/export`);
       if (res.ok) {
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
@@ -192,7 +193,7 @@ export default function DebitNoteListPage() {
       if (statusFilter) filterParams.status = statusFilter;
       if (startDate) filterParams.startDate = startDate;
       if (endDate) filterParams.endDate = endDate;
-      const res = await fetch("/api/debit-notes/export-bulk", {
+      const res = await authFetch("/api/debit-notes/export-bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(filterParams),
@@ -247,7 +248,7 @@ export default function DebitNoteListPage() {
           if (startDate) params.set("startDate", startDate);
           if (endDate) params.set("endDate", endDate);
           if (searchQuery) params.set("search", searchQuery);
-          const res = await fetch(`/api/debit-notes/bulk?${params}`, { method: "DELETE" });
+          const res = await authFetch(`/api/debit-notes/bulk?${params}`, { method: "DELETE" });
           if (res.ok) {
             const data = await res.json();
             const deleted = data.count ?? total;
@@ -268,7 +269,7 @@ export default function DebitNoteListPage() {
 
   const handlePreview = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/debit-notes/${id}`);
+      const res = await authFetch(`/api/debit-notes/${id}`);
       if (res.ok) {
         setPreviewNote(await res.json());
         setShowPreview(true);

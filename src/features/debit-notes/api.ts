@@ -38,6 +38,8 @@ export interface DebitNoteEmailConfig {
   campus: string;
   division: string;
   receiverName: string;
+  sendToEmail?: string[];
+  ccToEmail?: string[];
   contacts?: { id: string; email: string; name: string; type: string }[];
 }
 
@@ -72,7 +74,7 @@ export const debitNotesApi = {
     remove: (id: string) =>
       api.delete<{ success: boolean }>(`/api/debit-note/emails/${id}`),
     bulkRemove: (ids: string[]) =>
-      api.post<{ deleted: number }>("/api/debit-note/emails/bulk", { ids }),
+      api.post<{ deleted: number }>("/api/debit-note/emails/bulk-delete", { ids }),
   },
 
   contacts: {

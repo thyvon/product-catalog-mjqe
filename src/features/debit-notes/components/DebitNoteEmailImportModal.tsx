@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FormLabel } from "@/features/shared/components/FormLabel";
+import { authFetch } from "@/features/shared/api/client";
 
 const IMPORT_COLUMNS = ["Warehouse", "Division", "Department", "Campus", "Receiver Name", "Send To Emails", "CC Emails"];
 
@@ -88,7 +89,7 @@ export default function DebitNoteEmailImportModal({ isOpen, onClose, onImportCom
     if (parsedRows.length === 0) return;
     setImportLoading(true);
     try {
-      const res = await fetch("/api/debit-note/emails/import", {
+      const res = await authFetch("/api/debit-note/emails/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(parsedRows),

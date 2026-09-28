@@ -15,6 +15,7 @@ import CreatableCombobox from "@/features/shared/components/CreatableCombobox";
 import EpurchaseItemCombobox from "@/features/shared/components/EpurchaseItemCombobox";
 import MultiSelectCombobox from "@/features/shared/components/MultiSelectCombobox";
 import { useToast } from "@/features/shared/components/Toast";
+import { authFetch } from "@/features/shared/api/client";
 import PmSimpleFormModal, { type SimpleEntity } from "@/features/product-management/components/PmSimpleFormModal";
 import PmVariationTemplateModal from "@/features/product-management/components/PmVariationTemplateModal";
 import { PmStatusBadge } from "@/features/product-management/components/PmShared";
@@ -363,7 +364,7 @@ export default function PmProductFormPage() {
       reader.onerror = () => reject(new Error("Failed to read image file."));
       reader.readAsDataURL(file);
     });
-    const response = await fetch("/api/products/upload-image", {
+    const response = await authFetch("/api/products/upload-image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image: base64Data, filename: file.name }),

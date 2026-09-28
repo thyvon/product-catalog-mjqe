@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { FormLabel } from "@/features/shared/components/FormLabel";
+import { authFetch } from "@/features/shared/api/client";
 
 interface ExcelImportModalProps {
   isOpen: boolean;
@@ -220,7 +221,7 @@ export default function ExcelImportModal({
     setLoading(true);
 
     try {
-      const response = await fetch("/api/products/import", {
+      const response = await authFetch("/api/products/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(parsedRows),

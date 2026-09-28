@@ -24,6 +24,26 @@ function handle401() {
   if (onSessionExpired) onSessionExpired();
 }
 
+export function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("auth_jwt");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// fetch() wrapper that injects the local JWT into protected API calls.
+// If a request made WITH a token still comes back 401, the session has
+// expired and the global session-expired handler is triggered. Requests
+// made without a token (anonymous) are left to the caller.
+export async function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const hadToken = Boolean(localStorage.getItem("auth_jwt"));
+  const { headers: initHeaders, ...rest } = init;
+  const res = await fetch(input, {
+    ...rest,
+    headers: { ...authHeaders(), ...(initHeaders as Record<string, string> | undefined) },
+  });
+  if (res.status === 401 && hadToken) handle401();
+  return res;
+}
+
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, params, headers: extraHeaders } = options;
 

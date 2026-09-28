@@ -12,6 +12,7 @@ import SelectField from "@/features/shared/components/SelectField";
 import { FormLabel } from "@/features/shared/components/FormLabel";
 import { formatAmount } from "@/features/shared/utils/format";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
+import { authFetch } from "@/features/shared/api/client";
 
 interface DimensionRow {
   key: string;
@@ -104,7 +105,7 @@ export default function SpendAnalyticsCard() {
   const { data: filterValues } = useQuery({
     queryKey: ["stock-filter-values"],
     queryFn: async (): Promise<FilterValues> => {
-      const res = await fetch("/api/stock-issue-items/filters/values");
+      const res = await authFetch("/api/stock-issue-items/filters/values");
       if (!res.ok) return { warehouses: [], departments: [], divisions: [], campuses: [], transactionTypes: [] };
       return res.json();
     },
@@ -129,7 +130,7 @@ export default function SpendAnalyticsCard() {
     queryKey: ["spend-analytics", analyticsParams],
     queryFn: async (): Promise<AnalyticsData> => {
       if (!analyticsParams) return { summary: { totalItems: 0, totalQuantity: 0, totalAmount: 0 }, previousSummary: { totalItems: 0, totalQuantity: 0, totalAmount: 0, startDate: "", endDate: "" }, trend: [], yoyCompare: [], byCampus: [], byDepartment: [], byDivision: [], byWarehouse: [], byRequester: [], byType: [], topByCount: [], topByAmount: [] };
-      const res = await fetch(`/api/stock-issue-items/analytics?${analyticsParams}`);
+      const res = await authFetch(`/api/stock-issue-items/analytics?${analyticsParams}`);
       if (!res.ok) throw new Error("Failed to load analytics.");
       const json = await res.json();
       return {

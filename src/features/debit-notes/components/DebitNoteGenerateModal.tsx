@@ -8,6 +8,7 @@ import ConfirmModal from "@/features/shared/components/ConfirmModal";
 import { useToast } from "@/features/shared/components/Toast";
 import { useAuth } from "@/features/auth/AuthContext";
 import { FormLabel } from "@/features/shared/components/FormLabel";
+import { authFetch } from "@/features/shared/api/client";
 
 interface DebitNoteGenerateModalProps {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export default function DebitNoteGenerateModal({ isOpen, onClose, onGenerated }:
   const runGenerate = async (params: GenerateParams) => {
     setGenerating(true);
     try {
-      const res = await fetch("/api/debit-notes/generate", {
+      const res = await authFetch("/api/debit-notes/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),

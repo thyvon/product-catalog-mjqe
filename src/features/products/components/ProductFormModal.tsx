@@ -13,6 +13,7 @@ import { FormLabel } from "@/features/shared/components/FormLabel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { authFetch } from "@/features/shared/api/client";
 
 interface ProductFormModalProps {
   isOpen: boolean;
@@ -171,7 +172,7 @@ export default function ProductFormModal({
     setAiError("");
 
     try {
-      const response = await fetch("/api/ai/copywrite", {
+      const response = await authFetch("/api/ai/copywrite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -223,7 +224,7 @@ export default function ProductFormModal({
           reader.readAsDataURL(pendingImageFile);
         });
 
-        const response = await fetch("/api/products/upload-image", {
+        const response = await authFetch("/api/products/upload-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

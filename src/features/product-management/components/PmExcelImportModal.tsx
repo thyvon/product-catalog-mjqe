@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { FormLabel } from "@/features/shared/components/FormLabel";
 import SelectField from "@/features/shared/components/SelectField";
 import { pmImportFile } from "@/features/product-management/api";
+import { authFetch } from "@/features/shared/api/client";
 
 interface PmExcelImportModalProps {
   isOpen: boolean;
@@ -66,7 +67,7 @@ export default function PmExcelImportModal({
       const endpoint = templateKind === "variable"
         ? "/api/pm/products/import/template/variable"
         : "/api/pm/products/import/template";
-      const res = await fetch(endpoint);
+      const res = await authFetch(endpoint);
       if (!res.ok) throw new Error("Failed to download template.");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

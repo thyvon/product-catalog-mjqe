@@ -12,6 +12,7 @@ import { SectionTitle } from "@/features/shared/components/SectionTitle";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Supplier, SupplierInput } from "@/features/shared/types";
+import { authFetch } from "@/features/shared/api/client";
 
 interface SupplierFormModalProps {
   isOpen: boolean;
@@ -106,7 +107,7 @@ export default function SupplierFormModal({
 
   const fetchOptionValues = async () => {
     try {
-      const res = await fetch("/api/suppliers/filters/values");
+      const res = await authFetch("/api/suppliers/filters/values");
       if (res.ok) {
         setOptionValues(await res.json());
       }

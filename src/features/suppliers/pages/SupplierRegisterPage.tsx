@@ -24,30 +24,31 @@ import { Separator } from "@/components/ui/separator";
 import BaseModal from "@/features/shared/components/BaseModal";
 import { DetailRow } from "@/features/shared/components/DetailRow";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { authFetch } from "@/features/shared/api/client";
 
 const suppliersApi = {
   list: async (): Promise<Supplier[]> => {
-    const res = await fetch("/api/suppliers");
+    const res = await authFetch("/api/suppliers");
     if (!res.ok) throw new Error("Failed to fetch suppliers.");
     return res.json();
   },
   getFilterValues: async () => {
-    const res = await fetch("/api/suppliers/filters/values");
+    const res = await authFetch("/api/suppliers/filters/values");
     if (!res.ok) return { statuses: [], applicationTypes: [] };
     return res.json();
   },
   create: async (data: SupplierInput) => {
-    const res = await fetch("/api/suppliers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    const res = await authFetch("/api/suppliers", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
     if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Failed to create supplier."); }
     return res.json();
   },
   update: async (id: string, data: SupplierInput) => {
-    const res = await fetch(`/api/suppliers/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    const res = await authFetch(`/api/suppliers/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
     if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Failed to update supplier."); }
     return res.json();
   },
   remove: async (id: string) => {
-    const res = await fetch(`/api/suppliers/${id}`, { method: "DELETE" });
+    const res = await authFetch(`/api/suppliers/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error("Failed to delete supplier.");
     return res.json();
   },

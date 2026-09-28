@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/pagination";
 import PageContent from "@/features/shared/components/PageContent";
 import ListPageLayout from "@/features/shared/components/ListPageLayout";
+import { authFetch } from "@/features/shared/api/client";
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96];
 
@@ -70,7 +71,7 @@ export default function LandingPage() {
   const { data, isLoading: loading, error: queryError, refetch } = useQuery({
     queryKey: ["catalog-landing", queryParams],
     queryFn: async (): Promise<CatalogResponse> => {
-      const res = await fetch(`/api/products?${queryParams}`);
+      const res = await authFetch(`/api/products?${queryParams}`);
       if (!res.ok) throw new Error("Could not load products catalog.");
       return res.json();
     },
@@ -87,7 +88,7 @@ export default function LandingPage() {
       const exportParams = new URLSearchParams({ page: "1", pageSize: "0", status: statusFilter, sort: sortBy });
       if (searchQuery) exportParams.set("search", searchQuery);
       if (selectedCategory) exportParams.set("category", selectedCategory);
-      const res = await fetch(`/api/products?${exportParams}`);
+      const res = await authFetch(`/api/products?${exportParams}`);
       if (!res.ok) return;
       const data = await res.json();
       const all: Product[] = data.data;

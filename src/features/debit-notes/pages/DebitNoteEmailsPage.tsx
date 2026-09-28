@@ -99,32 +99,28 @@ export default function DebitNoteEmailsPage() {
 
   const openEdit = (config: DebitNoteEmailConfig) => {
     setEditing(config);
-    const sendTo = (config.contacts ?? []).filter((c) => c.type === "sendTo").map((c) => c.email);
-    const ccTo = (config.contacts ?? []).filter((c) => c.type === "cc").map((c) => c.email);
     setFormData({
       warehouse: config.warehouse,
       department: config.department,
       campus: config.campus,
       division: config.division || "",
       receiverName: config.receiverName,
-      sendToEmail: sendTo,
-      ccToEmail: ccTo,
+      sendToEmail: config.sendToEmail ?? [],
+      ccToEmail: config.ccToEmail ?? [],
     });
     setShowForm(true);
   };
 
   const openDuplicate = (config: DebitNoteEmailConfig) => {
     setEditing(null);
-    const sendTo = (config.contacts ?? []).filter((c) => c.type === "sendTo").map((c) => c.email);
-    const ccTo = (config.contacts ?? []).filter((c) => c.type === "cc").map((c) => c.email);
     setFormData({
       warehouse: config.warehouse,
       department: config.department,
       campus: config.campus,
       division: config.division || "",
       receiverName: config.receiverName,
-      sendToEmail: sendTo,
-      ccToEmail: ccTo,
+      sendToEmail: config.sendToEmail ?? [],
+      ccToEmail: config.ccToEmail ?? [],
     });
     setShowForm(true);
   };
@@ -176,13 +172,15 @@ export default function DebitNoteEmailsPage() {
   const handleExport = useCallback(async () => {
     try {
       const XLSX = await import("xlsx");
-      const columns = ["Warehouse", "Division", "Department", "Campus", "Receiver Name"];
+      const columns = ["Warehouse", "Division", "Department", "Campus", "Receiver Name", "Send To Emails", "CC Emails"];
       const rows = filtered.map((c) => [
         c.warehouse,
+        c.division,
         c.department,
         c.campus,
-        c.division,
         c.receiverName,
+        (c.sendToEmail ?? []).join("; "),
+        (c.ccToEmail ?? []).join("; "),
       ]);
       const ws = XLSX.utils.aoa_to_sheet([columns, ...rows]);
       const wb = XLSX.utils.book_new();
@@ -399,6 +397,32 @@ export default function DebitNoteEmailsPage() {
             { accessorKey: "department", header: "Department", meta: { width: "110px", className: "text-muted-foreground" } },
             { accessorKey: "campus", header: "Campus", meta: { width: "80px", className: "text-muted-foreground" } },
             { accessorKey: "receiverName", header: "Receiver", meta: { width: "120px", className: "font-medium text-foreground" } },
+            {
+              id: "sendToEmail",
+              header: "Send To",
+              meta: { width: "180px", className: "text-muted-foreground" },
+              cell: ({ row }) => {
+                const list = row.original.sendToEmail ?? [];
+                return (
+                  <span className="block truncate max-w-[180px] font-mono text-xs" title={list.join(", ")}>
+                    {list.length > 0 ? list.join(", ") : "-"}
+                  </span>
+                );
+              },
+            },
+            {
+              id: "ccToEmail",
+              header: "CC",
+              meta: { width: "180px", className: "text-muted-foreground" },
+              cell: ({ row }) => {
+                const list = row.original.ccToEmail ?? [];
+                return (
+                  <span className="block truncate max-w-[180px] font-mono text-xs" title={list.join(", ")}>
+                    {list.length > 0 ? list.join(", ") : "-"}
+                  </span>
+                );
+              },
+            },
             {
               id: "actions",
               header: "Actions",

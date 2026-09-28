@@ -36,6 +36,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import PageContent from "@/features/shared/components/PageContent";
 import ListPageLayout from "@/features/shared/components/ListPageLayout";
+import { authFetch } from "@/features/shared/api/client";
 
 const PAGE_SIZE_OPTIONS = [12, 24, 48, 96];
 
@@ -48,7 +49,7 @@ interface CatalogResponse {
 
 const catalogApi = {
   fetch: async (params: string): Promise<CatalogResponse> => {
-    const res = await fetch(`/api/products?${params}`);
+    const res = await authFetch(`/api/products?${params}`);
     if (!res.ok) throw new Error("Could not load products catalog from database server APIs.");
     return res.json();
   },
@@ -108,7 +109,7 @@ export default function CatalogPage() {
       const isEdit = "id" in productData;
       const url = isEdit ? `/api/products/${(productData as Product).id}` : "/api/products";
       const method = isEdit ? "PUT" : "POST";
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(productData),
@@ -133,7 +134,7 @@ export default function CatalogPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (productId: string) => {
-      const res = await fetch(`/api/products/${productId}`, { method: "DELETE" });
+      const res = await authFetch(`/api/products/${productId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Unable to delete product.");
       return res.json();
     },
@@ -178,7 +179,7 @@ export default function CatalogPage() {
       const exportParams = new URLSearchParams({ page: "1", pageSize: "0", status: statusFilter, sort: sortBy });
       if (searchQuery) exportParams.set("search", searchQuery);
       if (selectedCategory) exportParams.set("category", selectedCategory);
-      const res = await fetch(`/api/products?${exportParams}`);
+      const res = await authFetch(`/api/products?${exportParams}`);
       if (!res.ok) return;
       const data = await res.json();
       const all: Product[] = data.data;
