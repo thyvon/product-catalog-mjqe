@@ -785,6 +785,36 @@ router.post("/api/debit-notes/send-emails", async (req, res) => {
   }
 });
 
+router.post("/api/debit-notes/resend-emails", async (req, res) => {
+  try {
+    assertDb();
+    const p = getPool()!;
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(422).json({ error: "No debit notes selected to resend." });
+    }
+    const placeholders = ids.map(() => "?").join(",");
+    const [rows] = await p.query<RowDataPacket[]>(
+      `SELECT id FROM debit_notes WHERE id IN (${placeholders})`,
+      ids
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Debit note not found." });
+
+    const progressKey = `dn_progress_${req.body.user || "anonymous"}`;
+    const existing = emailProgressMap.get(progressKey);
+    if (existing && !existing.finished) return res.status(409).json({ error: "Email sending is already in progress." });
+
+    emailProgressMap.set(progressKey, { status: "Starting...", finished: false });
+    runSendDebitNotesEmail(ids, true, progressKey, req.body.user).catch((err) => {
+      console.error("Email resend error:", err);
+      emailProgressMap.set(progressKey, { status: `Error: ${err.message}`, finished: true });
+    });
+    res.json({ success: true, message: "Resending email." });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to resend email." });
+  }
+});
+
 router.post("/api/debit-notes/:id/resend", async (req, res) => {
   try {
     assertDb();

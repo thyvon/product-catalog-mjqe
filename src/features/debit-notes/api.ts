@@ -49,6 +49,16 @@ export interface DnContact {
   name: string;
 }
 
+export interface SendEmailsBody {
+  ids?: string[];
+  user?: string;
+  warehouse?: string;
+  department?: string;
+  campus?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 export const debitNotesApi = {
   list: (params: Record<string, string>) =>
     api.get<DebitNoteListResponse>("/api/debit-notes", params),
@@ -56,10 +66,10 @@ export const debitNotesApi = {
     api.get<DebitNoteFilterValues>("/api/debit-notes/filters/values"),
   remove: (id: string) =>
     api.delete<{ success: boolean }>(`/api/debit-notes/${id}`),
-  sendEmails: (ids: string[]) =>
-    api.post<{ taskId: string }>("/api/debit-notes/send-emails", { ids }),
-  resendEmails: (ids: string[]) =>
-    api.post<{ taskId: string }>("/api/debit-notes/resend-emails", { ids }),
+  sendEmails: (body: SendEmailsBody) =>
+    api.post<{ success: boolean; message?: string }>("/api/debit-notes/send-emails", body),
+  resendEmails: (ids: string[], user?: string) =>
+    api.post<{ success: boolean; message?: string }>("/api/debit-notes/resend-emails", { ids, user }),
   exportExcel: (ids: string[]) =>
     api.post<{ url: string }>("/api/debit-notes/export", { ids }),
 

@@ -127,13 +127,14 @@ export default function DebitNoteListPage() {
         setSendingEmails(true);
         setProgress({ status: "Starting...", finished: false });
         try {
-          const filterParams: Record<string, string> = {};
-          if (warehouse) filterParams.warehouse = warehouse;
-          if (department) filterParams.department = department;
-          if (campus) filterParams.campus = campus;
-          if (startDate) filterParams.startDate = startDate;
-          if (endDate) filterParams.endDate = endDate;
-          await debitNotesApi.sendEmails([user?.username || "anonymous"]);
+          await debitNotesApi.sendEmails({
+            user: user?.username,
+            warehouse,
+            department,
+            campus,
+            startDate,
+            endDate,
+          });
         } catch {
           setSendingEmails(false);
           toast.error("Failed to send emails.");
@@ -157,7 +158,7 @@ export default function DebitNoteListPage() {
         setSendingEmails(true);
         setProgress({ status: "Starting...", finished: false });
         try {
-          await debitNotesApi.resendEmails([note.id]);
+          await debitNotesApi.resendEmails([note.id], user?.username);
         } catch {
           setSendingEmails(false);
           toast.error("Failed to resend.");
@@ -165,7 +166,7 @@ export default function DebitNoteListPage() {
       },
       isPending ? "Send" : "Resend",
     );
-  }, [toast, confirm, closeConfirm]);
+  }, [user, toast, confirm, closeConfirm]);
 
   const handleExport = useCallback(async (id: string) => {
     try {
