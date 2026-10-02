@@ -49,6 +49,7 @@ export default function DebitNoteListPage() {
   const [pageSize, setPageSize] = useState(10);
 
   const [showGenerate, setShowGenerate] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // Email progress
   const [progress, setProgress] = useState<EmailProgress | null>(null);
@@ -170,6 +171,7 @@ export default function DebitNoteListPage() {
 
   const handleExport = useCallback(async (id: string) => {
     try {
+      setExporting(true);
       const res = await authFetch(`/api/debit-notes/${id}/export`);
       if (res.ok) {
         const blob = await res.blob();
@@ -179,14 +181,21 @@ export default function DebitNoteListPage() {
         a.download = `debit-note-${id.slice(0, 8)}.xlsx`;
         a.click();
         window.URL.revokeObjectURL(url);
+      } else {
+        let msg = `Export failed (HTTP ${res.status}).`;
+        try { const d = await res.json(); if (d.error) msg = d.error; } catch {}
+        toast.error(msg);
       }
     } catch {
       toast.error("Failed to export.");
+    } finally {
+      setExporting(false);
     }
   }, [toast]);
 
   const handleBulkExport = useCallback(async () => {
     try {
+      setExporting(true);
       const filterParams: Record<string, string> = {};
       if (warehouse) filterParams.warehouse = warehouse;
       if (department) filterParams.department = department;
@@ -207,9 +216,15 @@ export default function DebitNoteListPage() {
         a.download = `debit-notes-export.zip`;
         a.click();
         window.URL.revokeObjectURL(url);
+      } else {
+        let msg = `Export failed (HTTP ${res.status}).`;
+        try { const d = await res.json(); if (d.error) msg = d.error; } catch {}
+        toast.error(msg);
       }
     } catch {
       toast.error("Failed to bulk export.");
+    } finally {
+      setExporting(false);
     }
   }, [warehouse, department, campus, statusFilter, startDate, endDate, toast]);
 
@@ -397,10 +412,11 @@ export default function DebitNoteListPage() {
           <Button
             variant="outline"
             onClick={handleBulkExport}
+            disabled={exporting}
             title="Bulk Export to ZIP"
           >
-            <Download />
-            <span>Export</span>
+            {exporting ? <Loader2 className="animate-spin" /> : <Download />}
+            <span>{exporting ? "Exporting..." : "Export"}</span>
           </Button>
           <Button
             onClick={handleSendEmails}
